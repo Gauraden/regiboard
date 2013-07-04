@@ -1,0 +1,26 @@
+--- ./build/++DFB-1.4.2.cortex_a8/++dfb/idirectfbsurface.cpp.orig	2010-11-16 15:56:16.000000000 +0300
++++ ./build/++DFB-1.4.2.cortex_a8/++dfb/idirectfbsurface.cpp	2013-07-03 10:35:17.786592684 +0400
+@@ -464,3 +464,10 @@
+      DFBCHECK( iface->Write (iface, rect, ptr, pitch) );
+ }
+ 
++void IDirectFBSurface::SetRenderOptions(DFBSurfaceRenderOptions options) {
++    DFBCHECK( iface->SetRenderOptions(iface, options) );
++}
++
++void IDirectFBSurface::SetMatrix(const s32 *matrix3x3) {
++    DFBCHECK( iface->SetMatrix(iface, matrix3x3) );
++}
+\ В конце файла нет новой строки
+--- ./build/++DFB-1.4.2.cortex_a8/include/idirectfbsurface.h.orig	2010-11-16 15:56:16.000000000 +0300
++++ ./build/++DFB-1.4.2.cortex_a8/include/idirectfbsurface.h	2013-07-03 10:27:45.422279673 +0400
+@@ -206,6 +206,9 @@
+      inline IDirectFBSurface& operator = (IDirectFBSurface_C* other){
+           return IPPAny<IDirectFBSurface, IDirectFBSurface_C>::operator =(other);
+      }
++
++     void                   SetRenderOptions    (DFBSurfaceRenderOptions   options);
++     void                   SetMatrix           (const s32                *matrix3x3);
+ };
+ 
+ #endif

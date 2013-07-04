@@ -1,0 +1,12 @@
+# Number of tries while downloading any tarball
+WGET_TRIES=3
+
+# Number of seconds for waiting between tries
+WGET_WAIT=10 #seconds
+
+# External directory for storing downloaded files
+# EXT_DOWNLOAD_DIR='/home/ftp/distfiles'
+EXT_DOWNLOAD_DIR='/home/denis/CrossTools/dl'
+
+# Flag for enabling (y) google translating of all messages
+TRANSLATING_MESSAGES=n

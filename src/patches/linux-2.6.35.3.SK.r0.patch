@@ -1,0 +1,704 @@
+--- ./build/linux-2.6.35.3.SK/Makefile.orig	2010-08-20 22:55:55.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/Makefile	2013-06-17 13:05:31.201390180 +0400
+@@ -333,10 +333,10 @@
+ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
+ 		  -Wbitwise -Wno-return-void $(CF)
+ MODFLAGS	= -DMODULE
+-CFLAGS_MODULE   = $(MODFLAGS)
++CFLAGS_MODULE   = $(MODFLAGS) #-mno-unaligned-access
+ AFLAGS_MODULE   = $(MODFLAGS)
+ LDFLAGS_MODULE  = -T $(srctree)/scripts/module-common.lds
+-CFLAGS_KERNEL	=
++CFLAGS_KERNEL	= #-mno-unaligned-access
+ AFLAGS_KERNEL	=
+ CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+ 
+@@ -353,7 +353,8 @@
+ 		   -fno-strict-aliasing -fno-common \
+ 		   -Werror-implicit-function-declaration \
+ 		   -Wno-format-security \
+-		   -fno-delete-null-pointer-checks
++		   -fno-delete-null-pointer-checks
++		   #-mno-unaligned-access
+ KBUILD_AFLAGS   := -D__ASSEMBLY__
+ 
+ # Read KERNELRELEASE from include/config/kernel.release (if it exists)
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/Makefile.orig	2013-06-04 14:24:31.296162313 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/Makefile	2013-06-04 14:24:05.066492065 +0400
+@@ -12,7 +12,7 @@
+ obj-$(CONFIG_ARCH_MX50) += clock_mx50.o dmaengine.o dma-apbh.o mx50_suspend.o mx50_freq.o mx50_ddr_freq.o mx50_wfi.o
+ 
+ obj-$(CONFIG_MACH_MX51_3DS) += mx51_3stack.o mx51_3stack_gpio.o mx51_3stack_pmic_mc13892.o
+-obj-$(CONFIG_MACH_MX51_BABBAGE) += mx51_babbage.o mx51_babbage_pmic_mc13892.o
++obj-$(CONFIG_MACH_MX51_BABBAGE) += mx51_babbage.o mx51_babbage_pmic_mc13892.o mx51_regigraf.o
+ obj-$(CONFIG_MACH_MX53_EVK) += mx53_evk.o mx53_evk_pmic_mc13892.o
+ obj-$(CONFIG_MACH_MX53_ARD) += mx53_ard.o mx53_ard_pmic_ltc3589.o
+ obj-$(CONFIG_MACH_MX53_SMD) += mx53_smd.o pm_i2c.o pm_da9053.o mx53_smd_pmic_da9053.o
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/clock.c.orig	2012-05-02 15:12:59.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/clock.c	2013-06-20 10:09:06.446825157 +0400
+@@ -4774,7 +4774,7 @@
+ 
+ 	return 0;
+ }
+-
++#ifdef CONFIG_ARCH_MX53
+ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc, unsigned long ckih1, unsigned long ckih2)
+ {
+ 	__iomem void *base;
+@@ -5044,7 +5044,7 @@
+ 
+ 	return 0;
+ }
+-
++#endif
+ /*!
+  * Setup cpu clock based on working point.
+  * @param	wp	cpu freq working point
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx51_babbage.c.orig	2011-11-10 01:55:29.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx51_babbage.c	2013-06-20 10:14:30.742748204 +0400
+@@ -100,6 +100,9 @@
+ extern struct cpu_wp *(*get_cpu_wp)(int *wp);
+ extern void (*set_num_cpu_wp)(int num);
+ extern struct dvfs_wp *(*get_dvfs_core_wp)(int *wp);
++/* regigraf external functions */
++extern void mx51_regigraf_init_clocks(void);
++extern void mx51_regigraf_init(void);
+ 
+ static int num_cpu_wp;
+ 
+@@ -765,57 +768,62 @@
+ 
+ static struct mtd_partition mxc_spi_nor_partitions[] = {
+ 	{
+-	 .name = "bootloader",
++	 .name   = "bootloader",
+ 	 .offset = 0,
+-	 .size = 0x00040000,},
++	 .size   = 0x00040000,
++	},
+ 	{
+-	 .name = "kernel",
++	 .name   = "kernel",
+ 	 .offset = MTDPART_OFS_APPEND,
+-	 .size = MTDPART_SIZ_FULL,},
+-
++	 .size   = MTDPART_SIZ_FULL,
++	},
+ };
+ 
+ static struct mtd_partition mxc_dataflash_partitions[] = {
+ 	{
+-	 .name = "bootloader",
++	 .name   = "bootloader",
+ 	 .offset = 0,
+-	 .size = 0x000100000,},
++	 .size   = 0x000100000
++	},
+ 	{
+-	 .name = "kernel",
++	 .name   = "config",
+ 	 .offset = MTDPART_OFS_APPEND,
+-	 .size = MTDPART_SIZ_FULL,},
++	 .size   = MTDPART_SIZ_FULL,
++	},
+ };
+ 
+ static struct flash_platform_data mxc_spi_flash_data[] = {
+ 	{
+-	 .name = "mxc_spi_nor",
+-	 .parts = mxc_spi_nor_partitions,
++	 .name     = "mxc_spi_nor",
++	 .parts    = mxc_spi_nor_partitions,
+ 	 .nr_parts = ARRAY_SIZE(mxc_spi_nor_partitions),
+-	 .type = "sst25vf016b",},
++	 .type     = "sst25vf016b",},
+ 	{
+-	 .name = "mxc_dataflash",
+-	 .parts = mxc_dataflash_partitions,
++	 .name     = "mxc_dataflash",
++	 .parts    = mxc_dataflash_partitions,
+ 	 .nr_parts = ARRAY_SIZE(mxc_dataflash_partitions),
+-	 .type = "at45db321d",}
++	 .type     = "at45db321d",
++	}
+ };
+ 
+ static struct spi_board_info mxc_spi_nor_device[] __initdata = {
+ 	{
+-	 .modalias = "mxc_spi_nor",
+-	 .max_speed_hz = 25000000,	/* max spi clock (SCK) speed in HZ */
+-	 .bus_num = 1,
+-	 .chip_select = 1,
++	 .modalias      = "mxc_spi_nor",
++	 .max_speed_hz  = 25000000,	/* max spi clock (SCK) speed in HZ */
++	 .bus_num       = 1,
++	 .chip_select   = 1,
+ 	 .platform_data = &mxc_spi_flash_data[0],
+ 	},
+ };
+ 
+ static struct spi_board_info mxc_dataflash_device[] __initdata = {
+ 	{
+-	 .modalias = "mxc_dataflash",
+-	 .max_speed_hz = 25000000,	/* max spi clock (SCK) speed in HZ */
+-	 .bus_num = 1,
+-	 .chip_select = 1,
+-	 .platform_data = &mxc_spi_flash_data[1],},
++	 .modalias      = "mxc_dataflash",
++	 .max_speed_hz  = 25000000,	/* max spi clock (SCK) speed in HZ */
++	 .bus_num       = 1,
++	 .chip_select   = 1,
++	 .platform_data = &mxc_spi_flash_data[1],
++	},
+ };
+ 
+ static int sdhc_write_protect(struct device *dev)
+@@ -1108,11 +1116,12 @@
+ 	gpio_set_value(BABBAGE_USBH1_HUB_RST, 1);
+ 
+ 	/* reset FEC PHY */
++	/*
+ 	gpio_request(BABBAGE_FEC_PHY_RESET, "fec-phy-reset");
+ 	gpio_direction_output(BABBAGE_FEC_PHY_RESET, 0);
+ 	msleep(10);
+ 	gpio_set_value(BABBAGE_FEC_PHY_RESET, 1);
+-
++	*/
+ 	/* reset FM */
+ 	gpio_request(BABBAGE_FM_RESET, "fm-reset");
+ 	gpio_direction_output(BABBAGE_FM_RESET, 0);
+@@ -1241,7 +1250,7 @@
+ 	mxc_register_device(&mxc_ssi2_device, NULL);
+ 	mxc_register_device(&mxc_ssi3_device, NULL);
+ 	mxc_register_device(&mxc_alsa_spdif_device, &mxc_spdif_data);
+-	mxc_register_device(&mxc_fec_device, NULL);
++//	mxc_register_device(&mxc_fec_device, NULL); // look at mx51_regigraf.c
+ 	mxc_register_device(&mxc_v4l2_device, NULL);
+ 	mxc_register_device(&mxc_v4l2out_device, NULL);
+ 	mxc_register_device(&mxc_powerkey_device, &pwrkey_data);
+@@ -1282,6 +1291,7 @@
+ 
+ 	mx5_usb_dr_init();
+ 	mx5_usbh1_init();
++	mx51_regigraf_init();
+ }
+ 
+ static void __init mx51_babbage_timer_init(void)
+@@ -1296,6 +1306,7 @@
+ 	}
+ 
+ 	mx51_clocks_init(32768, 24000000, 22579200, 24576000);
++	mx51_regigraf_init_clocks();
+ 
+ 	uart_clk = clk_get_sys("mxcintuart.0", NULL);
+ 	early_console_setup(UART1_BASE_ADDR, uart_clk);
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx51_regigraf.c.orig	2013-06-19 11:01:40.866782067 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx51_regigraf.c	2013-06-20 10:14:46.862545550 +0400
+@@ -0,0 +1,356 @@
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/partitions.h>
++#include <linux/clk.h>
++#include <linux/phy.h>
++#include <linux/fec.h>
++#include <asm/io.h>
++#include <asm/mach/flash.h>
++#include <mach/common.h>
++#include <mach/clock.h>
++#include "iomux.h"
++#include "mx51_pins.h"
++#include "devices.h"
++
++#define CLEAR_BITS(out, mask, offs) (out & ~(mask << offs))
++#define CHANGE_REG(getter, setter, mask, offs, value) \
++	setter(CLEAR_BITS(getter, mask, offs) | ((value) << offs))
++
++#define MXC_NFC_CFG_2          IO_ADDRESS(NFC_BASE_ADDR) + 0x24
++#define MXC_NFC_CFG_2_GET      __raw_readl(MXC_NFC_CFG_2)
++#define MXC_NFC_CFG_2_SET(val) __raw_writel(val, MXC_NFC_CFG_2)
++#define MXC_NFC_CFG_2_UP(mask, offs, val) \
++	CHANGE_REG(MXC_NFC_CFG_2_GET, MXC_NFC_CFG_2_SET, mask, offs, val)
++
++#define MXC_NFC_CFG_3          IO_ADDRESS(NFC_BASE_ADDR) + 0x28
++#define MXC_NFC_CFG_3_GET      __raw_readl(MXC_NFC_CFG_3)
++#define MXC_NFC_CFG_3_SET(val) __raw_writel(val, MXC_NFC_CFG_3)
++#define MXC_NFC_CFG_3_UP(mask, offs, val) \
++	CHANGE_REG(MXC_NFC_CFG_3_GET, MXC_NFC_CFG_3_SET, mask, offs, val)
++
++#define MXC_NFC_SPAS(val)           MXC_NFC_CFG_2_UP(0xFF, 16, val / 2)
++#define MXC_NFC_ADR_PHASES1(val)    MXC_NFC_CFG_2_UP(0x3,  12, val - 3)
++#define MXC_NFC_PPB(val)            MXC_NFC_CFG_2_UP(0x3,  7,  val)
++#define MXC_NFC_ECC_MODE(val)       MXC_NFC_CFG_2_UP(0x1,  6,  (val / 4) - 1)
++#define MXC_NFC_ADR_PHASES0(val)    MXC_NFC_CFG_2_UP(0x1,  5,  val - 1)
++#define MXC_NFC_CMD_PHASES(val)     MXC_NFC_CFG_2_UP(0x1,  4,  val - 1)
++#define MXC_NFC_ECC_EN(val)         MXC_NFC_CFG_2_UP(0x1,  3,  val)
++#define MXC_NFC_SYM(val)            MXC_NFC_CFG_2_UP(0x1,  2,  val)
++#define MXC_NFC_PS(val)             MXC_NFC_CFG_2_UP(0x3,  0,  val)
++
++#define MXC_NFC_RBB_MODE(val)       MXC_NFC_CFG_3_UP(0x1,  15, val)
++#define MXC_NFC_NUM_OF_DEVICES(val) MXC_NFC_CFG_3_UP(0x7,  12, val - 1)
++#define MXC_NFC_SBB(val)            MXC_NFC_CFG_3_UP(0x7,  8,  val)
++#define MXC_NFC_SB2R(val)           MXC_NFC_CFG_3_UP(0x7,  4,  val)
++#define MXC_NFC_FW(val)             MXC_NFC_CFG_3_UP(0x1,  3,  (16 / val) - 1)
++#define MXC_NFC_TOO(val)            MXC_NFC_CFG_3_UP(0x1,  2,  val - 1)
++#define MXC_NFC_ADD_OP(val)         MXC_NFC_CFG_3_UP(0x3,  0,  val)
++
++static int mxc_mt29f_nand_init(void);
++
++static struct mxc_iomux_pin_cfg __initdata mxc_iomux_pins[] = {
++  /* ---- FEC ---- */
++	{    /* RST_ENET_B -> RST */ 
++		MX51_PIN_EIM_A20, IOMUX_CONFIG_GPIO,
++		(PAD_CTL_PKE_ENABLE),
++	}, { /* ENET_IRQ_B -> INTRP */
++		MX51_PIN_EIM_A21, IOMUX_CONFIG_GPIO,
++	}, { /* FEC_MDIO */
++		MX51_PIN_EIM_EB2, IOMUX_CONFIG_ALT3,
++		(PAD_CTL_SRE_FAST | PAD_CTL_DRV_HIGH | PAD_CTL_ODE_OPENDRAIN_ENABLE |
++		PAD_CTL_22K_PU | PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE |
++		PAD_CTL_PUE_PULL),
++	}, { /* FEC_CRS */
++		MX51_PIN_EIM_CS5, IOMUX_CONFIG_ALT3,
++		(PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++		MUX_IN_FEC_FEC_CRS_SELECT_INPUT,
++	}, { /* FEC_COL */
++		MX51_PIN_NANDF_RB2, IOMUX_CONFIG_ALT1,
++		(PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++		MUX_IN_FEC_FEC_COL_SELECT_INPUT,
++	}, { /* FEC_MDC */
++		MX51_PIN_NANDF_CS3, IOMUX_CONFIG_ALT2,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
++	}, { /* FEC_RX_CLK */
++		MX51_PIN_NANDF_RB3, IOMUX_CONFIG_ALT1,
++		(PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++		MUX_IN_FEC_FEC_RX_CLK_SELECT_INPUT,
++	}, { /* FEC_RX_ER */
++		MX51_PIN_EIM_CS4, IOMUX_CONFIG_ALT3,
++		(PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++		MUX_IN_FEC_FEC_RX_ER_SELECT_INPUT,
++	}, { /* FEC_RX_DV */
++		MX51_PIN_NANDF_D11, IOMUX_CONFIG_ALT2,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
++		MUX_IN_FEC_FEC_RX_DV_SELECT_INPUT,
++	}, { /* FEC_RDATA[0] */
++		MX51_PIN_NANDF_D9, IOMUX_CONFIG_ALT2,
++		(PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++		MUX_IN_FEC_FEC_RDATA_0_SELECT_INPUT,
++	}, { /* FEC_RDATA[1] */
++		MX51_PIN_EIM_EB3, IOMUX_CONFIG_ALT3,
++		(PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++		MUX_IN_FEC_FEC_RDATA_1_SELECT_INPUT,
++	}, { /* FEC_RDATA[2] */
++		MX51_PIN_EIM_CS2, IOMUX_CONFIG_ALT3,
++		(PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++		MUX_IN_FEC_FEC_RDATA_2_SELECT_INPUT,
++	}, { /* FEC_RDATA[3] */
++		MX51_PIN_EIM_CS3, IOMUX_CONFIG_ALT3,
++		(PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++		MUX_IN_FEC_FEC_RDATA_3_SELECT_INPUT,
++	}, { /* FEC_TX_EN */
++		MX51_PIN_NANDF_CS7, IOMUX_CONFIG_ALT1,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
++	}, { /* FEC_TX_CLK */
++		MX51_PIN_NANDF_RDY_INT, IOMUX_CONFIG_ALT1,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_HYS_ENABLE | PAD_CTL_PKE_ENABLE),
++	}, { /* FEC_TX_ER */
++		MX51_PIN_NANDF_CS2, IOMUX_CONFIG_ALT2,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
++	}, { /* FEC_TDATA[0] */
++		MX51_PIN_NANDF_D8, IOMUX_CONFIG_ALT2,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
++	}, { /* FEC_TDATA[1] */
++		MX51_PIN_NANDF_CS4, IOMUX_CONFIG_ALT2,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
++	}, { /* FEC_TDATA[2] */
++		MX51_PIN_NANDF_CS5, IOMUX_CONFIG_ALT2,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
++	}, { /* FEC_TDATA[3] */
++		MX51_PIN_NANDF_CS6, IOMUX_CONFIG_ALT2,
++		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
++	}
++	/* ---- EMI NAND ---- */
++};
++
++static struct mtd_partition nand_flash_partitions[] = {
++	{
++		.name   = "kernel",
++		.offset = 0,
++		.size   = 10 * 1024 * 1024
++	}, {
++		.name   = "rootfs",
++		.offset = 10 * 1024 * 1024,
++		.size   = 256 * 1024 * 1024
++	}, {
++		.name   = "storage",
++		.offset = MTDPART_OFS_APPEND,
++		.size   = MTDPART_SIZ_FULL	
++	},
++};
++
++static struct flash_platform_data mxc_mt29f_nand_data = {
++	.parts    = nand_flash_partitions,
++	.nr_parts = ARRAY_SIZE(nand_flash_partitions),
++	.width    = 1,
++	.init     = mxc_mt29f_nand_init,
++};
++
++static struct fec_platform_data fec_data = {
++	.phy = PHY_INTERFACE_MODE_RMII,
++};
++
++/*!
++ * Board specific lcd backlight initialization
++ */
++static void mxc_init_lcd_backlight(void)
++{
++	/* Changing modes of BGA pins: Backlight_EN(GPIO4_15), PWM1_OUT(GPIO1_2) */
++	mxc_request_iomux(MX51_PIN_CSI2_PIXCLK, IOMUX_CONFIG_ALT3);
++	mxc_request_iomux(MX51_PIN_GPIO1_2, IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_DI1_D0_CS, IOMUX_CONFIG_ALT4); // look at: mxc_iomux_pins
++	/* Enabling backlight through GPIO pin */
++	gpio_direction_output(IOMUX_TO_GPIO(MX51_PIN_CSI2_PIXCLK), 1);
++	gpio_set_value(IOMUX_TO_GPIO(MX51_PIN_CSI2_PIXCLK), 1);
++	/* Set the value of backlight signal */
++	gpio_direction_output(IOMUX_TO_GPIO(MX51_PIN_GPIO1_2), 1);
++	gpio_set_value(IOMUX_TO_GPIO(MX51_PIN_GPIO1_2), 1);
++
++	gpio_direction_output(IOMUX_TO_GPIO(MX51_PIN_DI1_D0_CS), 1);
++  gpio_set_value(IOMUX_TO_GPIO(MX51_PIN_DI1_D0_CS), 1);
++}
++/*!
++ * Board specific DISP1 data bus fix
++ */
++static void mxc_init_disp1_24bit_data_bus(void)
++{
++	/* We need to change modes of DISP1 data pins. 
++	   They should be configured to transfer data. */
++	mxc_request_iomux(MX51_PIN_DISP1_DAT22, IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_DISP1_DAT23, IOMUX_CONFIG_ALT0);
++}
++
++static void mxc_setup_display(void)
++{
++	printk("Regigraf display setup...\n");
++	/* Enabling backlight */
++	mxc_init_lcd_backlight();
++	/* Setup DISP1 data bus for 24 bit transfer */
++	mxc_init_disp1_24bit_data_bus();
++}
++
++static void mxc_init_fec(void)
++{
++	struct clk *iim_clk;
++	struct clk *fec0_clk;
++	struct clk *cko1_clk;
++	struct clk *pll2_sw_clk;
++	int rate;
++	int ret;
++
++	printk("Regigraf FEC setup...\n");
++	cko1_clk = clk_get(NULL, "cko1");
++	if (cko1_clk == 0) {
++		printk("Error: can't find cko1_clk\n");
++		return;
++	}
++	pll2_sw_clk = clk_get(NULL, "pll2");
++	if (pll2_sw_clk == 0) {
++		printk("Error: can't find pll2_sw_clk\n");
++		return;
++	}
++	clk_set_parent(cko1_clk, pll2_sw_clk);
++	rate = clk_round_rate(cko1_clk, 50000000);
++	clk_set_rate(cko1_clk, rate);
++	clk_enable(cko1_clk);
++
++	/* reset FEC PHY */
++	gpio_direction_output(IOMUX_TO_GPIO(MX51_PIN_EIM_A20), 0); // PIN_EIM_A20 look at: mxc_iomux_pins
++	msleep(10);
++	gpio_set_value(IOMUX_TO_GPIO(MX51_PIN_EIM_A20), 1);
++
++	iim_clk  = clk_get(NULL, "iim_clk");
++	fec0_clk = clk_get(NULL, "fec.0");
++	cko1_clk = clk_get(NULL, "cko1");
++	
++	printk("\t IIM  clock: %lu Hz\n", clk_get_rate(iim_clk));
++	printk("\t FEC0 clock: %lu Hz\n", clk_get_rate(fec0_clk));
++	printk("\t CKO1 clock: %lu Hz\n", clk_get_rate(cko1_clk));
++}
++
++static void mxc_init_emi(void)
++{
++	/* Configure NANDF_D to NFC */
++	/* ALT0 is config pin like EMI pin */
++	mxc_request_iomux(MX51_PIN_NANDF_D0,   IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_D1,   IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_D2,   IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_D3,   IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_D4,   IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_D5,   IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_D6,   IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_D7,   IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_CLE,  IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_CS0,  IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_WE_B, IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_RE_B, IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_RB0,  IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_ALE,  IOMUX_CONFIG_ALT0);
++	mxc_request_iomux(MX51_PIN_NANDF_WP_B, IOMUX_CONFIG_ALT0);
++}
++
++static int mxc_mt29f_nand_init(void)
++{
++	printk("Regigraf NFC setup...\n");
++//	MXC_NFC_CFG_2_UP(0x1, 15, 1); // Mask interrupt is enabled (interrupt disabled)
++//	MXC_NFC_CFG_2_UP(0x1, 14, 0); // Mask AUTO_PROG_DONE is disabled (auto_prog_done enabled)
++	MXC_NFC_CFG_3_UP(0x1, 20, 1); // SDMA is not in being used for NFC operations
++	MXC_NFC_SPAS(218);     // 218 Spare size
++	MXC_NFC_PPB(1);        // 64 pages per block
++	MXC_NFC_ECC_MODE(8);   // set 8bit ECC
++	MXC_NFC_ECC_EN(0);     // disable ECC
++//	MXC_NFC_ECC_EN(1);     // enable ECC
++	MXC_NFC_SYM(0);        // set 2 clock per RE#WE# (asymmetric RE waveform)
++	MXC_NFC_PS(3);         // set 4KB page (11)
++//	MXC_NFC_RBB_MODE(0);       // NFC monitors ready-busy status by doing a status-read command.
++	MXC_NFC_RBB_MODE(1);       // NFC monitors ready-busy status by checking ipp_nfc_rbbX signals
++	MXC_NFC_NUM_OF_DEVICES(1); // Num Of Devices: 1 dev
++	MXC_NFC_SBB(6);            // set READY bit 6 in status
++	MXC_NFC_SB2R(0);           // set FAIL bit 0 in status
++	MXC_NFC_FW(8);             // Nand Flash IO width: 8bit
++	MXC_NFC_TOO(1);            // Only 1 device is connected to all CS lines
++	MXC_NFC_ADD_OP(1);         // use only address group NAND_ADD[0-8] will only use one NAND
++	MXC_NFC_ADR_PHASES1(5);    // 5 phases during read/program oeprations
++	MXC_NFC_ADR_PHASES0(2);    // 2 phases less then NUM_ADR_PHASES1 (during an AUTO_ERASE operation)
++	MXC_NFC_CMD_PHASES(2);     // 2 command phases for reading a page (read command & read-confirm command)
++	return 1;
++}
++
++static void mxc_setup_devices(void)
++{
++	/* NAND Micron MT29F */
++	mxc_register_device(&mxc_nandv2_mtd_device, &mxc_mt29f_nand_data);
++	/* FEC */
++	mxc_register_device(&mxc_fec_device, &fec_data);
++}
++
++void mx51_regigraf_init_iomux(void)
++{
++	int i;
++//	printk("Regigraf IOMUX setup...\n");
++	for (i = 0; i < ARRAY_SIZE(mxc_iomux_pins); i++) {
++		mxc_request_iomux(mxc_iomux_pins[i].pin,
++			                mxc_iomux_pins[i].mux_mode);
++		if (mxc_iomux_pins[i].pad_cfg)
++			mxc_iomux_set_pad(mxc_iomux_pins[i].pin,
++				                mxc_iomux_pins[i].pad_cfg);
++		if (mxc_iomux_pins[i].in_select)
++			mxc_iomux_set_input(mxc_iomux_pins[i].in_select,
++			                    mxc_iomux_pins[i].in_mode);
++	}
++}
++
++void mx51_regigraf_init_clocks(void)
++{
++	struct clk *emi_enfc_clk;
++	struct clk *emi_slow_clk;
++	struct clk *emi_fast_clk;
++	struct clk *ahb_clk;
++	struct clk *pll2_sw_clk;
++	struct clk *main_bus_clk;
++	struct clk *ddr_clk;
++	struct clk *ddr_hf_clk;
++	
++	printk("Regigraf clocks setup...\n");
++	emi_enfc_clk = clk_get(NULL, "nfc_clk");
++	emi_slow_clk = clk_get(NULL, "emi_slow_clk");
++	emi_fast_clk = clk_get(NULL, "emi_fast_clk");
++	ahb_clk      = clk_get(NULL, "ahb_clk");
++	pll2_sw_clk  = clk_get(NULL, "pll2");
++	main_bus_clk = clk_get(NULL, "main_bus_clk");
++	ddr_clk      = clk_get(NULL, "ddr_clk");
++	ddr_hf_clk   = clk_get(NULL, "ddr_hf_clk");
++	/* Down DDR clock from 200MHz (default for EVK) to 100MHz*/
++	if (ddr_hf_clk)
++		clk_set_rate(ddr_hf_clk, 100000000);
++	if (ddr_clk)
++		clk_set_rate(ddr_clk,    100000000);
++	/* Up emi slow clock for valid timing values on NFC */
++//	clk_set_parent(emi_slow_clk, main_bus_clk);
++//	clk_set_rate(pll2_sw_clk, 332500000);
++//	clk_set_rate(main_bus_clk, 332500000);		
++//	clk_set_rate(emi_slow_clk, clk_round_rate(emi_slow_clk, 133000000));
++//	clk_set_rate(emi_enfc_clk, clk_round_rate(emi_enfc_clk,
++//			(clk_get_rate(emi_slow_clk))/2));
++//	printk("\t EMI fast clock: %lu Hz\n", clk_get_rate(emi_fast_clk));
++	printk("\t PLL2 sw clock.: %lu Hz\n", clk_get_rate(pll2_sw_clk));
++	printk("\t main bus clock: %lu Hz\n", clk_get_rate(main_bus_clk));
++	printk("\t AHB clock.....: %lu Hz\n", clk_get_rate(ahb_clk));
++	printk("\t EMI slow clock: %lu Hz\n", clk_get_rate(emi_slow_clk));
++	printk("\t ENFC clock....: %lu Hz\n", clk_get_rate(emi_enfc_clk));
++	printk("\t DDR clock.....: %lu Hz\n", clk_get_rate(ddr_clk));
++	printk("\t DDR HF clock..: %lu Hz\n", clk_get_rate(ddr_hf_clk));
++}
++
++void mx51_regigraf_init(void)
++{
++	mx51_regigraf_init_iomux();
++	mxc_setup_display();
++	/* Setup External Memory Interface */
++	mxc_init_emi();
++	/* Setup Fast Ethernet Controller */
++	mxc_init_fec();
++	/* Register "Regigraf" devices */
++	mxc_setup_devices();
++}
+--- ./build/linux-2.6.35.3.SK/drivers/input/touchscreen/mxc_ts.c.orig	2011-11-10 01:51:29.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/input/touchscreen/mxc_ts.c	2013-06-19 15:59:40.792000965 +0400
+@@ -111,9 +111,12 @@
+ 				 ts_sample.contact_resistance);
+ #ifdef CONFIG_MXC_PMIC_MC13892
+ 		/* workaround for aplite ADC resistance large range value */
+-		if (ts_sample.contact_resistance > 22)
++//		if (ts_sample.contact_resistance > 22)
++		/* Resistance fixup for Regiboard */
++		if (ts_sample.contact_resistance < 100) {
++//			printk("DEBUG resistance: %d\n", ts_sample.contact_resistance);
+ 			ts_sample.contact_resistance = 1;
+-		else
++		} else
+ 			ts_sample.contact_resistance = 0;
+ #endif
+ 		/* report the BTN_TOUCH */
+--- ./build/linux-2.6.35.3.SK/drivers/mtd/nand/nand_device_info.c.orig	2011-11-10 01:53:32.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/mtd/nand/nand_device_info.c	2013-06-04 14:30:30.911641334 +0400
+@@ -913,6 +913,25 @@
+  * Type 7
+  */
+ static struct nand_device_info nand_device_info_table_type_7[] __initdata = {
++	{ // Regigraf NAND
++	.end_of_table             = false,
++	.manufacturer_code        = 0x2c,
++	.device_code              = 0xa5,
++	.cell_technology          = NAND_DEVICE_CELL_TECH_SLC,
++	.chip_size_in_bytes       = 2LL*SZ_1G,
++	.block_size_in_pages      = 64,
++	.page_total_size_in_bytes = 4*SZ_1K + 218, // imx5 NFC support only 218 sized spare
++	.ecc_strength_in_bits     = 8,
++	.ecc_size_in_bytes        = 512,
++	.data_setup_in_ns         = 15, // 15
++	.data_hold_in_ns          = 10, // 10
++	.address_setup_in_ns      = 25, // 25
++	.gpmi_sample_delay_in_ns  = 6,  // don't know the meaning of it
++	.tREA_in_ns               = 25, // 25
++	.tRLOH_in_ns              = -1,
++	.tRHOH_in_ns              = 15, // 15
++	"Micron MT29F16G08ADBCAH4",
++	},
+ 	{
+ 	.end_of_table             = false,
+ 	.manufacturer_code        = 0x2c,
+--- ./build/linux-2.6.35.3.SK/drivers/mtd/nand/mxc_nd2.c.orig	2011-11-10 01:53:38.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/mtd/nand/mxc_nd2.c	2013-06-17 14:14:06.129658526 +0400
+@@ -30,6 +30,8 @@
+ 
+ #define DVR_VER "3.0"
+ 
++/* Regigraf board: functions for large NAND with several LUN`s*/
++static u8 select_dev_lun(struct mtd_info *mtd, u32 page_addr, bool use_irq);
+ /* Global address Variables */
+ static void __iomem *nfc_axi_base, *nfc_ip_base;
+ static int nfc_irq;
+@@ -500,6 +502,39 @@
+ 
+ }
+ 
++/* Regigraf board: functions for LUN selection*/
++static void configure_auto_cmd(void)
++{
++//	raw_write(raw_read(NFC_CONFIG1) & ~(7 << 12),  NFC_CONFIG1); // access NAND device connected to CS0
++	raw_write(raw_read(NFC_CONFIG1) & ~(0xF << 8), NFC_CONFIG1); // execute automatic operation 1 time
++	raw_write(raw_read(NFC_CONFIG1) & ~(7 << 4),   NFC_CONFIG1); // Ram Buffer Address 0
++	raw_write(raw_read(NFC_CONFIG1) & ~(1 << 1),   NFC_CONFIG1); // CE# signal operates normally
++	raw_write(raw_read(NFC_CONFIG1) & ~1,          NFC_CONFIG1); // Program/read main and spare area
++}
++
++static u8 select_dev_lun(struct mtd_info *mtd, u32 page_addr, bool use_irq)
++{
++	u16 lun_id;
++	u8  ret;
++	if (page_addr < (1024 * 1024 * 1024)) // 8Gb => 1GB => 0 LUN
++		lun_id = 0;
++	else
++		lun_id = 1;
++	/* sending READ STATUS ENHANCED command to select LUN */
++	send_atomic_cmd(0x78, use_irq);
++	/* fill address */
++	send_addr(0x00,   use_irq); // page
++	send_addr(0x00,   use_irq); // block
++	send_addr(lun_id, use_irq); // LUN
++	/* transfer data from nand */
++	configure_auto_cmd();
++	raw_write(NFC_OUTPUT, REG_NFC_OPS); // One page data out
++	wait_op_done(TROP_US_DELAY, use_irq);
++	/* reading status */
++	ret = *((u8*)MAIN_AREA0);
++	return ret;
++}
++
+ #ifdef NFC_AUTO_MODE_ENABLE
+ static inline void read_dev_status(u16 *status)
+ {
+@@ -927,15 +962,18 @@
+ 	 */
+ 	switch (command) {
+ 	case NAND_CMD_STATUS:
++		select_dev_lun(mtd, page_addr, useirq);
+ 		g_nandfc_info.colAddr = 0;
+ 		g_nandfc_info.bStatusRequest = true;
+ 		break;
+ 
+ 	case NAND_CMD_READ0:
++		select_dev_lun(mtd, page_addr, useirq);
+ 		g_nandfc_info.colAddr = column;
+ 		break;
+ 
+ 	case NAND_CMD_READOOB:
++		select_dev_lun(mtd, page_addr, useirq);
+ 		g_nandfc_info.colAddr = column;
+ 		command = NAND_CMD_READ0;
+ 		break;
+@@ -992,6 +1030,7 @@
+ 		break;
+ 
+ 	case NAND_CMD_ERASE1:
++		select_dev_lun(mtd, page_addr, useirq);
+ 		break;
+ 	case NAND_CMD_ERASE2:
+ 		break;
+--- ./build/linux-2.6.35.3.SK/drivers/mxc/pmic/core/pmic_core_spi.c.orig	2013-06-04 12:50:04.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/mxc/pmic/core/pmic_core_spi.c	2013-06-04 12:59:56.639959382 +0400
+@@ -41,8 +41,12 @@
+ 
+ #include <asm/uaccess.h>
+ 
++#ifdef CONFIG_MXC_PMIC_MC13892
+ #include <linux/mfd/mc13892/core.h>
++#endif
++#ifdef CONFIG_MXC_PMIC_MC34708
+ #include <linux/mfd/mc34708/core.h>
++#endif
+ 
+ #include "pmic.h"
+ 
+@@ -103,8 +107,12 @@
+ };
+ 
+ struct pmic_internal pmic_internal[] = {
++#ifdef CONFIG_MXC_PMIC_MC13892
+ 	[PMIC_ID_MC13892] = _PMIC_INTERNAL_INITIALIZER(mc13892),
++#endif
++#ifdef CONFIG_MXC_PMIC_MC34708
+ 	[PMIC_ID_MC34708] = _PMIC_INTERNAL_INITIALIZER(mc34708),
++#endif
+ };
+ 
+ /*

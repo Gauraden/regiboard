@@ -1,0 +1,15 @@
+system=fbdev
+fbdev=/dev/fb0
+mode=1024x768
+depth=24
+pixelformat=RGB24
+no-cursor
+tslib-devices=/dev/input/event0
+#memcpy=armasm
+#no-vt
+#no-vt-switch
+#no-init-layer=0
+#dma
+#disable-module=keyboard
+disable-module=linux_input
+

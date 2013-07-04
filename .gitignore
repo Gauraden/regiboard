@@ -1,0 +1,15 @@
+*~
+*.bak
+*.backup
+*.tmp
+*.o
+*.old
+*.orig
+.config
+
+build
+dl
+log
+output
+tmp
+

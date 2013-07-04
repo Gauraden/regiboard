@@ -1,0 +1,44 @@
+# Name of the board
+BOARD_NAME='regigraf'
+
+# Name of CPU architecture
+BOARD_ARCH='arm'
+
+# Name of ARM CPU core
+BOARD_PREFIX='cortex_a8'
+
+# Name of CPU
+BOARD_CPU='imx51'
+
+# CrossTool-NG version
+BOARD_CTNG_VER='1.16.0'
+
+# Version of BysyBox, that will be used for initramfs creation
+BOARD_BUSYBOX_VER='1.21.0'
+
+# Option for using external toolchain, by default it will be compiled from sources.
+# For compiling it will use special config of "BOARD_PREFIX"
+# BOARD_TOOLCHAIN='/home/denis/Projects/regigraf-environment/output/toolchain_imx51'
+
+# Option for using external buildroot, by default it will be compiled from sources
+# For compiling it will use special config of "BOARD_NAME"
+# BOARD_BUILDROOT='/home/denis/CrossTools/buildroot_imx51'
+
+# U-Boot -----------------------------------------------------------------------
+# Version of U-Boot bootloader
+BOARD_UBOOT_VER='2009.08.01-regigraf'
+
+# Name of config, that will be used for building U-Boot
+BOARD_UBOOT_CNF='mx51_regigraf'
+
+# Arguments for DD tool. Used for creating bootable MMC/SD.
+BOARD_UBOOT_DD='bs=512 skip=2 seek=2'
+
+# Linux kernel -----------------------------------------------------------------
+# Version of Linux kernel
+BOARD_KERNEL_VER='2.6.35.3.SK'
+
+# Nome of config, that will be used for building kernel
+BOARD_KERNEL_CNF='regigraf.imx51.kernel.2.6.35.3'
+
+BOARD_BUILDROOT_VER='2012.05'

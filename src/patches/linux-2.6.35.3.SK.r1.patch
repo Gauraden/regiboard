@@ -1,0 +1,29 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_loco.c.orig	2012-05-02 17:27:25.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_loco.c	2013-06-22 20:01:03.000000000 +0400
+@@ -860,13 +860,21 @@
+  * 16M should cover all kind of NAND boot support on MX53.
+  */
+ 	{
+-	 .name = "bootloader and kernel",
++//	 .name   = "bootloader and kernel",
++	 .name   = "bootloader",
+ 	 .offset = 0,
+-	 .size = 32 * 1024 * 1024},
+-	{
+-	 .name = "nand.rootfs",
++   .size   = 16 * 1024 * 1024
++//	 .size = 32 * 1024 * 1024
++
++	}, {
++	 .name   = "kernel",
++	 .offset = 16 * 1024 * 1024,
++   .size   = 16 * 1024 * 1024
++	}, {
++	 .name   = "rootfs",
+ 	 .offset = MTDPART_OFS_APPEND,
+-	 .size = MTDPART_SIZ_FULL},
++	 .size   = MTDPART_SIZ_FULL
++	},
+ };
+ #endif
+ 

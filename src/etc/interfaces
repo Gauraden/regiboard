@@ -1,0 +1,12 @@
+# Configure Loopback
+auto lo
+iface lo inet loopback
+
+# The primary network interface. 
+# At first stage of booting it will has a static IP, because it may be a network without DHCP server.
+# On the second stage of booting will be executed init.d script: S41eth0_restart
+auto eth0
+iface eth0 inet static
+    up echo "Static IP: 192.168.0.1"
+    address 192.168.0.1
+    netmask 255.255.255.0

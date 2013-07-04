@@ -1,0 +1,158 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx51_babbage.c.orig	2013-07-03 13:46:42.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx51_babbage.c	2013-07-03 15:53:51.816296789 +0400
+@@ -339,14 +339,14 @@
+ 	.delay = 2,
+ 	.matrix = keymapping,
+ };
+-
++/*
+ static struct platform_pwm_backlight_data mxc_pwm_backlight_data = {
+ 	.pwm_id = 0,
+ 	.max_brightness = 255,
+ 	.dft_brightness = 128,
+ 	.pwm_period_ns = 78770,
+ };
+-
++*/
+ extern void mx5_ipu_reset(void);
+ static struct mxc_ipu_config mxc_ipu_data = {
+ 	.rev = 2,
+@@ -1241,8 +1241,8 @@
+ 	mxc_register_device(&mxc_dvfs_per_device, &dvfs_per_data);
+ 	mxc_register_device(&mxc_iim_device, &iim_data);
+ 	mxc_register_device(&mxc_pwm1_device, NULL);
+-	mxc_register_device(&mxc_pwm1_backlight_device,
+-		&mxc_pwm_backlight_data);
++//	mxc_register_device(&mxc_pwm1_backlight_device,
++//		&mxc_pwm_backlight_data);
+ 	mxc_register_device(&mxc_keypad_device, &keypad_plat_data);
+ 	mxc_register_device(&mxcsdhc1_device, &mmc1_data);
+ 	mxc_register_device(&mxcsdhc2_device, &mmc2_data);
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx51_regigraf.c.orig	2013-07-03 13:30:51.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx51_regigraf.c	2013-07-03 15:58:14.212998016 +0400
+@@ -4,6 +4,7 @@
+ #include <linux/clk.h>
+ #include <linux/phy.h>
+ #include <linux/fec.h>
++#include <linux/pwm_backlight.h>
+ #include <asm/io.h>
+ #include <asm/mach/flash.h>
+ #include <mach/common.h>
+@@ -47,6 +48,9 @@
+ #define MXC_NFC_ADD_OP(val)         MXC_NFC_CFG_3_UP(0x3,  0,  val)
+ 
+ static int mxc_mt29f_nand_init(void);
++static int mxc_pwm_backlight_init(struct device *dev);
++static int mxc_pwm_backlight_notify(struct device *dev, int brightness);
++static void mxc_pwm_backlight_exit(struct device *dev);
+ 
+ static struct mxc_iomux_pin_cfg __initdata mxc_iomux_pins[] = {
+   /* ---- FEC ---- */
+@@ -122,6 +126,7 @@
+ 		(PAD_CTL_DRV_VOT_HIGH | PAD_CTL_DRV_HIGH),
+ 	}
+ 	/* ---- EMI NAND ---- */
++	// ...
+ };
+ 
+ static struct mtd_partition nand_flash_partitions[] = {
+@@ -151,22 +156,44 @@
+ 	.phy = PHY_INTERFACE_MODE_RMII,
+ };
+ 
++static struct platform_pwm_backlight_data mxc_pwm_backlight_data = {
++	.pwm_id         = 0,
++	.max_brightness = 255,
++	.dft_brightness = 128,
++	.pwm_period_ns  = 78770,
++	.init           = mxc_pwm_backlight_init,
++	.notify         = mxc_pwm_backlight_notify,
++	.exit           = mxc_pwm_backlight_exit
++};
++
+ /*!
+  * Board specific lcd backlight initialization
+  */
++static int mxc_pwm_backlight_init(struct device *dev) {
++	printk("Regigraf PWM backlight init\n");
++	return 0;
++}
++
++static int mxc_pwm_backlight_notify(struct device *dev, int brightness) {
++	return brightness;
++}
++
++static void mxc_pwm_backlight_exit(struct device *dev) {
++	printk("Regigraf PWM backlight exit\n");
++}
++
+ static void mxc_init_lcd_backlight(void)
+ {
+-	/* Changing modes of BGA pins: Backlight_EN(GPIO4_15), PWM1_OUT(GPIO1_2) */
+-	mxc_request_iomux(MX51_PIN_CSI2_PIXCLK, IOMUX_CONFIG_ALT3);
+-	mxc_request_iomux(MX51_PIN_GPIO1_2, IOMUX_CONFIG_ALT0);
+-	mxc_request_iomux(MX51_PIN_DI1_D0_CS, IOMUX_CONFIG_ALT4); // look at: mxc_iomux_pins
+-	/* Enabling backlight through GPIO pin */
+-	gpio_direction_output(IOMUX_TO_GPIO(MX51_PIN_CSI2_PIXCLK), 1);
+-	gpio_set_value(IOMUX_TO_GPIO(MX51_PIN_CSI2_PIXCLK), 1);
+-	/* Set the value of backlight signal */
+-	gpio_direction_output(IOMUX_TO_GPIO(MX51_PIN_GPIO1_2), 1);
+-	gpio_set_value(IOMUX_TO_GPIO(MX51_PIN_GPIO1_2), 1);
+-
++	mxc_register_device(&mxc_pwm1_backlight_device, &mxc_pwm_backlight_data);
++	/* Setup PWM1_OUT */
++	mxc_request_iomux(MX51_PIN_GPIO1_2,     IOMUX_CONFIG_ALT1); // PWM1 OUT
++	mxc_request_iomux(MX51_PIN_DI1_D0_CS,   IOMUX_CONFIG_ALT4); // GPIO3_3  -> LVDS_PW R_DW N_B 
++	mxc_request_iomux(MX51_PIN_CSI2_PIXCLK, IOMUX_CONFIG_ALT3); // GPIO4_15 -> Backlight_EN
++	/* Setup GPIO */
++	// DI1
++	gpio_direction_output(IOMUX_TO_GPIO(MX51_PIN_DI1_D0_CS), 1);
++  gpio_set_value(IOMUX_TO_GPIO(MX51_PIN_DI1_D0_CS), 1);
++  // CSI2
+ 	gpio_direction_output(IOMUX_TO_GPIO(MX51_PIN_DI1_D0_CS), 1);
+   gpio_set_value(IOMUX_TO_GPIO(MX51_PIN_DI1_D0_CS), 1);
+ }
+@@ -259,8 +286,8 @@
+ 	MXC_NFC_SPAS(218);     // 218 Spare size
+ 	MXC_NFC_PPB(1);        // 64 pages per block
+ 	MXC_NFC_ECC_MODE(8);   // set 8bit ECC
+-	MXC_NFC_ECC_EN(0);     // disable ECC
+-//	MXC_NFC_ECC_EN(1);     // enable ECC
++//	MXC_NFC_ECC_EN(0);     // disable ECC
++	MXC_NFC_ECC_EN(1);     // enable ECC
+ 	MXC_NFC_SYM(0);        // set 2 clock per RE#WE# (asymmetric RE waveform)
+ 	MXC_NFC_PS(3);         // set 4KB page (11)
+ //	MXC_NFC_RBB_MODE(0);       // NFC monitors ready-busy status by doing a status-read command.
+--- ./build/linux-2.6.35.3.SK/drivers/video/Kconfig.orig	2011-11-10 01:51:30.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/video/Kconfig	2013-07-03 15:38:54.867572961 +0400
+@@ -207,7 +207,7 @@
+        default n
+ 
+ config FB_BACKLIGHT
+-	bool
++	bool "Enable backlight control for FB"
+ 	depends on FB
+ 	select BACKLIGHT_LCD_SUPPORT
+ 	select BACKLIGHT_CLASS_DEVICE
+--- ./build/linux-2.6.35.3.SK/drivers/mtd/nand/mxc_nd2.c.orig	2013-06-25 15:10:19.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/mtd/nand/mxc_nd2.c	2013-06-25 15:10:44.258326010 +0400
+@@ -1176,7 +1176,8 @@
+ 	.offs = 0,
+ 	.len = 4,
+ 	.veroffs = 4,
+-	.maxblocks = 4,
++//	.maxblocks = 4,
++	.maxblocks = 8,
+ 	.pattern = bbt_pattern
+ };
+ 
+@@ -1186,7 +1187,8 @@
+ 	.offs = 0,
+ 	.len = 4,
+ 	.veroffs = 4,
+-	.maxblocks = 4,
++//	.maxblocks = 4,
++	.maxblocks = 8,
+ 	.pattern = mirror_pattern
+ };
+ 
