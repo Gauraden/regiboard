@@ -30,14 +30,16 @@ Units:
 How to use:
 	Format....: ./rb_build <unit> <args>
 		<unit>..: name of executable unit
-			* toolchain
-			* uboot
-			* kernel
-			* rootfs
-			* initramfs
-			* packets
-			* image [NOT READY]
-			* mmc
+		  * help.....: for printing this help
+		  * board....: for selecting target board
+			* toolchain:
+			* uboot....:
+			* kernel...:
+			* rootfs...:
+			* initramfs:
+			* packets..:
+			* image....: [NOT READY]
+			* mmc......: for writing all binaries and images to MMC
 		<args>..: arguments for executable unit, if it is empty then default build 
 		          programm will be executed.
 			* config...: for configurating of unit
