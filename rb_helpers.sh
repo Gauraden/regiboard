@@ -1,12 +1,14 @@
 #!/bin/sh
 
 # Service variables
+_RUN_ID=$(date +%j%H%M%S)
 _BIN_DIR=$PATH
 _INC_DIR='/usr/include'
 _DEV_NULL='/dev/null'
 _PROC_VERSION=$(cat /proc/version)
 _WGET_ARGS="-q -t ${WGET_TRIES} --waitretry=${WGET_WAIT}"
 _USE_SUDO=''
+_SYS_LOCALE=$(locale | grep -m1 -P -o '([a-z]{2,2})\_([A-Z]{2,2})' | grep -P -o '([a-z]+)')
 
 if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	. ./.config
@@ -39,17 +41,16 @@ fi
 # translate.
 #   < message to be translated
 TranslateByGoogle() {
-	local sys_locale=$(locale | grep -m1 -P -o '([a-z]{2,2})\_([A-Z]{2,2})' | grep -P -o '([a-z]+)')
 	local gt_url='http://translate.google.com/translate_a/t'
 	# searching message in cache
 	local result=''
 	local delimiter=']---<>---['
-	local cache_file="${TMP_DIR}/msg_cache.$sys_locale"
+	local cache_file="${TMP_DIR}/msg_cache.${_SYS_LOCALE}"
 	if [ -f "$cache_file" ]; then
 		result=$(cat "$cache_file" | grep "$1" | awk -F $delimiter '{print $2}')
 	else
 		# sending request to google
-		result=$(wget -U 'Mozilla/5.0' -qO - "$gt_url?client=t&text=$1&sl=auto&tl=$sys_locale" |
+		result=$(wget -U 'Mozilla/5.0' -qO - "$gt_url?client=t&text=$1&sl=auto&tl=${_SYS_LOCALE}" |
 		         sed 's/\[\[\[\"//' | cut -d \" -f 1)
 		# saving message to cache
 		echo "$1${delimiter}${result}" >> $cache_file
@@ -368,7 +369,7 @@ IsVersion() {
 CreatePatch() {
   DieIfNotDefined "$1" "directory for *.orig files search"
 	local patch_name=$(GetPathPart 'file' "$1")
-  local patch_file="${TMP_DIR}/$patch_name.patch"
+  local patch_file="${TMP_DIR}/$patch_name.r${_RUN_ID}.patch"
   PrintNotice "Creating patch \"$patch_name\"..."
   rm -f "$patch_file"
 	for src_file in $(find "$1" -name "*.orig" | sed -r 's/(.*)\.orig$/\1/'); do

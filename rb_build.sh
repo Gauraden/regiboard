@@ -49,6 +49,10 @@ CancelRootFS
 
 # Run subprogram
 case "${SUBPROG_TYPE}" in
+	# Printing help
+	'help'      ) PrintHelp;;
+	# Select board config
+	'board'     ) SelectBoardConfig;;
 	# Building toolchain
 	'toolchain' ) BuildToolchain;;
 	# Building u-boot

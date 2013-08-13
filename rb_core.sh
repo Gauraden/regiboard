@@ -16,6 +16,14 @@ DumpCoreSelects() {
 	echo "CORE_SELECT_BOARD=\"${CORE_SELECT_BOARD}\"" > "${CORE_SELECT_CONF}"
 }
 
+PrintHelp() {
+	local help_file="${WORK_DIR}/readme_${_SYS_LOCALE}.txt"
+	if ! IsFileExists $help_file; then
+		help_file="${WORK_DIR}/readme_en.txt"
+	fi
+	cat $help_file
+}
+
 SelectBoardConfig() {
 	ListAllConfigs
 	PrintWarn "Please enter name of default configuration:"
