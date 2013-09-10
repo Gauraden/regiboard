@@ -5,7 +5,7 @@ _BIN_DIR=$PATH
 _INC_DIR='/usr/include'
 _DEV_NULL='/dev/null'
 _PROC_VERSION=$(cat /proc/version)
-_WGET_ARGS="-q -t ${WGET_TRIES} --waitretry=${WGET_WAIT}"
+_WGET_ARGS="-q -t ${WGET_TRIES} --waitretry=${WGET_WAIT} "
 _USE_SUDO=''
 
 if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
