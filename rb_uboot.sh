@@ -30,8 +30,12 @@ BuildUBoot() {
 	TcTargetDistCleanSources ${UBOOT_BUILD_DIR}
 	PrintNotice "Configurating u-boot: ${BOARD_UBOOT_CNF}"
 	TcTargetMakeSources ${UBOOT_BUILD_DIR} "${BOARD_UBOOT_CNF}_config"
-	PrintNotice "Building u-boot..."
+	PrintNotice "Building u-boot.bin"
 	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'all'
+	PrintNotice "Building u-boot.imx"
+	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot.imx'
+	PrintNotice "Building u-boot-with-nand-spl.imx"
+	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot-with-nand-spl.imx'
 	PrintNotice "Moving to output: ${UBOOT_IMG}"
 	mv "${UBOOT_BUILD_DIR}/u-boot.bin" "${UBOOT_IMG_DIR}/${UBOOT_IMG}"
 	NotifyUser "Building of U-Boot \"${BOARD_UBOOT_CNF}\" was finished!"

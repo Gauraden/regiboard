@@ -27,12 +27,13 @@ BOARD_BUSYBOX_VER='1.20.1'
 # U-Boot -----------------------------------------------------------------------
 # Version of U-Boot bootloader
 BOARD_UBOOT_VER='2009.08.01-regigraf'
+#BOARD_UBOOT_VER='2013.07'
 
 # Name of config, that will be used for building U-Boot
 BOARD_UBOOT_CNF='mx53_regigraf'
 
 # Arguments for DD tool. Used for creating bootable MMC/SD.
-BOARD_UBOOT_DD='bs=512 skip=2 seek=2'
+BOARD_UBOOT_DD='bs=512 skip=1 seek=1'
 
 # Linux kernel -----------------------------------------------------------------
 # Version of Linux kernel
