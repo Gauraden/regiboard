@@ -21,8 +21,12 @@ cp "${SRC_SHELL_DIR}/rb_functions.sh"   "${ossetup_dir}/" || PrintAndDie "Copy f
 cp "${SRC_SHELL_DIR}/rb_setup_linux.sh" "${ossetup_dir}/" || PrintAndDie "Copy failed to: ${ossetup_dir}"
 cp "${SRC_SHELL_DIR}/rb_fuses_imx53.sh" "${ossetup_dir}/" || PrintAndDie "Copy failed to: ${ossetup_dir}"
 cp "${SRC_SHELL_DIR}/rb_update_kernel"  "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
+cp "${SRC_SHELL_DIR}/click"             "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
+cp "${SRC_SHELL_DIR}/led"               "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
+cp "${SRC_SHELL_DIR}/udhcpc_renew"      "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
 
 PrintNotice 'Copying of system scripts and configs...'
+cp "${SRC_SHELL_DIR}/S00gpio_init"     "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_SHELL_DIR}/S41eth0_restart"  "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_SHELL_DIR}/S39gui"           "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_ETC_DIR}/interfaces"         "${TARGET_DIR}/etc/network/"

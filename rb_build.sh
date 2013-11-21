@@ -47,6 +47,23 @@ ConfigurateInitRAMFS
 CancelKernel
 CancelRootFS
 
+UploadImages() {
+	UBootToRemoteRepo
+	KernelToRemoteRepo
+	RootFSToRemoteRepo
+}
+
+BootOverUSB() {
+	local imx_usb_loader_path="${SRC_UTILS_DIR}/imx-usb-loader/"
+	local imx_usb_tool="$imx_usb_loader_path/imx-usb-loader"
+	local uboot_img="$imx_usb_loader_path/u-boot.imx"
+	IsFileExists $imx_usb_tool || PrintAndDie "iMX USB loader not found!"
+	IsFileExists $uboot_img || PrintAndDie "u-boot image not found!"
+	FindUSBDevice 'Freescale' || PrintAndDie "iMX board not found on USB bus!"
+	PrintNotice "Sending image to board..."
+	sudo $imx_usb_tool $uboot_img
+}
+
 # Run subprogram
 case "${SUBPROG_TYPE}" in
 	# Printing help
@@ -69,6 +86,10 @@ case "${SUBPROG_TYPE}" in
 	'image'     );;
 	# Prepare MMC
 	'mmc'       ) BuildMMC;;
+	# Upload images and misc to remote repository
+	'upload'    ) UploadImages;;
+	# Boot board over USB
+	'usb-boot'  ) BootOverUSB;;
 	# default
 	*           ) PrintWarn "Unknown subprogram: ${SUBPROG_TYPE}";;
 esac

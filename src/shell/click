@@ -1,0 +1,6 @@
+#!/bin/sh
+
+SPEAKER=111
+GPIO_PIN="/sys/class/gpio/gpio$SPEAKER/value"
+
+echo 0 > $GPIO_PIN && usleep 100000 && echo 1 > $GPIO_PIN

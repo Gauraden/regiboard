@@ -23,7 +23,8 @@ PacketConfigure() {
 		return
 	fi
 	if IsFileExists "$build_dir/CMakeLists.txt"; then
-		export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} CFLAGS="${PACKET_CONFIGURE}" CXXFLAGS="${PACKET_CONFIGURE}" && cmake ./
+		FLAGS="-I'${RFS_ROOT_DIR}/staging/usr/include' -L'${RFS_ROOT_DIR}/target/usr/lib' ${PACKET_CONFIGURE}"
+		export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
 		return
 	fi
 	PrintAndDie 'Do not know how to configurate Automake'

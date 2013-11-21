@@ -141,3 +141,7 @@ RootFSToMMC() {
 	fi
 	RootFSValidation "$1"
 }
+
+RootFSToRemoteRepo() {
+	UploadDataToRemoteRepo "${ROOTFS_IMG_DIR}/${RFS_IMAGE}" 'rootfs.tar'
+}

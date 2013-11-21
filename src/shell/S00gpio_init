@@ -1,0 +1,19 @@
+#!/bin/sh
+
+GPIO_SYS_DIR='/sys/class/gpio/'
+VD1_2=110
+VD3_4=109
+SPEAKER=111
+
+GPIOexport() {
+    local pin_id=$1
+    local pin_dir=$2
+    local trig=$3
+    echo $pin_id > $GPIO_SYS_DIR/export
+    echo $pin_dir > $GPIO_SYS_DIR/gpio$pin_id/direction
+    echo $trig > $GPIO_SYS_DIR/gpio$pin_id/active_low
+}
+
+GPIOexport $VD1_2 out 0
+GPIOexport $VD3_4 out 0
+GPIOexport $SPEAKER out 1

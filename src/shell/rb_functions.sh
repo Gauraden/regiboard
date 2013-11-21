@@ -146,3 +146,17 @@ ReadFuse() {
 	fi
 	$fuse_parser $fuse_val
 }
+# Function for downloading files from FTP.
+#   < name of downloadable file
+#   < name of directory to save this file
+GetFileFromFTP() {
+	local file_name="$1"
+	local output_dir="$2"
+	DieIfNotDefined $file_name    'Name of downloadable file!'
+	DieIfNotDefined $output_dir   'Name of output directory!'
+	DieIfNotDefined $FTP_REPO_URL 'FTP repository URL!'
+	DieIfNotDefined $FTP_REPO_PSW 'FTP repository password!'
+	IsItFunction 'wget' || PrintAndDie 'No wget util was found!'
+	PrintNotice "Downloading..."
+	wget --password=$FTP_REPO_PSW -P "$output_dir" ftp://$FTP_REPO_URL/$file_name
+}

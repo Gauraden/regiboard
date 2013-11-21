@@ -57,3 +57,7 @@ UBootToMMC() {
 	PrintNotice "Writing u-boot image \"${UBOOT_IMG}\" to: ${SUBPROG_ARG}"
 	sudo dd if="${UBOOT_IMG_DIR}/${UBOOT_IMG}" of="${SUBPROG_ARG}" ${BOARD_UBOOT_DD} && sync
 }
+
+UBootToRemoteRepo() {
+	UploadDataToRemoteRepo "${UBOOT_IMG_DIR}/${UBOOT_IMG}" 'u-boot.bin'
+}
