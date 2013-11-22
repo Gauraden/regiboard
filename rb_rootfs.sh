@@ -54,7 +54,11 @@ RFSPrepareConfig() {
 	#TODO: we have a BUG, string is cutted!
 	SetConfigVar ${br_config_path} 'BR2_TARGET_GENERIC_ISSUE'             "Welcome to RegiBoard (${BOARD_CONFIG})"
 	SetConfigVar ${br_config_path} 'BR2_ROOTFS_POST_BUILD_SCRIPT'         "${WORK_DIR}/rb_patch_rootfs_image.sh"
-	
+	# Enable UDev
+	SetConfigVar ${br_config_path} 'BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_UDEV' 'y'
+	UndefineConfigVar ${br_config_path} 'BR2_ROOTFS_DEVICE_CREATION_STATIC'
+	UndefineConfigVar ${br_config_path} 'BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_DEVTMPFS'
+	UndefineConfigVar ${br_config_path} 'BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_MDEV'
 #	UndefineConfigVar ${br_config_path} 'BR2_PREFER_SOFT_FLOAT'
 }
 
