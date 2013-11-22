@@ -33,5 +33,7 @@ cp "${SRC_ETC_DIR}/interfaces"         "${TARGET_DIR}/etc/network/"
 cp "${SRC_ETC_DIR}/sshd_config"        "${TARGET_DIR}/etc/"
 cp "${SRC_ETC_DIR}/directfbrc"         "${TARGET_DIR}/etc/"
 # Hacks ------------------------------------------------------------------------
+# Samba is not working correct! Removing it from autorun.
+mv "${TARGET_DIR}/etc/init.d/S91smb" "${TARGET_DIR}/root/"
 # Was usefull with gcc 4.7
 #cd "${TARGETDIR}/lib/" && ln -sf ld-2.9.so ld-linux-armhf.so.3
