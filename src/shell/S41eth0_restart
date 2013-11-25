@@ -1,6 +1,0 @@
-#!/bin/sh
-BOARD_NAME=$(cat /proc/cpuinfo | grep -E 'Hardware(.*):(.*)' | sed -r 's/(.+): (.+)/\2/g') #'
-
-if [ "$BOARD_NAME" != 'MX53 Regiboard' ]; then
-	ethtool -s eth0 speed 10 duplex half
-fi

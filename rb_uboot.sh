@@ -26,6 +26,7 @@ BuildUBoot() {
 		mcedit "${UBOOT_BUILD_DIR}/include/configs/${BOARD_UBOOT_CNF}.h"
 		return 0
 	fi
+	local imx_tools_path="${SRC_UTILS_DIR}/imx-usb-loader"
 	PrintNotice "Clearing u-boot sources..."
 	TcTargetDistCleanSources ${UBOOT_BUILD_DIR}
 	PrintNotice "Configurating u-boot: ${BOARD_UBOOT_CNF}"
@@ -33,9 +34,11 @@ BuildUBoot() {
 	PrintNotice "Building u-boot.bin"
 	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'all'
 	PrintNotice "Building u-boot.imx"
-	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot.imx'
-	PrintNotice "Building u-boot-with-nand-spl.imx"
-	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot-with-nand-spl.imx'
+	cp "${UBOOT_BUILD_DIR}/u-boot.bin" $imx_tools_path
+	cd $imx_tools_path && ./mk_imx_image.sh 'u-boot.bin'
+#	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot.imx'
+#	PrintNotice "Building u-boot-with-nand-spl.imx"
+#	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot-with-nand-spl.imx'
 	PrintNotice "Moving to output: ${UBOOT_IMG}"
 	mv "${UBOOT_BUILD_DIR}/u-boot.bin" "${UBOOT_IMG_DIR}/${UBOOT_IMG}"
 	NotifyUser "Building of U-Boot \"${BOARD_UBOOT_CNF}\" was finished!"
