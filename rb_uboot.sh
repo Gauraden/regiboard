@@ -26,12 +26,19 @@ BuildUBoot() {
 		mcedit "${UBOOT_BUILD_DIR}/include/configs/${BOARD_UBOOT_CNF}.h"
 		return 0
 	fi
+	local imx_tools_path="${SRC_UTILS_DIR}/imx-usb-loader"
 	PrintNotice "Clearing u-boot sources..."
 	TcTargetDistCleanSources ${UBOOT_BUILD_DIR}
 	PrintNotice "Configurating u-boot: ${BOARD_UBOOT_CNF}"
 	TcTargetMakeSources ${UBOOT_BUILD_DIR} "${BOARD_UBOOT_CNF}_config"
-	PrintNotice "Building u-boot..."
+	PrintNotice "Building u-boot.bin"
 	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'all'
+	PrintNotice "Building u-boot.imx"
+	cp "${UBOOT_BUILD_DIR}/u-boot.bin" $imx_tools_path
+	cd $imx_tools_path && ./mk_imx_image.sh 'u-boot.bin'
+#	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot.imx'
+#	PrintNotice "Building u-boot-with-nand-spl.imx"
+#	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot-with-nand-spl.imx'
 	PrintNotice "Moving to output: ${UBOOT_IMG}"
 	mv "${UBOOT_BUILD_DIR}/u-boot.bin" "${UBOOT_IMG_DIR}/${UBOOT_IMG}"
 	NotifyUser "Building of U-Boot \"${BOARD_UBOOT_CNF}\" was finished!"
@@ -52,4 +59,8 @@ UBootToMMC() {
 	cp "${SRC_FIRMWARE_DIR}/u-boot_nand_config.bin" "$1/"
 	PrintNotice "Writing u-boot image \"${UBOOT_IMG}\" to: ${SUBPROG_ARG}"
 	sudo dd if="${UBOOT_IMG_DIR}/${UBOOT_IMG}" of="${SUBPROG_ARG}" ${BOARD_UBOOT_DD} && sync
+}
+
+UBootToRemoteRepo() {
+	UploadDataToRemoteRepo "${UBOOT_IMG_DIR}/${UBOOT_IMG}" 'u-boot.bin'
 }

@@ -1,0 +1,18 @@
+#!/bin/sh
+
+GPIO_PATH='/sys/class/gpio'
+RED_GPIO_PIN='109'
+GREEN_GPIO_PIN='110'
+
+SetLedPin() {
+  local pin_id=$1
+  local pin_val=$2
+  local pin_path="${GPIO_PATH}/gpio${pin_id}/value"
+  echo $pin_val > $pin_path
+}
+
+if [ "$1" = 'R' -o "$1" = 'r' ]; then
+  SetLedPin $RED_GPIO_PIN $2
+else
+  SetLedPin $GREEN_GPIO_PIN $2
+fi

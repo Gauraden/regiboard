@@ -1,0 +1,6 @@
+#!/bin/sh
+
+MTD_NUM=4
+
+ubiattach /dev/ubi_ctrl -m $MTD_NUM
+mount -a

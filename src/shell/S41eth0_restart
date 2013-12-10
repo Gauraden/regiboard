@@ -1,3 +1,0 @@
-#!/bin/sh
-ethtool -s eth0 speed 10 duplex half
-udhcpc -n

@@ -74,3 +74,7 @@ KernelToMMC() {
 #	rm -r -f "$1/modules"
 #	cp -r "${KERNEL_MODULES_DIR}" "$1/modules"
 }
+
+KernelToRemoteRepo() {
+	UploadDataToRemoteRepo "${KERNEL_IMG_DIR}/${KERNEL_IMG}" 'uImage'
+}

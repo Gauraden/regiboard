@@ -1,0 +1,17 @@
+#!/bin/sh
+
+OS_SETUP_DIR='/root/os_setup'
+OS_SETUP_SCRIPT='rb_setup_linux.sh'
+KERNEL_IMAGE='uImage'
+
+if [ ! -f "${OS_SETUP_DIR}/${OS_SETUP_SCRIPT}" ]; then
+    echo "Script for kernel update was not found!"
+    exit 1;
+fi
+
+if [ ! -f "${OS_SETUP_DIR}/${KERNEL_IMAGE}" ]; then
+    echo "Kernel image \"${KERNEL_IMAGE}\" was not found!"
+    exit 1;
+fi
+
+cd "$OS_SETUP_DIR" && "./$OS_SETUP_SCRIPT" os

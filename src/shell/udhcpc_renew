@@ -1,0 +1,3 @@
+#!/bin/sh
+
+pidof udhcpc | xargs kill -SIGUSR1 && ifconfig

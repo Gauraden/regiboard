@@ -2,7 +2,7 @@
 
 GetPacketBuildDir() {
 	DieIfNotDefined "$1" 'Name of tarball'
-	echo $(echo "$1" | sed -E 's:([^/]+).tar(.*)$:\1:')
+	echo $(echo "$1" | sed -E 's:([^/]+).tar(.*)$:\1:') #'
 }
 
 PacketConfigure() {
@@ -10,22 +10,29 @@ PacketConfigure() {
 	if IsFileExists "$build_dir/Makefile"; then
 		return
 	fi
+	if IsFileExists "$build_dir/autogen.sh"; then
+		./autogen.sh
+	fi
 	if IsFileExists "$build_dir/configure"; then
 		local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
 		local conf_flags="--host=${TC_PREFIX} --prefix=${RFS_ROOT_DIR}/target"
-		./configure $conf_flags ${PACKET_CONFIGURE} ${TC_CONFIGURE_FLAGS} $pkg_config
+		if [ "${PACKET_ENV_VARS}" != '' ]; then
+			export ${PACKET_ENV_VARS}
+		fi
+		./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config
 		return
 	fi
 	if IsFileExists "$build_dir/CMakeLists.txt"; then
-		export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} && cmake ./
+		FLAGS="-I'${RFS_ROOT_DIR}/staging/usr/include' -L'${RFS_ROOT_DIR}/target/usr/lib' ${PACKET_CONFIGURE}"
+		export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
 		return
 	fi
-	PrintAndDie 'Don`t know how to configurate Automake'
+	PrintAndDie 'Do not know how to configurate Automake'
 }
 
 PacketClean() {
 	local build_dir=$1
-	TcTargetCleanSources ${build_dir}
+	#TcTargetCleanSources ${build_dir}
 }
 
 PacketMake() {

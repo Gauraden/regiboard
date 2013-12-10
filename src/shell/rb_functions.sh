@@ -90,9 +90,73 @@ DieIfNoTool() {
 #   > name of MTD
 GetMTDFor() {
 	DieIfNotDefined 'MTD label'
-	local mtd=$(cat /proc/mtd | grep $1 | grep -E -o '^([^\:]+)')
+	local mtd=$(cat /proc/mtd | grep $1 | grep -E -o '^([^\:]+)') #'
 	if ! IsFileExists "/dev/$mtd"; then
 		PrintAndDie "MTD with label '$1' was not found!"
 	fi
 	echo $mtd
+}
+# Function for disabling printing messages of linux kernel on console.
+DisableKernelMessages() {
+	local printk_cnf='/proc/sys/kernel/printk'
+	if ! IsFileExists $printk_cnf; then
+		PrintWarn 'Disabling messages of kernel is failed!'
+		return 0
+	fi
+	echo 0 > $printk_cnf
+}
+# Function for enabling printing messages of linux kernel on console.
+EnableKernelMessages() {
+	local printk_cnf='/proc/sys/kernel/printk'
+	if ! IsFileExists $printk_cnf; then
+		PrintWarn 'Enabling messages of kernel is failed!'
+		return 0
+	fi
+	echo 1 > $printk_cnf
+}
+# Function for extracting bits from bytes.
+#   < offset of extracting bits
+#   < source value for extraction bits
+#   < mask of extracting bits. Not mandatory, by default will use 1!
+#   > value representing extracted bits
+GetBit() {
+	local offs=$1
+	local src=$2
+	local mask=$3
+	if [ "$mask" = "" ]; then
+		mask='1'
+	fi
+	let "BIT_VALUE=($2 >> $offs) & $mask" && echo $BIT_VALUE || echo '0'
+}
+# Function for reading data from FUSE.
+#   < name of FUSE register
+#   < offset of FUSE register
+#   < handler for value that was extracted from FUSE
+ReadFuse() {
+	DieIfNotDefined $FUSE_DEV 'Name of FUSE device!'
+	local fuse_addr=`echo $(($2))`
+	local fuse_val=$(dd if=$FUSE_DEV bs=1 skip=$fuse_addr count=1 2> /dev/null | \
+	  hexdump | \
+	  head -1 | \
+	  sed -r 's/^\w+\ ([0-9a-f]{4,4})/\1/g')
+	PrintNotice "FUSE [$2] $1: $fuse_val"
+	local fuse_parser=$3
+	if [ "$fuse_parser" = "" ]; then
+		return;
+	fi
+	$fuse_parser $fuse_val
+}
+# Function for downloading files from FTP.
+#   < name of downloadable file
+#   < name of directory to save this file
+GetFileFromFTP() {
+	local file_name="$1"
+	local output_dir="$2"
+	DieIfNotDefined $file_name    'Name of downloadable file!'
+	DieIfNotDefined $output_dir   'Name of output directory!'
+	DieIfNotDefined $FTP_REPO_URL 'FTP repository URL!'
+	DieIfNotDefined $FTP_REPO_PSW 'FTP repository password!'
+	IsItFunction 'wget' || PrintAndDie 'No wget util was found!'
+	PrintNotice "Downloading..."
+	wget --password=$FTP_REPO_PSW -P "$output_dir" ftp://$FTP_REPO_URL/$file_name
 }

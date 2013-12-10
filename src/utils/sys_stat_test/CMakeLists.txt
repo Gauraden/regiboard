@@ -5,5 +5,5 @@ project("sys_stat_test")
 #### compilation
 ## executable
 add_executable(sys_stat_test
-	stat_test.c
+	stat_test.cpp
 )

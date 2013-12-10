@@ -496,3 +496,15 @@ InstallPacket() {
 	return 0
 }
 
+UploadDataToRemoteRepo() {
+	DieIfNoTool 'ncftp'
+	PrintNotice "Uploading \"$1\" to: $REPO_URL_FTP/$2"
+	local user=$(echo "$REPO_URL_FTP" | sed -r 's/^([^@]+)@(.+)$/\1/')
+	local host=$(echo "$REPO_URL_FTP" | sed -r 's/^([^@]+)@(.+)$/\2/')
+	ncftpput -u$user -p"$REPO_PSW_FTP" -C "$host" $1 "/$2" || PrintWarn "Failed to upload file: $1"
+}
+
+FindUSBDevice() {
+  lsusb | grep "$1" > /dev/null && return 0
+  return 1
+}

@@ -35,7 +35,7 @@ SetBaud() {
 GetAvailableBaud() {
 	local tty=$1
 	local baud=115200
-	local prev_baud=$(stty -F /dev/$tty | sed -r 's/speed ([0-9]+) baud(.*)/\1/' \
+	local prev_baud=$(stty -F /dev/$tty | sed -r 's/speed ([0-9]+) baud(.*)/\1/' \ #'
                                       | grep -P '([0-9]{4,})')
 	Print "Scaning for available baud on: $tty"
 	PrintNotice "Previous baud: $prev_baud"
@@ -64,7 +64,7 @@ RecievingBlock() {
 
 DoForTTYDevice() {
 	Print "Do '$1' for all devices:"
-	for tty_dev in $(ls /dev/ | grep -oE 'ttyUSB([0-9]+)'); do
+	for tty_dev in $(ls /dev/ | grep -oE 'ttyUSB([0-9]+)'); do # '
 		$1 $tty_dev $2
 	done
 }
