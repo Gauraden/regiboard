@@ -16,6 +16,7 @@
 		var frame        = new Image();
 		var timeout      = 0;
 		var disconnected = true;
+		var mouse        = {'x': 0, 'y': 0, 'state': 0, 'send': 1};
 
 		frame.onload = function() {
 		  var frame_lim = 12;
@@ -56,6 +57,21 @@
 			message_node = document.getElementById("message");
 			canvas_node  = document.getElementById("screen");
 			canvas_ctx   = canvas_node.getContext('2d');
+			
+			canvas_node.onmouseup = function(event) {
+		    mouse.x     = event.x;
+ 		    mouse.y     = event.y;
+ 		    mouse.state = 0;
+ 		    mouse.send  = 1;
+		  }
+		  
+			canvas_node.onmousedown = function(event) {
+		    mouse.x     = event.x;
+ 		    mouse.y     = event.y;
+ 		    mouse.state = 1;
+ 		    mouse.send  = 1;
+		  }
+		  
 			setInterval(function() {
 				if (ready == false) {
 					timeout++;
@@ -65,8 +81,15 @@
 					disconnected = true;
 				}
 				UpdateState();
-				ready     = false;
-				frame.src = 'http://' + document.domain + ':8080';
+				ready = false;
+				var get_req = '';
+				if (mouse.send) {
+				  get_req = '?x=' + mouse.x +
+				            '&y=' + mouse.y +
+				            '&s=' + mouse.state;
+          mouse.send = 0;
+        }
+				frame.src = 'http://' + document.domain + ':8080' + get_req;
 			}, 500);
 		}
 		</script>

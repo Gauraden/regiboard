@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sstream>
 #include <signal.h>
+#include <cstdlib>
 
 static int CreateServerSocket() {
 	int serverSock = socket(AF_INET, SOCK_STREAM, 0);
@@ -30,12 +31,30 @@ static std::string GetDateTime() {
   return std::string(buffer);
 }
 
+static int GetNumber(char *str) {
+  const char *sub_str = strtok(str, "=");
+  if (sub_str == 0)
+    return -1;
+  return atol(sub_str);
+}
+
 static void WaitForRequest(int socket, fb::Screen &screen) {
 		char receivedStr[1000];
 		sockaddr_in clientAddr;
 		socklen_t   sin_size = sizeof(struct sockaddr_in);
 		int clientSock = accept(socket, (struct sockaddr*)&clientAddr, &sin_size);
 		recv(clientSock, receivedStr, 500, 0);
+		
+		int x = -1;
+		int y = -1;
+		int s = -1;
+		if (std::string(receivedStr, 7) == "GET /?x") {
+  		GetNumber(receivedStr);
+      x = GetNumber(0);
+      y = GetNumber(0);
+      s = GetNumber(0);
+  		std::cout << "recv: x=" << x << "; y=" << y << "; s=" << s << std::endl;
+		}
     fb::PngUserData udata = screen.get_png_udata();
 		std::stringstream head;
 		head << "HTTP/1.1 200 OK\r\n"
