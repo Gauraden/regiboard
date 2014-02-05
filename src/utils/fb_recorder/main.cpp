@@ -9,6 +9,67 @@
 #include <sstream>
 #include <signal.h>
 
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+// [dsmover: 2014-02-05 Wed 05:05 PM]
+typedef struct message {
+  long mtype;
+
+	char cmd[128];
+	char result[32];
+} mess_t;
+
+int nres;
+int qid;
+key_t msgkey;
+mess_t sent, received;
+const static int mes_length = sizeof(mess_t) - sizeof(long);
+
+void InitIPC();
+void TerminateIPC();
+
+// получить через http новые координаты нажатия
+// what_happened: 0 - ничего
+//                1 - нажатие
+//                2 = отжатие
+bool GetNewCoords(int *x, int *y, int *what_happened);
+// передать нажатия в regigraf
+bool SendNewCoords(int x, int y, int what);
+
+void InitIPC()
+{
+	msgkey = ftok("/home/regigraf",'a');
+	qid = msgget(msgkey, IPC_CREAT | 0660);
+
+	std::cout << "InitIPC: QID = " << qid << " mtype version" << std::endl;
+}
+void TerminateIPC()
+{
+	msgctl(qid, IPC_RMID, 0);
+
+	std::cout << "TerminateIPC: QID = " << qid << std::endl;
+}
+
+bool GetNewCoords(int *x, int *y, int *what_happened)
+{
+	*x = rand() % 1024;
+	*y = rand() % 768;
+	*what_happened = 1;
+	return true;
+}
+
+bool SendNewCoords(int x, int y, int what)
+{
+	sent.mtype = 1; // always one
+	snprintf(sent.cmd, 128, "got coords; x=%i y=%i what=%i", x, y, what);
+	snprintf(sent.result, 5, "%s", "OK");
+	nres = msgsnd(qid, &sent, mes_length, 0);
+	if (nres == -1) { std::cout << "Couldn't msgsng!" << std::endl; return false; }
+
+	return true;
+}
+
 static int CreateServerSocket() {
 	int serverSock = socket(AF_INET, SOCK_STREAM, 0);
 	sockaddr_in serverAddr;
@@ -36,6 +97,19 @@ static void WaitForRequest(int socket, fb::Screen &screen) {
 		socklen_t   sin_size = sizeof(struct sockaddr_in);
 		int clientSock = accept(socket, (struct sockaddr*)&clientAddr, &sin_size);
 		recv(clientSock, receivedStr, 500, 0);
+
+		int x, y, what_happened;
+		if (GetNewCoords(&x, &y, &what_happened)) {
+			//std::cout << "Got new coords from socket: x, y = " << x << ", " << y << " what_happened: " <<
+				what_happened << std::endl;
+			if (SendNewCoords(x, y, what_happened)) {
+				//std::cout << "Managed to send coords to the regigraf program" << std::endl;
+			} else {
+				//std::cout << "Error! Couldn't send coords to the regigraf program" << std::endl;
+			}
+		}
+		sleep(1);
+
     fb::PngUserData udata = screen.get_png_udata();
 		std::stringstream head;
 		head << "HTTP/1.1 200 OK\r\n"
@@ -74,15 +148,20 @@ void SignalCatcher(int sig_num) {
 		}
 		case SIGTERM:
 		case SIGINT:
+			TerminateIPC();
 		default:
 			break;
 	}
 }
 
+
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		ERROR("Ошибка " << "укажите директорию для сохранения скриншотов");
 	}
+
+	InitIPC();
+
 	const std::string kOutPath(argv[1]);
 	const std::string kImageFile = kOutPath + "/screen.bmp";
 	fb::Screen screen;
@@ -98,5 +177,8 @@ int main(int argc, char *argv[]) {
 //		fwrite(udata.data.get(), sizeof(png_byte), udata.offs, bmp_f);
 //		fclose(bmp_f);
 	}
+
+	TerminateIPC();
+
 	return 0;
 }
