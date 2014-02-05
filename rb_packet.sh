@@ -7,9 +7,8 @@ GetPacketBuildDir() {
 
 PacketConfigure() {
 	local build_dir="$1"
-	if IsFileExists "$build_dir/Makefile"; then
-		return
-	fi
+	local rfs_include="${RFS_ROOT_DIR}/staging/usr/include"
+	local rfs_lib="${RFS_ROOT_DIR}/target/usr/lib"
 	if IsFileExists "$build_dir/autogen.sh"; then
 		./autogen.sh
 	fi
@@ -19,11 +18,15 @@ PacketConfigure() {
 		if [ "${PACKET_ENV_VARS}" != '' ]; then
 			export ${PACKET_ENV_VARS}
 		fi
-		./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config
+		./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config || \
+		./configure ${PACKET_CONFIGURE}
+		return
+	fi
+	if IsFileExists "$build_dir/Makefile"; then
 		return
 	fi
 	if IsFileExists "$build_dir/CMakeLists.txt"; then
-		FLAGS="-I'${RFS_ROOT_DIR}/staging/usr/include' -L'${RFS_ROOT_DIR}/target/usr/lib' ${PACKET_CONFIGURE}"
+		FLAGS="-I'${INCLUDE_DIR}' -I'${rfs_include}' -L'${rfs_lib}' ${PACKET_CONFIGURE}"
 		export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
 		return
 	fi

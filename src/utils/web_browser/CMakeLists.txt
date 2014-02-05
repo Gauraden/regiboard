@@ -1,10 +1,10 @@
 #### cmake project
 cmake_minimum_required(VERSION 2.6)
-project("gtk_test")
+project("regiweb")
 
 #### compilation
 ## executable
-add_executable(gtk_test
+add_executable(regiweb
 	gtk_test.cpp
 )
 
@@ -29,6 +29,6 @@ target_link_libraries(gtk_test
     -lglib-2.0
 )
 
-INSTALL(TARGETS gtk_test
-  RUNTIME DESTINATION "${PROJECT_SOURCE_DIR}/output"
-)
+#INSTALL(TARGETS gtk_test
+#  RUNTIME DESTINATION "${PROJECT_SOURCE_DIR}/output"
+#)

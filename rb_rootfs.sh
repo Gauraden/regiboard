@@ -49,7 +49,7 @@ RFSPrepareConfig() {
 	local br_config_path="${RFS_BUILD_DIR}/.config"
 	SetConfigVar ${br_config_path} 'BR2_TOOLCHAIN_EXTERNAL_PATH'          "${TC_ROOT_DIR}"
 	SetConfigVar ${br_config_path} 'BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX' "${TC_PREFIX}"
-  SetConfigVar ${br_config_path} 'BR2_TOOLCHAIN_EXTERNAL_PREFIX'        "${TC_PREFIX}"
+	SetConfigVar ${br_config_path} 'BR2_TOOLCHAIN_EXTERNAL_PREFIX'        "${TC_PREFIX}"
 	SetConfigVar ${br_config_path} 'BR2_TARGET_GENERIC_HOSTNAME'          "${BOARD_NAME}"
 	#TODO: we have a BUG, string is cutted!
 	SetConfigVar ${br_config_path} 'BR2_TARGET_GENERIC_ISSUE'             "Welcome to RegiBoard (${BOARD_CONFIG})"
@@ -137,7 +137,7 @@ RootFSToMMC() {
 	sudo sh -c "echo '/dev/mmcblk0p1 /boot vfat defaults 0 0' >> '$1/etc/fstab'"
 	sudo mkdir "$1/boot"
 	local setup_dir="$1/root/os_setup"
- 	PrintNotice 'Copying linux setup files...'
+	PrintNotice 'Copying linux setup files...'
 	if IsFileExists "${setup_dir}"; then
 		sudo cp "${ROOTFS_IMG_DIR}/${RFS_IMAGE}" "${setup_dir}/rootfs.tar"
 	else
