@@ -21,9 +21,10 @@ IsFileExists() {
 # Mount the /proc and /sys filesystems.
 mount -t proc none /proc
 mount -t sysfs none /sys
+mount -t devtmpfs devtmpfs /dev
 # ------------------------------------------------------------------------------
 # Do your stuff here.
-#/bin/splash_scr /root/logo.bmp
+/bin/splash_scr /root/logo.bmp
 # ------------------------------------------------------------------------------
 # Mount rootfs
 CMD_LINE=$(cat /proc/cmdline)
@@ -34,11 +35,16 @@ if ! IsFileExists "$NEW_ROOT"; then
 	mkdir "$NEW_ROOT" || PrintAndDie "Failed to create: $NEW_ROOT"
 fi
 
+echo "ROOT: $ROOT"
+echo "ROOT_FS: $ROOT_FS_TYPE"
+
 mount -t $ROOT_FS_TYPE $ROOT $NEW_ROOT || PrintAndDie "Failed to mount: $ROOT"
 
-# Clean up
-umount /proc
-umount /sys
+# Moving mounted pseudo filesystems
+mount --move /sys $NEW_ROOT/sys
+mount --move /proc $NEW_ROOT/proc
+mount --move /dev $NEW_ROOT/dev
 
 # Boot the real thing
+echo "executing linuxrc..."
 exec switch_root $NEW_ROOT /sbin/init

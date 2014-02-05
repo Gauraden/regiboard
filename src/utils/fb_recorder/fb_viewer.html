@@ -1,0 +1,80 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<html>
+	<head>
+  	<meta charset="UTF-8">
+	  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	  <title>F1772 Online</title>
+		<script type="text/javascript">
+		var debug_node   = 0;
+		var message_node = 0;
+		var canvas_node  = 0;
+		var canvas_ctx   = 0;
+		var ready        = true;
+		var frame        = new Image();
+		var timeout      = 0;
+		var disconnected = true;
+
+		frame.onload = function() {
+		  var frame_lim = 12;
+		  var frame_num = 0;
+		  disconnected = false;
+ 		  var fade_int = setInterval(function() {
+ 		  	canvas_ctx.save();
+ 		  	canvas_ctx.globalAlpha = (frame_num / frame_lim);
+			  canvas_ctx.drawImage(frame, 0, 0);
+			  canvas_ctx.restore();
+			  frame_num++;
+			  if (frame_num > frame_lim) {
+			    clearInterval(fade_int);
+			    ready = true;
+			  }
+			}, 1000 / frame_lim); 
+		}
+				
+		function Debug(msg) {
+			if (debug_node == 0)
+				return;
+			var tm = new Date();
+			debug_node.innerHTML += '> ' + tm.toLocaleTimeString() +
+						                  ": " + msg + '</br>'
+		}
+
+		function UpdateState() {
+			if (message_node == 0)
+				return;
+			if (disconnected)
+				message_node.innerHTML = 'Нет связи с устройством';
+			else
+				message_node.innerHTML = 'Просмотр работает только в браузерах: Chrome, Chromium!';
+		}
+
+		function OnLoad() {
+			debug_node   = document.getElementById("debug");
+			message_node = document.getElementById("message");
+			canvas_node  = document.getElementById("screen");
+			canvas_ctx   = canvas_node.getContext('2d');
+			setInterval(function() {
+				if (ready == false) {
+					timeout++;
+					if (timeout < 10)
+						return;
+					timeout = 0;
+					disconnected = true;
+				}
+				UpdateState();
+				ready     = false;
+				frame.src = 'http://' + document.domain + ':8080';
+			}, 500);
+		}
+		</script>
+	</head>
+	<body onload="OnLoad()">
+	  <div id="message"></div>
+		<canvas id="screen" width="1024" height="768" style="border: 1px solid #000000;">
+		</canvas>
+		<!--<div id="debug" style="overflow:scroll"></div>-->
+	</body>
+</html>

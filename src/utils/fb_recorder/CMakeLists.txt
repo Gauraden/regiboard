@@ -1,25 +1,23 @@
 #### cmake project
 cmake_minimum_required(VERSION 2.6)
-project("fb_rd")
+project("fb_recorder")
 
-set(CMAKE_CXX_FLAGS "-static -s")
-
-include_directories("${PROJECT_SOURCE_DIR}")
+#set(CMAKE_CXX_FLAGS "-static -s ${CMAKE_CXX_FLAGS}")
 
 #### compilation
 ## executable
-add_executable(fb_rd
+add_executable(fb_recorder
     main.cpp
     framebuf.cpp
 )
 
 ## libraries
-target_link_libraries(fb_rd
+target_link_libraries(fb_recorder
     png
     z
     rt
 )
 
-INSTALL(TARGETS fb_rd
-  RUNTIME DESTINATION "${PROJECT_SOURCE_DIR}"
-)
+#INSTALL(TARGETS fb_rd
+#  RUNTIME DESTINATION "${PROJECT_SOURCE_DIR}"
+#)
