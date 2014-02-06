@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sstream>
 #include <signal.h>
+#include <cstdlib>
 
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -91,6 +92,13 @@ static std::string GetDateTime() {
   return std::string(buffer);
 }
 
+static int GetNumber(char *str) {
+  const char *sub_str = strtok(str, "=");
+  if (sub_str == 0)
+    return -1;
+  return atol(sub_str);
+}
+
 static void WaitForRequest(int socket, fb::Screen &screen) {
 		char receivedStr[1000];
 		sockaddr_in clientAddr;
@@ -98,17 +106,28 @@ static void WaitForRequest(int socket, fb::Screen &screen) {
 		int clientSock = accept(socket, (struct sockaddr*)&clientAddr, &sin_size);
 		recv(clientSock, receivedStr, 500, 0);
 
-		int x, y, what_happened;
-		if (GetNewCoords(&x, &y, &what_happened)) {
-			//std::cout << "Got new coords from socket: x, y = " << x << ", " << y << " what_happened: " <<
-				what_happened << std::endl;
-			if (SendNewCoords(x, y, what_happened)) {
-				//std::cout << "Managed to send coords to the regigraf program" << std::endl;
-			} else {
-				//std::cout << "Error! Couldn't send coords to the regigraf program" << std::endl;
+		//int x, y, what_happened;
+		int x = -1;
+		int y = -1;
+		int s = -1;
+		if (std::string(receivedStr, 7) == "GET /?x") {
+  		GetNumber(receivedStr);
+      x = GetNumber(0);
+      y = GetNumber(0);
+      s = GetNumber(0);
+  		std::cout << "recv: x=" << x << "; y=" << y << "; s=" << s << std::endl;
+			if (s == 1) {
+				if (SendNewCoords(x, y, s)) {
+					//std::cout << "Managed to send coords to the regigraf program" << std::endl;
+				} else {
+					//std::cout << "Error! Couldn't send coords to the regigraf program" << std::endl;
+				}
 			}
 		}
-		sleep(1);
+		//if (GetNewCoords(&x, &y, &what_happened)) {
+
+			//std::cout << "Got new coords from socket: x, y = " << x << ", " << y << " what_happened: " <<
+			//	what_happened << std::endl;
 
     fb::PngUserData udata = screen.get_png_udata();
 		std::stringstream head;
