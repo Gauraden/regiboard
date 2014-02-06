@@ -1,6 +1,6 @@
 #
 # Automatically generated make config: don't edit
-# Buildroot 2012.05-ga66483c-dirty Configuration
+# Buildroot 2012.05-gec39133-dirty Configuration
 #
 BR2_HAVE_DOT_CONFIG=y
 BR2_arm=y
@@ -305,7 +305,7 @@ BR2_PACKAGE_DIRECTFB_PNG=y
 # BR2_PACKAGE_DIVINE is not set
 # BR2_PACKAGE_FBDUMP is not set
 # BR2_PACKAGE_FBGRAB is not set
-# BR2_PACKAGE_FBSET is not set
+BR2_PACKAGE_FBSET=y
 # BR2_PACKAGE_FBV is not set
 # BR2_PACKAGE_IMAGEMAGICK is not set
 # BR2_PACKAGE_LITE is not set

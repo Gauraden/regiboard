@@ -151,18 +151,21 @@ bool Screen::ConvertToBmp(const char *ext_head, size_t ext_size) {
 		return true;
 	Header header;
 	Info   info;
+	const int kWidth    = _width;
+	const int kHeight   = _height;
+	const int kDepth    = _depth;
 	const int kHeadSize = sizeof(header) + sizeof(info);
-	const int kBodySize = _width * _height * _depth;
+	const int kBodySize = kWidth * kHeight * kDepth;
 	header.bfType        = 0x42 | (0x4D << 8);   // тип файла, символы «BM» (в HEX: 0x42 0x4d).
 	header.bfSize        = kHeadSize + kBodySize; // размер всего файла в байтах.
 	header.bfReserved1   = 0;
 	header.bfReserved2   = 0;
 	header.bfOffBits     = kHeadSize;             // содержит смещение на данные изображения 
 	info.biSize          = sizeof(info);
-	info.biWidth         = 1024;
-	info.biHeight        = -768;
+	info.biWidth         = kWidth;
+	info.biHeight        = kHeight * (-1);
 	info.biPlanes        = 1;
-	info.biBitCount      = 24;
+	info.biBitCount      = kDepth * 8;
 	info.biCompression   = 0; // BI_RGB
 	info.biSizeImage     = kBodySize;
 	info.biXPelsPerMeter = 0;
@@ -170,6 +173,7 @@ bool Screen::ConvertToBmp(const char *ext_head, size_t ext_size) {
 	info.biClrUsed       = 0;
 	info.biClrImportant  = 0;
 //	ERROR("DEBUG: new BMP frame...: size: " << header.bfSize << ": offs: " << header.bfOffBits);
+  std::cout << "w: " << kWidth << "; h: " << kHeight << "; d: " << kDepth << std::endl;
 	_png_udata.offs = 0;
 	if (ext_size > 0 && ext_head != 0) {
 	 	memcpy(_png_buf.get(), ext_head, ext_size);
@@ -186,7 +190,7 @@ bool Screen::ConvertToBmp(const char *ext_head, size_t ext_size) {
 
 size_t Screen::GetFrameSize() const {
 	const int kHeadSize = sizeof(Header) + sizeof(Info);
-	const int kBodySize = _width * _height * _depth;
+	const int kBodySize = _width * _height * _depth;//_width * _height * _depth;
 	return kHeadSize + kBodySize;
 }
 
