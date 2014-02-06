@@ -6,7 +6,7 @@ _BIN_DIR=$PATH
 _INC_DIR='/usr/include'
 _DEV_NULL='/dev/null'
 _PROC_VERSION=$(cat /proc/version)
-_WGET_ARGS="-q -t ${WGET_TRIES} --waitretry=${WGET_WAIT}"
+_WGET_ARGS="-q -t ${WGET_TRIES} --waitretry=${WGET_WAIT} "
 _USE_SUDO=''
 _SYS_LOCALE=$(locale | grep -m1 -P -o '([a-z]{2,2})\_([A-Z]{2,2})' | grep -P -o '([a-z]+)')
 
