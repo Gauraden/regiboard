@@ -5,6 +5,7 @@
   <title>F1772 Online</title>
   <meta http-equiv="content-type" content="text/html;charset=utf-8" />
 	<script type="text/javascript">
+	  var kPollPeriod  = 250; // msec
 		var debug_node   = 0;
 		var message_node = 0;
 		var canvas_node  = 0;
@@ -13,25 +14,9 @@
 		var frame        = new Image();
 		var timeout      = 0;
 		var disconnected = true;
-		var mouse        = {'x': 0, 'y': 0, 'state': 0, 'send': 1};
+		var mouse        = {'x': 0, 'y': 0, 'state': 0, 'send': false};
+		var poll_tm_out  = 0;
 
-		frame.onload = function() {
-		  var frame_lim = 12;
-		  var frame_num = 0;
-		  disconnected = false;
- 		  var fade_int = setInterval(function() {
- 		  	canvas_ctx.save();
- 		  	canvas_ctx.globalAlpha = (frame_num / frame_lim);
-			  canvas_ctx.drawImage(frame, 0, 0);
-			  canvas_ctx.restore();
-			  frame_num++;
-			  if (frame_num > frame_lim) {
-			    clearInterval(fade_int);
-			    ready = true;
-			  }
-			}, 1000 / frame_lim); 
-		}
-				
 		function Debug(msg) {
 			if (debug_node == 0)
 				return;
@@ -49,50 +34,94 @@
 				message_node.innerHTML = 'Просмотр работает только в браузерах: Chrome, Chromium!';
 		}
 
+    function GetReqParams() {
+      var req = '';//'?stamp=' + (new Date().getUTCSeconds()) + '&';
+			if (mouse.send != true)
+			  return req;
+      mouse.send = false;
+  		return ('?' + req + 'x=' + mouse.x + '&y=' + mouse.y + '&s=' + mouse.state);
+    }
+
 		function OnLoad() {
 			debug_node   = document.getElementById("debug");
 			message_node = document.getElementById("message");
 			canvas_node  = document.getElementById("screen");
 			canvas_ctx   = canvas_node.getContext('2d');
-			
-			canvas_node.onmouseup = function(event) {
-		    /*mouse.x     = event.x;
+		  /*
+		  canvas_node.onmousedown = function(event) {
+		    mouse.x     = event.x;
  		    mouse.y     = event.y;
- 		    mouse.state = 0;
- 		    mouse.send  = 1;*/
-		  }
+  		  mouse.state = 0;
+ 		    mouse.send  = true;
+		  };*/
 		  
 			canvas_node.onmousedown = function(event) {
 		    mouse.x     = event.x;
  		    mouse.y     = event.y;
  		    mouse.state = 1;
- 		    mouse.send  = 1;
+ 		    mouse.send  = true;
+		  };
+		  
+		  function UpdatePollTimeout() {
+		    if (poll_tm_out != undefined && poll_tm_out != 0)
+  			  clearTimeout(poll_tm_out);
+        poll_tm_out = setTimeout(PollFrame, kPollPeriod);
 		  }
 		  
-			setInterval(function() {
+			function PollFrame() {
 				if (ready == false) {
 					timeout++;
-					if (timeout < 10)
-						return;
+					if (timeout < 10) 
+						return UpdatePollTimeout();
 					timeout = 0;
 					disconnected = true;
 				}
 				UpdateState();
 				ready = false;
-				var get_req = '';
-				if (mouse.send) {
-				  get_req = '?x=' + mouse.x +
-				            '&y=' + mouse.y +
-				            '&s=' + mouse.state;
-          mouse.send = 0;
-        }
-				frame.src = 'http://' + document.domain + ':8080' + get_req;
-			}, 500);
+				frame.src = 'http://' + document.domain + ':8080' + GetReqParams();
+			}
+      
+		  frame.onload = function() {
+		    /*var frame_lim = 10;
+		    var frame_num = 0;
+		    disconnected = false;
+   		  var fade_int = setInterval(function() {
+   		  	canvas_ctx.save();
+   		  	canvas_ctx.globalAlpha = (frame_num / frame_lim);
+			    canvas_ctx.drawImage(frame, 0, 0);
+			    canvas_ctx.restore();
+			    frame_num++;
+			    if (frame_num > frame_lim) {
+			      clearInterval(fade_int);
+			      ready = true;
+			    }
+			  }, kPollPeriod / frame_lim);*/
+	    	canvas_ctx.save();
+		    canvas_ctx.drawImage(this, 0, 0);
+		    canvas_ctx.restore();
+	      ready        = true;
+		    disconnected = false;
+        UpdatePollTimeout();
+		  };
+		  
+		  frame.onerror = function() {
+	      ready        = false;
+		    disconnected = true;
+        UpdatePollTimeout();
+		  };
+		  
+		  frame.onabort = function() {
+	      ready        = false;
+		    disconnected = true;
+        UpdatePollTimeout();
+		  };
+		  
+      UpdatePollTimeout();
 		}
 		</script>
 	</head>
 	<body onload="OnLoad()" style="padding: 0px; margin: 0px">
-		<canvas id="screen" width="1024" height="768" style="border: 1px solid #000000; padding: 0px; margin: 0px">
+		<canvas id="screen" width="1024" height="768" style="border: 1px solid #000000;">
 		</canvas>
 	  <div id="message"></div>
 		<!--<div id="debug" style="overflow:scroll"></div>-->

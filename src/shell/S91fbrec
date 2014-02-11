@@ -1,0 +1,32 @@
+#!/bin/sh
+
+FBREC_NAME='framebuffer recorder'
+FBREC_DIR='/root'
+FBREC_BIN="fb_recorder"
+
+StartCmd() {
+	echo -n "Starting $FBREC_NAME: "
+	$FBREC_DIR/$FBREC_BIN &
+	echo "OK"
+}
+
+StopCmd() {
+	echo -n "Stopping $FBREC_NAME: "
+	#pidof $FBREC_BIN | xargs kill -SIGTERM
+	killall -9 $FBREC_BIN
+	echo "OK"
+}
+
+case "$1" in
+	start) StartCmd;;
+	stop ) StopCmd;;
+	restart|reload)
+	    StopCmd
+	    StartCmd
+	    ;;
+	*)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

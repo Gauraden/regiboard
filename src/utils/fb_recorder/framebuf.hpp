@@ -33,9 +33,34 @@ struct PngUserData {
   int      offs;
 };
 
+static uint8_t       RGBIter   = 0;
+static const uint8_t kRGBWeight[] = {28, 151, 77};
+
+struct RGBQuad {
+  RGBQuad(): r(RGBIter), g(RGBIter), b(RGBIter), reserved(0) { RGBIter++; }  
+  RGBQuad(uint8_t _b, uint8_t _g, uint8_t _r)
+      : r(_r), g(_g), b(_b), reserved(0) {}
+  void operator= (png_byte *bm) {
+    r = bm[0];
+    g = bm[1];
+    b = bm[2];
+  }
+  uint8_t GetId() const {
+    return (uint32_t)((r * kRGBWeight[0]) +
+                      (g * kRGBWeight[1]) +
+                      (b * kRGBWeight[2])) >> 8;
+  }
+  uint8_t r,
+          g,
+          b,
+          reserved;
+};
+
 class Screen {
 	public:
-		static const uint8_t kPngDepth = 3;
+		static const int     kPaletteColors = 256;
+		static const uint8_t kPngDepth      = 3;
+		static const uint8_t kBmpDepth      = 1;
 		Screen()
 			: _fbdev(-1),
 			  _width(0),
@@ -45,7 +70,7 @@ class Screen {
 			  _size(0),
 			  _png_ptr(0),
 			  _info_ptr(0),
-			  _last_up(0) {}
+			  _last_up(0) { GeneratePalette(); }
 		Screen(uint32_t w, uint32_t h, uint8_t d)
 			: _fbdev(-1),
 			  _width(w),
@@ -59,16 +84,18 @@ class Screen {
 		~Screen() { UnBind(); }
 		void BindToFbDev(const char *fname);
 		void UnBind();
-		bool ConvertToPng();
-		bool ConvertToBmp(const char *ext_head, size_t ext_size);
-		PngUserData get_png_udata() { return _png_udata; }
-		size_t GetFrameSize() const;
+		bool SendFrameAsPng(int socket);
+		bool SendFrameAsBmp(int socket);
 	private:
-		bool GetVideoMode();
-		void AllocatePngRows();
-		bool SetupPngFrame();
-		void DestroyPngFrame();
-		bool FrameTimeout();
+		bool   GetVideoMode();
+		void   AllocatePngRows();
+		bool   SetupPngFrame();
+		void   DestroyPngFrame();
+		bool   FrameTimeout();
+		void   InitHttpHeader(int socket, const char *ctype, uint8_t color_depth);
+		void   SendUData(int socket);
+		size_t GetFrameSize(uint8_t color_depth) const;
+		void   GeneratePalette();
 
 		int         _fbdev;
 		uint32_t    _width;
@@ -82,6 +109,7 @@ class Screen {
 		png_structp _png_ptr;
     png_infop   _info_ptr;
     TimeVal     _last_up;
+    RGBQuad     _palette[kPaletteColors];
 };
 
 } // namespace fb

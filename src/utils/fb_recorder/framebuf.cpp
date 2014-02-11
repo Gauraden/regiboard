@@ -1,4 +1,7 @@
 #include "framebuf.hpp"
+#include <sstream>
+#include <sys/socket.h>
+//#include <arm_neon.h>
 
 namespace fb {
 
@@ -100,16 +103,19 @@ bool Screen::GetVideoMode() {
 	return true;
 }
 
-bool Screen::ConvertToPng() {
-//	ERROR("DEBUG: new PNG frame...: " << PNG_ZBUF_SIZE);
+bool Screen::SendFrameAsPng(int socket) {
+  // FIXIT
+  /*
 	SetupPngFrame();
   _png_udata.offs = 0;
   png_write_info(_png_ptr, _info_ptr);
   png_write_png(_png_ptr, _info_ptr, PNG_TRANSFORM_BGR, NULL);
   DestroyPngFrame();
+  */
   return true;
 }
-
+// Да, да. Это мерзкое говно. Но так проще оформлять/читать структуру в
+// соответствии с документацией.
 typedef uint16_t WORD;
 typedef uint32_t DWORD;
 typedef int32_t  LONG;
@@ -126,41 +132,99 @@ struct __attribute__ ((__packed__)) Info {
 	DWORD biSize; 
 	LONG  biWidth; 
 	LONG  biHeight; 
-	WORD  biPlanes; 
+	WORD  biPlanes;        // В BMP допустимо только значение 1 
 	WORD  biBitCount; 
-	DWORD biCompression; 
-	DWORD biSizeImage; 
-	LONG  biXPelsPerMeter; 
-	LONG  biYPelsPerMeter; 
-	DWORD biClrUsed; 
-	DWORD biClrImportant; 
+	DWORD biCompression;   // Указывает на способ хранения пикселей
+	DWORD biSizeImage;     // Размер пиксельных данных в байтах
+	LONG  biXPelsPerMeter; // Количество пикселей на метр по горизонтали
+	LONG  biYPelsPerMeter; // Количество пикселей на метр по вертикали
+	DWORD biClrUsed;       // Размер таблицы цветов в ячейках
+	DWORD biClrImportant;  // Количество ячеек от начала таблицы цветов до последней используемой (можно указывать 0, если используем все ячейки)
 };
 
 bool Screen::FrameTimeout() {
 	timespec new_tm;
 	clock_gettime(CLOCK_MONOTONIC, &new_tm);
 	const uint64_t kNewTime = (new_tm.tv_sec * 1000000000) + new_tm.tv_nsec;
-	if ((kNewTime - _last_up) < 500000000)
+	if ((kNewTime - _last_up) < 250000000)
 		return false;
 	_last_up = kNewTime;
 	return true;
 }
 
-bool Screen::ConvertToBmp(const char *ext_head, size_t ext_size) {
-	if (not FrameTimeout())
+void Screen::InitHttpHeader(int         socket,
+                            const char *ctype,
+                            uint8_t     color_depth) {
+  std::stringstream head;
+  head << "HTTP/1.1 200 OK\r\n"
+	     << "Connection: close\r\n"
+		   << "Content-Length: " << GetFrameSize(color_depth) << "\r\n"
+		   <<	"Content-Type: " << ctype << "\r\n"
+       << "\r\n";
+  _png_udata.offs = 0;
+  memcpy(_png_buf.get(), head.str().c_str(), head.str().size());
+  _png_udata.offs = head.str().size();
+}
+
+void Screen::SendUData(int socket) {
+  ssize_t sended = 0;
+  while (sended < _png_udata.offs) {
+    const ssize_t kResult = send(socket, _png_buf.get() + sended,
+                                         _png_udata.offs - sended,
+                                         MSG_NOSIGNAL);
+    if (kResult < 0)
+      break;
+    sended += kResult;
+  }
+}
+
+void Screen::GeneratePalette() {
+  static const RGBQuad kColors[] = {
+    RGBQuad(0,   0,   0),
+    RGBQuad(255, 255, 255),
+    RGBQuad(189, 195, 199),
+    RGBQuad(236, 240, 241),
+    RGBQuad(127, 140, 141), // 102 -> 136, 136
+    RGBQuad(149, 165, 166), // 120 -> 160, 163
+    RGBQuad(225, 225, 225), // 168 -> 225, 
+    RGBQuad(150, 75,  0),
+    RGBQuad(231, 76,  60),
+    RGBQuad(225, 129, 128), // 120 -> 160, 139
+    RGBQuad(255, 153, 0),   // 102 -> 136, 118
+    RGBQuad(255, 218, 0),
+    RGBQuad(255, 255, 156),
+    RGBQuad(85,  187, 119),
+    RGBQuad(153, 255, 119),
+    RGBQuad(41,  128, 185),
+    RGBQuad(0,   191, 255),
+    RGBQuad(210, 0,   255),
+    RGBQuad(199, 103, 219),
+    RGBQuad(52,  73,  94),
+    RGBQuad(44,  62,  80)
+  };
+  static const int kAmount = sizeof(kColors) / sizeof(RGBQuad);
+  for (int idx = 0; idx < kAmount; idx++)
+    _palette[kColors[idx].GetId()] = kColors[idx];
+}
+
+bool Screen::SendFrameAsBmp(int socket) {
+	if (not FrameTimeout()) {
+	 	SendUData(socket);
 		return true;
+  }
 	Header header;
 	Info   info;
-	const int kWidth    = _width;
-	const int kHeight   = _height;
-	const int kDepth    = _depth;
-	const int kHeadSize = sizeof(header) + sizeof(info);
-	const int kBodySize = kWidth * kHeight * kDepth;
-	header.bfType        = 0x42 | (0x4D << 8);   // тип файла, символы «BM» (в HEX: 0x42 0x4d).
+	static const int kWidth       = _width;
+	static const int kHeight      = _height;
+	static const int kDepth       = kBmpDepth;
+	static const int kHeadSize    = sizeof(header) + sizeof(info);
+	static const int kBodySize    = kWidth * kDepth * kHeight;
+	static const int kPaletteSize = kPaletteColors * sizeof(RGBQuad);
+	header.bfType        = 0x42 | (0x4D << 8);    // тип файла, символы «BM» (в HEX: 0x42 0x4d).
 	header.bfSize        = kHeadSize + kBodySize; // размер всего файла в байтах.
 	header.bfReserved1   = 0;
 	header.bfReserved2   = 0;
-	header.bfOffBits     = kHeadSize;             // содержит смещение на данные изображения 
+	header.bfOffBits     = kHeadSize + (kPaletteSize * sizeof(RGBQuad)); // смещение на данные
 	info.biSize          = sizeof(info);
 	info.biWidth         = kWidth;
 	info.biHeight        = kHeight * (-1);
@@ -170,27 +234,76 @@ bool Screen::ConvertToBmp(const char *ext_head, size_t ext_size) {
 	info.biSizeImage     = kBodySize;
 	info.biXPelsPerMeter = 0;
 	info.biYPelsPerMeter = 0;
-	info.biClrUsed       = 0;
+	info.biClrUsed       = kPaletteSize;
 	info.biClrImportant  = 0;
-//	ERROR("DEBUG: new BMP frame...: size: " << header.bfSize << ": offs: " << header.bfOffBits);
-  std::cout << "w: " << kWidth << "; h: " << kHeight << "; d: " << kDepth << std::endl;
-	_png_udata.offs = 0;
-	if (ext_size > 0 && ext_head != 0) {
-	 	memcpy(_png_buf.get(), ext_head, ext_size);
- 		_png_udata.offs = ext_size;
-	}
+	// инициализация заголовков: HTTP, BMP
+	InitHttpHeader(socket, "image/bmp", kBmpDepth);
  	memcpy(_png_buf.get() + _png_udata.offs, (void*)&header, sizeof(header));
  	_png_udata.offs += sizeof(header);
  	memcpy(_png_buf.get() + _png_udata.offs, (void*)&info,   sizeof(info));
 	_png_udata.offs += sizeof(info);
- 	memcpy(_png_buf.get() + _png_udata.offs, _fbmmap, kBodySize);
-	_png_udata.offs += kBodySize;
+  // подготовка палитры палитры
+ 	memcpy(_png_buf.get() + _png_udata.offs, (void*)&_palette, kPaletteSize);
+	_png_udata.offs += kPaletteSize;
+  // подготовка кадра
+ 	uint8_t   *dst_row  = _png_buf.get() + _png_udata.offs;
+ 	uint8_t   *src_row  = _fbmmap;
+  const int  kSrcStep = _depth * 8;
+  // Реализация алгоритма с помощью arm_neon.h
+  /*uint8x8_t  out;
+  uint8x8_t  alpha = vdup_n_u8(128);
+  uint16x8_t tmp;
+  for (int d_col = 0; d_col < kBodySize / 8; d_col += kDepth) {
+    uint8x8x3_t rgb = vld3_u8(src_row);
+    tmp = vaddl_u8(rgb.val[0], rgb.val[1]);
+    tmp = vaddw_u8(tmp, rgb.val[2]);
+    tmp = vaddw_u8(tmp, alpha);
+    out = vshrn_n_u16(tmp, 2);
+   	vst1_u8(dst_row, out);
+    src_row += kSrcStep;
+    dst_row += 8;
+  }*/
+  // Реализация алгоритма на асме + neon. Алгоритм изменён, расчёт ведётся с
+  // учетом веса компоненты RGB
+  __asm__ __volatile__ (
+    " mov       r0, %[src]\n\t"
+    " mov       r1, %[dst]\n\t"
+    " mov       r2, %[size]\n\t"
+    " lsr       r2, r2, #3\n\t" // shift right >> 3 bit
+    " mov       r3, %[rw]\n\t"  // weight of R component
+    " mov       r4, %[gw]\n\t"  // weight of G component
+    " mov       r5, %[bw]\n\t"  // weight of B component
+    " vdup.8    d3, r3\n\t"
+    " vdup.8    d4, r4\n\t"
+    " vdup.8    d5, r5\n\t"
+    
+    ".loop: \n\t"
+    " vld3.8    {d0-d2}, [r0]!\n\t" // vld3_u8(src_row)
+    " vmull.u8  q3, d0, d3\n\t"
+    " vmlal.u8  q3, d1, d4\n\t"
+    " vmlal.u8  q3, d2, d5\n\t"
+    " vshrn.u16 d6, q3, #8\n\t"
+    " vst1.8	  {d6}, [r1]!\n\t"     
+    " subs      r2, r2, #1\n\t"
+    " bne       .loop\n\t"
+    : // no output
+    : [size]  "r" (kBodySize),
+      [src]   "r" (src_row),
+      [dst]   "r" (dst_row),
+      [rw]    "r" (kRGBWeight[0]),
+      [gw]    "r" (kRGBWeight[1]),
+      [bw]    "r" (kRGBWeight[2])
+    : "r0", "r1", "r2", "r3", "r4", "r5",
+      "d0", "d1", "d2", "d3", "d4", "d5", "d6"
+  );
+	_png_udata.offs += kBodySize - (kWidth * kDepth);
+ 	SendUData(socket);
 	return true;
 }
 
-size_t Screen::GetFrameSize() const {
-	const int kHeadSize = sizeof(Header) + sizeof(Info);
-	const int kBodySize = _width * _height * _depth;//_width * _height * _depth;
+size_t Screen::GetFrameSize(uint8_t color_depth) const {
+	static const int kHeadSize = sizeof(Header) + sizeof(Info);
+	static const int kBodySize = _width * _height * color_depth;
 	return kHeadSize + kBodySize;
 }
 
