@@ -7,7 +7,6 @@
 	<script type="text/javascript">
 	  var kPollPeriod  = 250; // msec
 		var debug_node   = 0;
-		var message_node = 0;
 		var canvas_node  = 0;
 		var canvas_ctx   = 0;
 		var ready        = true;
@@ -25,13 +24,47 @@
 						                  ": " + msg + '</br>'
 		}
 
-		function UpdateState() {
-			if (message_node == 0)
-				return;
+    function DrawRect(x, y, w, h, color) {
+      if (canvas_ctx == 0)
+        return;
+      if (color == undefined)
+        color = '#000000';
+      canvas_ctx.fillStyle = color;
+      canvas_ctx.fillRect(x, y, w, h);
+//      canvas_ctx.beginPath();
+//      canvas_ctx.rect(x, y, x + w, y + h);
+//      canvas_ctx.closePath();
+//      canvas_ctx.clip();
+    }
+
+    function PrintText(msg, x, y, color) {
+      if (canvas_ctx == 0)
+        return;
+      if (color == undefined)
+        color = '#FFFFFF';
+      canvas_ctx.textAlign    = 'center';
+      canvas_ctx.textBaseline = 'top';
+      canvas_ctx.fillStyle    = color;
+      canvas_ctx.font="16px Arial";
+      canvas_ctx.fillText(msg, x, y);
+    }
+
+    function ShowMessage(msg) {
+      if (canvas_ctx == 0)
+        return;
+      var x = canvas_node.width / 2;
+      var y = canvas_node.height / 2;
+      var w = msg.length * 16;
+      var h = 20;
+      DrawRect(x - (w / 2), y - (h / 2), w, h);
+      PrintText(msg, x, y - (h / 2));
+    }
+
+		function ShowState() {
+      if (canvas_ctx == 0)
+        return;
 			if (disconnected)
-				message_node.innerHTML = 'Нет связи с устройством';
-			else
-				message_node.innerHTML = 'Просмотр работает только в браузерах: Chrome, Chromium!';
+			  ShowMessage('Нет связи с устройством');
 		}
 
     function GetReqParams() {
@@ -44,16 +77,8 @@
 
 		function OnLoad() {
 			debug_node   = document.getElementById("debug");
-			message_node = document.getElementById("message");
 			canvas_node  = document.getElementById("screen");
 			canvas_ctx   = canvas_node.getContext('2d');
-		  /*
-		  canvas_node.onmousedown = function(event) {
-		    mouse.x     = event.x;
- 		    mouse.y     = event.y;
-  		  mouse.state = 0;
- 		    mouse.send  = true;
-		  };*/
 		  
 			canvas_node.onmousedown = function(event) {
 		    mouse.x     = event.x;
@@ -76,26 +101,12 @@
 					timeout = 0;
 					disconnected = true;
 				}
-				UpdateState();
+        ShowState();
 				ready = false;
 				frame.src = 'http://' + document.domain + ':8080' + GetReqParams();
 			}
       
 		  frame.onload = function() {
-		    /*var frame_lim = 10;
-		    var frame_num = 0;
-		    disconnected = false;
-   		  var fade_int = setInterval(function() {
-   		  	canvas_ctx.save();
-   		  	canvas_ctx.globalAlpha = (frame_num / frame_lim);
-			    canvas_ctx.drawImage(frame, 0, 0);
-			    canvas_ctx.restore();
-			    frame_num++;
-			    if (frame_num > frame_lim) {
-			      clearInterval(fade_int);
-			      ready = true;
-			    }
-			  }, kPollPeriod / frame_lim);*/
 	    	canvas_ctx.save();
 		    canvas_ctx.drawImage(this, 0, 0);
 		    canvas_ctx.restore();
@@ -123,7 +134,6 @@
 	<body onload="OnLoad()" style="padding: 0px; margin: 0px">
 		<canvas id="screen" width="1024" height="768" style="border: 1px solid #000000;">
 		</canvas>
-	  <div id="message"></div>
 		<!--<div id="debug" style="overflow:scroll"></div>-->
 	</body>
 </html>

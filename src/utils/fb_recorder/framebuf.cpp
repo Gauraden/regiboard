@@ -184,13 +184,13 @@ void Screen::GeneratePalette() {
     RGBQuad(255, 255, 255),
     RGBQuad(189, 195, 199),
     RGBQuad(236, 240, 241),
-    RGBQuad(127, 140, 141), // 102 -> 136, 136
-    RGBQuad(149, 165, 166), // 120 -> 160, 163
-    RGBQuad(225, 225, 225), // 168 -> 225, 
+    RGBQuad(127, 140, 141), 
+    RGBQuad(149, 165, 166), 
+    RGBQuad(225, 225, 225), 
     RGBQuad(150, 75,  0),
     RGBQuad(231, 76,  60),
-    RGBQuad(225, 129, 128), // 120 -> 160, 139
-    RGBQuad(255, 153, 0),   // 102 -> 136, 118
+    RGBQuad(225, 129, 128), 
+    RGBQuad(255, 153, 0),   
     RGBQuad(255, 218, 0),
     RGBQuad(255, 255, 156),
     RGBQuad(85,  187, 119),
@@ -200,7 +200,9 @@ void Screen::GeneratePalette() {
     RGBQuad(210, 0,   255),
     RGBQuad(199, 103, 219),
     RGBQuad(52,  73,  94),
-    RGBQuad(44,  62,  80)
+    RGBQuad(44,  62,  80),
+    RGBQuad(99,  225, 255),
+    RGBQuad(246, 165, 0)
   };
   static const int kAmount = sizeof(kColors) / sizeof(RGBQuad);
   for (int idx = 0; idx < kAmount; idx++)

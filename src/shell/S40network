@@ -15,7 +15,7 @@ case "$1" in
 	if [ "$BOARD_NAME" != 'MX53 Regiboard' ]; then
 		ethtool -s eth0 speed 10 duplex half
 	fi
-	udhcpc -n
+	udhcpc -b -A 2147483647
 	;;
   stop)
 	echo -n "Stopping network..."

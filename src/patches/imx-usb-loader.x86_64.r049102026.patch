@@ -1,0 +1,24 @@
+--- ./build/imx-usb-loader.x86_64/Makefile.orig	2014-02-18 10:19:37.107607847 +0400
++++ ./build/imx-usb-loader.x86_64/Makefile	2014-02-18 10:19:37.107607847 +0400
+@@ -1,5 +1,3 @@
+-all: imx-usb-loader imx-image
+-
+ BUILDHOST := $(shell uname -s)
+ BUILDHOST := $(patsubst CYGWIN_%,CYGWIN,$(BUILDHOST))
+ 
+@@ -8,9 +6,14 @@
+ LDFLAGS = `pkg-config --libs libusb-1.0`
+ else
+ CFLAGS = -I/usr/include/libusb-1.0
+-CFLAGS = -L/usr/lib -lusb-1.0
++LDFLAGS = -L/usr/lib -lusb-1.0
+ endif
+ 
++all: imx-usb-loader imx-image
++
++imx-usb-loader:
++	cc $(CFLAGS) imx-usb-loader.c $(LDFLAGS) -o imx-usb-loader
++
+ clean:
+ 	rm -f imx-usb-loader imx-usb-loader.o imx-image imx-image.o
+ 

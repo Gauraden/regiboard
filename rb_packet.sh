@@ -1,5 +1,12 @@
 #!/bin/sh
 
+IsPacketForHost() {
+  if [ "${PACKET_FOR_HOST}" = "true" ]; then
+    return 0
+  fi
+  return 1
+}
+
 GetPacketBuildDir() {
 	DieIfNotDefined "$1" 'Name of tarball'
 	echo $(echo "$1" | sed -E 's:([^/]+).tar(.*)$:\1:') #'
@@ -13,21 +20,33 @@ PacketConfigure() {
 		./autogen.sh
 	fi
 	if IsFileExists "$build_dir/configure"; then
-		local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
-		local conf_flags="--host=${TC_PREFIX} --prefix=${RFS_ROOT_DIR}/target"
-		if [ "${PACKET_ENV_VARS}" != '' ]; then
-			export ${PACKET_ENV_VARS}
-		fi
-		./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config || \
-		./configure ${PACKET_CONFIGURE}
+	  if ! IsPacketForHost; then
+	    # target
+		  local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
+		  local conf_flags="--host=${TC_PREFIX} --prefix=${RFS_ROOT_DIR}/target"
+		  if [ "${PACKET_ENV_VARS}" != '' ]; then
+			  export ${PACKET_ENV_VARS}
+		  fi
+		  ./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config || \
+  ./configure ${PACKET_CONFIGURE}
+    else
+      # host
+      ./configure ${PACKET_CONFIGURE}
+    fi
 		return
 	fi
 	if IsFileExists "$build_dir/Makefile"; then
 		return
 	fi
 	if IsFileExists "$build_dir/CMakeLists.txt"; then
-		FLAGS="-I'${INCLUDE_DIR}' -I'${rfs_include}' -L'${rfs_lib}' ${PACKET_CONFIGURE}"
-		export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
+	  if ! IsPacketForHost; then
+	    # target
+		  FLAGS="-I'${INCLUDE_DIR}' -I'${rfs_include}' -L'${rfs_lib}' ${PACKET_CONFIGURE}"
+		  export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
+		else
+		  # host
+  		cmake ./
+		fi
 		return
 	fi
 	PrintAndDie 'Do not know how to configurate Automake'
@@ -40,7 +59,11 @@ PacketClean() {
 
 PacketMake() {
 	local build_dir=$1
-	TcTargetMakeSources ${build_dir}
+	if ! IsPacketForHost; then
+  	TcTargetMakeSources ${build_dir}
+  else
+    TcHostMakeSources ${build_dir}
+  fi
 }
 
 SetPacketControl() {
@@ -117,10 +140,18 @@ PacketBuild() {
 		# Unpacking and patching
 		UnpackArchive "${tarball}" "${BUILD_DIR}"
 		ApplyAllPatchesFor "${build_dir}" "${BUILD_DIR}/${build_dir}"
-		mv "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
+		if ! IsPacketForHost; then
+		  mv "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
+		else
+		  mv "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
+		fi
 		rebuild=true
 	fi
-	build_dir="${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
+	if ! IsPacketForHost; then
+  	build_dir="${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
+  else
+    build_dir="${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
+	fi
 	if [ "${SUBPROG_ARG1}" = 'mkpatch' ]; then
 		CreatePatch "${build_dir}"
 		return 0
@@ -145,6 +176,9 @@ PacketBuild() {
 		else
 			PacketMake $build_dir
 		fi
+	fi
+	if IsPacketForHost; then
+	  return
 	fi
 	# Making opkg packet
 	PrintNotice 'Creating package...'

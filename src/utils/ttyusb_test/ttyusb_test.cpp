@@ -211,14 +211,16 @@ void PrintFTDIDevice(Ftdi::Context *ctx, int eeprom_size) {
 void InteractWithFTDIDevice(Ftdi::Context *ctx, struct usb_device *usb_dev) {
 	std::cout << "Открытие <" << (void*)ctx << ">: ";
 	int err = 0;
-	if (usb_dev != 0)
+	usb_dev_handle *hndl = usb_open(usb_dev);
+	ctx->set_usb_device(hndl);
+	/*if (usb_dev != 0)
 		err = ctx->open(usb_dev);
 	else
 		err = ctx->open();
 	if (err != 0) {
 		std::cout << "Ошибка: [" << err << "]: " << ctx->error_string() << std::endl;
 		return;
-	}
+	}*/
 	std::cout << "Ок" << std::endl;
 	// Чтение конфигурации
 	PrintFTDIDevice(ctx, kEEPROMSize);
@@ -246,11 +248,11 @@ void InteractWithFTDIDevice(Ftdi::Context *ctx, struct usb_device *usb_dev) {
 	Config[kCRS485]       = 1;
 	Config[kDRS485]       = 1;
 	Config[kEEPROMChip]   = 0x46; // EEPROM Type 0x46 for 93xx46, 0x56 for 93xx56 and 0x66 for 93xx66
-	if (usb_dev->devnum == NeedConfig) {
+/*	if (usb_dev->devnum == NeedConfig) {
 		WriteFTDIConfig(ctx, kEEPROMSize);
 		std::cout << "Проверка конфигурации..." << std::endl;
 		PrintFTDIDevice(ctx, kEEPROMSize);
-	}
+	}*/
 	/*std::cout << "Установка режимов: " << std::endl;
 	// HIGH/ON value configures a line as output.
 	//         TX RX RTS CTS DTR DSR DCD EX_TX
@@ -302,15 +304,22 @@ void ScanUSBBus(int vendor, int product) {
 		for (dev = bus->devices; dev; dev = dev->next) {
 			if (NeedConfig != -1 & NeedConfig != dev->devnum)
 				continue;
-			char str_serial[512];
+			char buff[512];
+			bool buff_ok = false;
 			usb_dev_handle *hndl = usb_open(dev);
-			bool serial_ok = usb_get_string_simple(hndl, dev->descriptor.iSerialNumber, str_serial, 512) > 0;
+//			bool serial_ok = usb_get_string_simple(hndl, dev->descriptor.iSerialNumber, str_serial, 512) > 0;
+			buff_ok = usb_get_string_simple(hndl, dev->descriptor.iManufacturer, buff, 512) > 0;
+			const std::string kManufacturer(buff_ok ? buff : "---");
+			buff_ok = usb_get_string_simple(hndl, dev->descriptor.iProduct, buff, 512) > 0;
+			const std::string kProduct(buff_ok ? buff : "---");
 			std::cout << " --------------------------------------------------------\n"
 				        << "   * DEV [" << (unsigned)dev->devnum << "]: "<< dev->filename << "\n"
 				        << "\t- Class........: " << (unsigned)dev->descriptor.bDeviceClass  << "\n"
-				        << "\t- iManufacturer: " << (unsigned)dev->descriptor.iManufacturer << "\n"
-				        << "\t- iProduct.....: " << (unsigned)dev->descriptor.iProduct      << "\n"
-				        << "\t- Serial number: " << (serial_ok ? str_serial : "Ошибка")      << "\n"
+				        << "\t- iManufacturer: " << (unsigned)dev->descriptor.iManufacturer
+				                                 << ": " << kManufacturer << "\n"
+				        << "\t- iProduct.....: " << (unsigned)dev->descriptor.iProduct
+				                                 << ": " << kProduct << "\n"
+//				        << "\t- Serial number: " << (serial_ok ? str_serial : "Ошибка")      << "\n"
 				        << "\t- Vendor.......: 0x" << std::hex << (unsigned)dev->descriptor.idVendor  << "\n"
 				        << "\t- idProduct....: 0x" << std::hex << (unsigned)dev->descriptor.idProduct << "\n"
 				        << std::dec;
@@ -320,7 +329,8 @@ void ScanUSBBus(int vendor, int product) {
 			    dev->descriptor.idProduct == product) {
 				Ftdi::Context ftdi_ctx;
 				InteractWithFTDIDevice(&ftdi_ctx, dev);
-			}
+			} /*else
+  			usb_close(hndl);*/
 		}
 	}
 }

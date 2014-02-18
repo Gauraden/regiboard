@@ -30,7 +30,7 @@ PreparingUBIFS() {
 	ubiformat /dev/${mtd_dev}
 	PrintNotice "Creating UBI volume (${vol_size}): "
 	ubiattach /dev/ubi_ctrl -m $mtd_num
-	ubimkvol  /dev/${ubi_dev} -N nandfs -s ${vol_size} || PrintAndDie "Check size: ${vol_size}!"
+	ubimkvol  /dev/${ubi_dev} -N $mtd_dev -s ${vol_size} || PrintAndDie "Check size: ${vol_size}!"
 }
 
 SetupRootFS() {
@@ -43,12 +43,12 @@ SetupRootFS() {
 		PrintAndDie "Mount point \"$3\" was not found!"
 	fi
 	PrintNotice "Mounting of UBI$1 partition to: $3"
-	mount -t ubifs ubi$1:nandfs "$3" || PrintAndDie "Check UBI device: ubi$1"
+	mount -t ubifs ubi$1:rootfs "$3" || PrintAndDie "Check UBI device: ubi$1"
 	PrintNotice "Unpacking root FS image: $2"
 	tar xvf "$2" -C "$3/" > ${_DEV_NULL}
 	PrintNotice 'Preparing home directory for "Regigraf" software'
 	mkdir "$3/home/regigraf"
-	echo 'ubi1:nandfs     /home/regigraf ubifs    defaults          0      0' >> "$3/etc/fstab"
+	echo 'ubi1:storage     /home/regigraf ubifs    defaults          0      0' >> "$3/etc/fstab"
 }
 
 InstallRootFS() {

@@ -3,9 +3,23 @@
 ConfigurateUBoot() {
 	DieIfNotDefined ${BOARD_UBOOT_VER} "u-boot version"
 	DieIfNotDefined ${BOARD_UBOOT_CNF} "u-boot configuration"
-	UBOOT_IMG="u-boot.${BOARD_NAME}.${BOARD_CPU}.bin"
+	UBOOT_IMG="u-boot.${TARGET_PREFIX}.bin"
 	UBOOT_DIR="u-boot-${BOARD_UBOOT_VER}"
 	UBOOT_BUILD_DIR="${BUILD_DIR}/${UBOOT_DIR}"
+}
+
+ConvertBinToImx() {
+	PrintNotice "Creating u-boot.imx image"
+  local output_dir=$1
+  DieIfNotDefined ${output_dir} "output directory for *.imx image"
+  IsFileExists ${output_dir} || (PrintErr "directory not found: ${output_dir}" && return)
+  local mkimg="${BIN_DIR}/${TARGET_PREFIX}/mkimage"
+  local nand_cfg="${CONF_DIR}/uboot/imximage_nand.cfg"
+  local sd_cfg="${CONF_DIR}/uboot/imximage.cfg"
+  local bin_img="${UBOOT_IMG_DIR}/${UBOOT_IMG}"
+  local imx_img="${output_dir}/u-boot.${TARGET_PREFIX}"
+#  $mkimg -n $nand_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.nand.imx
+  $mkimg -n $sd_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.imx
 }
 
 BuildUBoot() {
@@ -26,21 +40,15 @@ BuildUBoot() {
 		mcedit "${UBOOT_BUILD_DIR}/include/configs/${BOARD_UBOOT_CNF}.h"
 		return 0
 	fi
-	local imx_tools_path="${SRC_UTILS_DIR}/imx-usb-loader"
 	PrintNotice "Clearing u-boot sources..."
 	TcTargetDistCleanSources ${UBOOT_BUILD_DIR}
 	PrintNotice "Configurating u-boot: ${BOARD_UBOOT_CNF}"
 	TcTargetMakeSources ${UBOOT_BUILD_DIR} "${BOARD_UBOOT_CNF}_config"
 	PrintNotice "Building u-boot.bin"
 	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'all'
-	PrintNotice "Building u-boot.imx"
-	cp "${UBOOT_BUILD_DIR}/u-boot.bin" $imx_tools_path
-	cd $imx_tools_path && ./mk_imx_image.sh 'u-boot.bin'
-#	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot.imx'
-#	PrintNotice "Building u-boot-with-nand-spl.imx"
-#	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'u-boot-with-nand-spl.imx'
 	PrintNotice "Moving to output: ${UBOOT_IMG}"
 	mv "${UBOOT_BUILD_DIR}/u-boot.bin" "${UBOOT_IMG_DIR}/${UBOOT_IMG}"
+	ConvertBinToImx ${UBOOT_IMG_DIR}
 	NotifyUser "Building of U-Boot \"${BOARD_UBOOT_CNF}\" was finished!"
 }
 

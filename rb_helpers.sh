@@ -9,11 +9,13 @@ _PROC_VERSION=$(cat /proc/version)
 _WGET_ARGS="-q -t ${WGET_TRIES} --waitretry=${WGET_WAIT} "
 _USE_SUDO=''
 _SYS_LOCALE=$(locale | grep -m1 -P -o '([a-z]{2,2})\_([A-Z]{2,2})' | grep -P -o '([a-z]+)')
+_HOST_ARCH=$(arch)
 
 if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	. ./.config
 	# Common variables
 	WORK_DIR=$PWD
+	BIN_DIR="${WORK_DIR}/bin"
 	LOG_DIR="${WORK_DIR}/log"
 	TMP_DIR="${WORK_DIR}/tmp"
 	BUILD_DIR="${WORK_DIR}/build"
@@ -148,14 +150,22 @@ IsFileExists() {
 	fi
 	return 0
 }
+
+IsDefined() {
+	if [ "$1" = "" ]; then
+    return 1
+	fi	
+	return 0
+}
 # Function for checking of defining variable.
 # If variable is not defined it will stop program execution!
 #   < variable value
 #   < message to describe variable
 DieIfNotDefined() {
-	if [ "$1" = "" ]; then
-		PrintAndDie "Variable is not defined: $2"
-	fi	
+#	if [ "$1" = "" ]; then
+#		PrintAndDie "Variable is not defined: $2"
+#	fi	
+  IsDefined $1 || PrintAndDie "Variable is not defined: $2"
 }
 # Function for creating directory if it's not exists
 #   < path
@@ -461,6 +471,7 @@ LoadBoardConfig() {
 	if [ -f "${BOARD_DIR}/${BOARD_CONFIG}" ]; then
 		Print "Loading configuration: ${BOARD_CONFIG} ..."
 		. ${BOARD_DIR}/${BOARD_CONFIG}
+		TARGET_PREFIX="${BOARD_NAME}.${BOARD_CPU}"
 		return
 	fi
 	PrintErr "Unknown configuration: ${BOARD_CONFIG}"
@@ -477,7 +488,8 @@ UnpackArchive() {
 	PrintNotice "Extracting \"$1\" to: ${dst_dir}"
 	if [ -d $1 ]; then
 	  PrintWarn "Directory is detected, it will be copied..."
-	  ${_USE_SUDO} cp -rP $1 $dst_dir
+	  #${_USE_SUDO} cp -rP $1 $dst_dir
+	  ${_USE_SUDO} rsync -a --exclude='.git' --exclude='.gitignore' $1 $dst_dir
 	else
 		${_USE_SUDO} tar -C "${dst_dir}" -xaf "$1"
 	fi

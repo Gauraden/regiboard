@@ -7,9 +7,3 @@ project("fcb_gen")
 add_executable(fcb_gen
 	fcb_gen.cpp
 )
-
-## libraries
-
-#INSTALL(TARGETS ttyusb_test
-#	RUNTIME DESTINATION ${OUTPUT_DIR}
-#)
