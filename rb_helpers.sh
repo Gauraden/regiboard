@@ -471,7 +471,8 @@ LoadBoardConfig() {
 	if [ -f "${BOARD_DIR}/${BOARD_CONFIG}" ]; then
 		Print "Loading configuration: ${BOARD_CONFIG} ..."
 		. ${BOARD_DIR}/${BOARD_CONFIG}
-		TARGET_PREFIX="${BOARD_NAME}.${BOARD_CPU}"
+		TARGET_NAME_CPU="${BOARD_NAME}.${BOARD_CPU}"
+		TARGET_NAME_PREFIX="${BOARD_NAME}.${BOARD_PREFIX}"
 		return
 	fi
 	PrintErr "Unknown configuration: ${BOARD_CONFIG}"

@@ -169,6 +169,9 @@ PacketBuild() {
 		else
 			PacketClean $build_dir
 		fi
+		# Copy registered configuration
+		IsDefined $PACKET_CONFIG_FILE && \
+		  cp ${CONF_DIR}/${PACKET_NAME}/${PACKET_CONFIG_FILE} ${build_dir}/.config
 		# Building
 		PrintNotice 'Building...'
 		if [ "${PACKET_BUILD}" != "" ]; then

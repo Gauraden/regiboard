@@ -1,14 +1,14 @@
 #!/bin/sh
 
-IRAMFS_BUILD_DIR="${BUILD_DIR}/initramfs.${BOARD_NAME}.${BOARD_PREFIX}"
+IRAMFS_BUILD_DIR="${BUILD_DIR}/initramfs.${TARGET_NAME_PREFIX}"
 
 ConfigurateInitRAMFS() {
 	Print "Preparing for building image of RAM FS..."
-	IRAMFS_BUILD_DIR="${BUILD_DIR}/initramfs.${BOARD_NAME}.${BOARD_PREFIX}"
+	IRAMFS_BUILD_DIR="${BUILD_DIR}/initramfs.${TARGET_NAME_PREFIX}"
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}"
 }
 
-BuildBusyBox() {
+BuildBusyBoxOld() {
 	local busybox_dir="${RFS_BUILD_DIR}/output/build/busybox-${BOARD_BUSYBOX_VER}"
 	if ! IsFileExists "${busybox_dir}"; then
 		PrintWarn "Busybox sources was not found: ${busybox_dir}"
@@ -30,6 +30,23 @@ BuildBusyBox() {
 	TcTargetCleanSources "${busybox_dir}"
 	TcTargetMakeSources  "${busybox_dir}"
 	mv "${busybox_dir}/busybox" "${IRAMFS_BUILD_DIR}/bin/"
+}
+
+BuildBusyBox() {
+  ./rb_build.sh packets busybox
+ 	PrintNotice "Creating busybox symlinks..."
+ 	local busybox="${IRAMFS_BUILD_DIR}/bin/busybox"
+ 	local symlink="${IRAMFS_BUILD_DIR}/bin"
+ 	ln -s $busybox "${symlink}/init/cat"
+ 	ln -s $busybox "${symlink}/init/echo"
+ 	ln -s $busybox "${symlink}/init/ls"
+ 	ln -s $busybox "${symlink}/init/mkdir"
+ 	ln -s $busybox "${symlink}/init/mount"
+ 	ln -s $busybox "${symlink}/init/sed"
+ 	ln -s $busybox "${symlink}/init/sh"
+ 	ln -s $busybox "${symlink}/init/sleep"
+ 	ln -s $busybox "${symlink}/init/switch_root"
+ 	ln -s $busybox "${symlink}/init/umount"
 }
 
 PrepareInitRAMFS() {
@@ -79,5 +96,5 @@ BuildInitRAMFS() {
 	PrintNotice "Installing utils and scripts..."
 	cp "${init_file}" "${IRAMFS_BUILD_DIR}/sbin/"
 	ln -s "${IRAMFS_BUILD_DIR}/sbin/init" "${IRAMFS_BUILD_DIR}/init"
-	NotifyUser "Building of init RAM FS for \"${BOARD_NAME}.${BOARD_PREFIX}\" was finished!"
+	NotifyUser "Building of init RAM FS for \"${TARGET_NAME_PREFIX}\" was finished!"
 }

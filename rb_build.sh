@@ -56,7 +56,7 @@ UploadImages() {
 
 BootOverUSB() {
 	local imx_usb_tool="${BIN_DIR}/imx-usb-loader"
-	local uboot_img="${UBOOT_IMG_DIR}/u-boot.${TARGET_PREFIX}.imx"
+	local uboot_img="${UBOOT_IMG_DIR}/u-boot.${TARGET_NAME_CPU}.imx"
 	IsFileExists $imx_usb_tool || ./rb_build.sh packets imx-usb-loader
 	IsFileExists $uboot_img || ConvertBinToImx ${UBOOT_IMG_DIR}
 	FindUSBDevice 'Freescale' || PrintAndDie "iMX board not found on USB bus!"
