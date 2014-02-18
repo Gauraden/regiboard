@@ -32,6 +32,9 @@ cp "${SRC_SHELL_DIR}/S39gui"           "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_ETC_DIR}/interfaces"         "${TARGET_DIR}/etc/network/"
 cp "${SRC_ETC_DIR}/sshd_config"        "${TARGET_DIR}/etc/"
 cp "${SRC_ETC_DIR}/directfbrc"         "${TARGET_DIR}/etc/"
+
+PrintNotice 'Applying of hacks...'
+cd "${TARGET_DIR}/usr/share/directfb-1.4.16/" && mv ./cursor.dat ./cursor.dat.bak
 # Hacks ------------------------------------------------------------------------
 # Samba is not working correct! Removing it from autorun.
 # mv "${TARGET_DIR}/etc/init.d/S91smb" "${TARGET_DIR}/root/"

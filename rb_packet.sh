@@ -178,6 +178,8 @@ PacketBuild() {
 		fi
 	fi
 	if IsPacketForHost; then
+  	PrintNotice 'Installing to "bin" directory...'
+  	PacketInstall
 	  return
 	fi
 	# Making opkg packet

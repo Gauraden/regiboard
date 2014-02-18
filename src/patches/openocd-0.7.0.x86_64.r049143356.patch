@@ -1,0 +1,22 @@
+--- ./build/openocd-0.7.0.x86_64/tcl/target/imx53.cfg.orig	2013-05-05 12:32:12.000000000 +0400
++++ ./build/openocd-0.7.0.x86_64/tcl/target/imx53.cfg	2014-02-18 14:19:49.000000000 +0400
+@@ -31,7 +31,8 @@
+ 
+ # GDB target: Cortex-A8, using DAP
+ set _TARGETNAME $_CHIPNAME.cpu
+-target create $_TARGETNAME cortex_a -chain-position $_CHIPNAME.DAP
++# target create $_TARGETNAME cortex_a -chain-position $_CHIPNAME.DAP
++target create $_TARGETNAME cortex_a8 -chain-position $_CHIPNAME.DAP
+ 
+ # some TCK tycles are required to activate the DEBUG power domain
+ jtag configure $_CHIPNAME.SJC -event post-reset "runtest 100"
+@@ -41,7 +42,8 @@
+ 
+ proc imx53_dbginit {target} {
+      # General Cortex A8 debug initialisation
+-     cortex_a dbginit
++#     cortex_a dbginit
++     cortex_a8 dbginit
+ }
+ 
+ # Slow speed to be sure it will work

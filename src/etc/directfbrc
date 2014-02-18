@@ -3,13 +3,12 @@ fbdev=/dev/fb0
 mode=1024x768
 depth=24
 pixelformat=RGB24
-no-cursor
 tslib-devices=/dev/input/event0
-#memcpy=armasm
-#no-vt
-#no-vt-switch
-#no-init-layer=0
-#dma
-#disable-module=keyboard
+memcpy=armasm
+dma
 disable-module=linux_input
+no-vt-switch
+no-vt-switching
+bg-color=FF000000
+#bg-image=/home/regigraf/themes/vbr_logo_0%.png
 

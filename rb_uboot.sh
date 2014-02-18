@@ -10,16 +10,16 @@ ConfigurateUBoot() {
 
 ConvertBinToImx() {
 	PrintNotice "Creating u-boot.imx image"
-  local output_dir=$1
-  DieIfNotDefined ${output_dir} "output directory for *.imx image"
-  IsFileExists ${output_dir} || (PrintErr "directory not found: ${output_dir}" && return)
-  local mkimg="${BIN_DIR}/${TARGET_PREFIX}/mkimage"
-  local nand_cfg="${CONF_DIR}/uboot/imximage_nand.cfg"
-  local sd_cfg="${CONF_DIR}/uboot/imximage.cfg"
-  local bin_img="${UBOOT_IMG_DIR}/${UBOOT_IMG}"
-  local imx_img="${output_dir}/u-boot.${TARGET_PREFIX}"
-#  $mkimg -n $nand_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.nand.imx
-  $mkimg -n $sd_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.imx
+	local output_dir=$1
+	DieIfNotDefined ${output_dir} "output directory for *.imx image"
+	IsFileExists ${output_dir} || (PrintErr "directory not found: ${output_dir}" && return)
+	local mkimg="${BIN_DIR}/${TARGET_PREFIX}/mkimage"
+	local nand_cfg="${CONF_DIR}/mkimage/imximage_nand.cfg"
+	local sd_cfg="${CONF_DIR}/mkimage/imximage.cfg"
+	local bin_img="${UBOOT_IMG_DIR}/${UBOOT_IMG}"
+	local imx_img="${output_dir}/u-boot.${TARGET_PREFIX}"
+#	$mkimg -n $nand_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.nand.imx
+	$mkimg -n $sd_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.imx
 }
 
 BuildUBoot() {

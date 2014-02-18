@@ -55,16 +55,31 @@ UploadImages() {
 }
 
 BootOverUSB() {
-	local imx_usb_loader_path="${BUILD_DIR}/imx-usb-loader.${_HOST_ARCH}/"
-	local imx_usb_tool="$imx_usb_loader_path/imx-usb-loader"
+	local imx_usb_tool="${BIN_DIR}/imx-usb-loader"
 	local uboot_img="${UBOOT_IMG_DIR}/u-boot.${TARGET_PREFIX}.imx"
-	IsFileExists $imx_usb_loader_path || ./rb_build.sh packets imx-usb-loader
-	IsFileExists $imx_usb_tool || PrintAndDie "iMX USB loader not found!"
+	IsFileExists $imx_usb_tool || ./rb_build.sh packets imx-usb-loader
 	IsFileExists $uboot_img || ConvertBinToImx ${UBOOT_IMG_DIR}
-	#|| PrintAndDie "u-boot image not found!"
 	FindUSBDevice 'Freescale' || PrintAndDie "iMX board not found on USB bus!"
 	PrintNotice "Sending image to board..."
 	sudo $imx_usb_tool $uboot_img
+}
+
+StartOpenOCD() {
+  local openocd="${BIN_DIR}/openocd"
+  local cfg_dir="${CONF_DIR}/openocd"
+  local log_file="${LOG_DIR}/openocd"
+  IsFileExists $openocd || ./rb_build.sh packets openocd
+  PrintNotice "Starting openOCD server..."
+  $openocd -f $cfg_dir/olimex-arm-usb-ocd.cfg -f $cfg_dir/imx53.cfg \
+     > ${log_file}.server.log \
+    2> ${log_file}.error.log &
+}
+
+ConnectToOpenOCD() {
+  local dbg_pid=$(pidof openocd)
+  IsDefined $dbg_pid || StartOpenOCD
+  PrintNotice "Connecting to openOCD server..."
+  telnet localhost 4444
 }
 
 # Run subprogram
@@ -93,6 +108,8 @@ case "${SUBPROG_TYPE}" in
 	'upload'    ) UploadImages;;
 	# Boot board over USB
 	'usb-boot'  ) BootOverUSB;;
+	# Starting openOCD server and/or client
+	'debug'     ) ConnectToOpenOCD;;
 	# default
 	*           ) PrintWarn "Unknown subprogram: ${SUBPROG_TYPE}";;
 esac
