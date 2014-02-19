@@ -157,6 +157,9 @@ void Screen::InitHttpHeader(int         socket,
                             uint8_t     color_depth) {
   std::stringstream head;
   head << "HTTP/1.1 200 OK\r\n"
+		   << "Cache-Control: no-store\r\n" // , must-revalidate, max-age=0
+       << "Pragma: no-store\r\n" // , no-cache
+       << "Expires: 0\r\n"
 	     << "Connection: close\r\n"
 		   << "Content-Length: " << GetFrameSize(color_depth) << "\r\n"
 		   <<	"Content-Type: " << ctype << "\r\n"

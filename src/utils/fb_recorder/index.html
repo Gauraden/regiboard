@@ -81,8 +81,8 @@
 			canvas_ctx   = canvas_node.getContext('2d');
 		  
 			canvas_node.onmousedown = function(event) {
-		    mouse.x     = event.x;
- 		    mouse.y     = event.y;
+		    mouse.x     = event.clientX;
+ 		    mouse.y     = event.clientY;
  		    mouse.state = 1;
  		    mouse.send  = true;
 		  };

@@ -13,7 +13,7 @@ StartCmd() {
 StopCmd() {
 	echo -n "Stopping $FBREC_NAME: "
 	#pidof $FBREC_BIN | xargs kill -SIGTERM
-	killall -9 $FBREC_BIN
+	killall -9 $FBREC_BIN && ipcrm -q0
 	echo "OK"
 }
 
