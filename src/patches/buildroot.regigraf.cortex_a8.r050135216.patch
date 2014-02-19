@@ -1,0 +1,170 @@
+--- ./build/buildroot.regigraf.cortex_a8/package/libftdi/libftdi-0.19-01_disable_serialnum.patch.orig	2013-06-28 12:50:16.180710748 +0400
++++ ./build/buildroot.regigraf.cortex_a8/package/libftdi/libftdi-0.19-01_disable_serialnum.patch	2013-06-28 12:48:51.381776814 +0400
+@@ -0,0 +1,17 @@
++--- libftdi-0.19/src/ftdi.c.orig	2011-05-23 19:20:11.000000000 +0400
+++++ libftdi-0.19/src/ftdi.c	2013-06-28 12:48:47.471825969 +0400
++@@ -386,8 +386,12 @@
++     {
++         if (usb_get_string_simple(ftdi->usb_dev, dev->descriptor.iSerialNumber, serial, serial_len) <= 0)
++         {
++-            ftdi_usb_close_internal (ftdi);
++-            ftdi_error_return(-9, usb_strerror());
+++// I think that serial number is not mandatory.
+++// FTDI chips can't return it if EEPROM is empty!
+++            static const char str_serial_err[] = "ERROR";
+++            memcpy(serial, str_serial_err, sizeof(str_serial_err));
+++//            ftdi_usb_close_internal (ftdi);
+++//            ftdi_error_return(-9, usb_strerror());
++         }
++     }
++ 
+--- ./build/buildroot.regigraf.cortex_a8/package/busybox/busybox-1.20.1_udhcpc.patch.orig	2014-02-18 16:40:50.196054184 +0400
++++ ./build/buildroot.regigraf.cortex_a8/package/busybox/busybox-1.20.1_udhcpc.patch	2014-02-19 11:39:43.443104830 +0400
+@@ -0,0 +1,147 @@
++--- ./networking/udhcp/dhcpc.c.orig	2014-02-12 13:55:00.000000000 +0400
+++++ ./networking/udhcp/dhcpc.c	2014-02-19 11:39:06.287571937 +0400
++@@ -31,7 +31,6 @@
++ 
++ /* "struct client_config_t client_config" is in bb_common_bufsiz1 */
++ 
++-
++ #if ENABLE_LONG_OPTS
++ static const char udhcpc_longopts[] ALIGN1 =
++ 	"clientid-none\0"  No_argument       "C"
++@@ -1180,9 +1179,28 @@
++ //usage:     "\n	USR1	Renew lease"
++ //usage:     "\n	USR2	Release lease"
++ 
+++#include <sys/types.h>
+++#include <sys/ipc.h>
+++#include <sys/types.h>
+++#include <sys/msg.h>
+++
+++typedef struct message {
+++  long mtype;
+++
+++	char cmd[128];
+++	char result[32];
+++} mess_t;
+++
+++
++ int udhcpc_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
++ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
++ {
+++  int nres;                // [dsmover: 2013-12-13 Fri 01:44 PM]
+++  int qid;
+++  key_t msgkey;
+++  mess_t sent, received;
+++	const int mes_length = sizeof(mess_t) - sizeof(long);
+++
++ 	uint8_t *temp, *message;
++ 	const char *str_V, *str_h, *str_F, *str_r;
++ 	IF_FEATURE_UDHCP_PORT(char *str_P;)
++@@ -1284,6 +1302,9 @@
++ 	) {
++ 		return 1;
++ 	}
+++	// good time to put here creating my message queue to inform our external program about local events. [dsmover: 2013-12-13 Fri 01:43 PM]
+++	msgkey = ftok("/home/regigraf", 'm');
+++	qid = msgget(msgkey, IPC_CREAT | 0660);
++ 
++ 	clientid_mac_ptr = NULL;
++ 	if (!(opt & OPT_C) && !udhcp_find_option(client_config.options, DHCP_CLIENT_ID)) {
++@@ -1407,6 +1428,15 @@
++ 					timeout = discover_timeout;
++ 					packet_num++;
++ 					continue;
+++				} else {
+++					// [dsmover: 2013-12-13 Fri 02:59 PM]:
+++					// that's a timeout. let's inform about it				
+++					sent.mtype = 1; // always one
+++					struct in_addr adr;
+++					adr.s_addr = requested_ip;
+++					snprintf(sent.cmd, 128, "got IP; IP %s", inet_ntoa(adr));
+++					snprintf(sent.result, 5, "%s", "FAILED");
+++					nres = msgsnd(qid, &sent, mes_length, 0);
++ 				}
++  leasefail:
++ 				udhcp_run_script(NULL, "leasefail");
++@@ -1454,14 +1484,14 @@
++ 			case RENEWING:
++ 				if (timeout > 60) {
++ 					/* send an unicast renew request */
++-			/* Sometimes observed to fail (EADDRNOTAVAIL) to bind
++-			 * a new UDP socket for sending inside send_renew.
++-			 * I hazard to guess existing listening socket
++-			 * is somehow conflicting with it, but why is it
++-			 * not deterministic then?! Strange.
++-			 * Anyway, it does recover by eventually failing through
++-			 * into INIT_SELECTING state.
++-			 */
+++			        /* Sometimes observed to fail (EADDRNOTAVAIL) to bind
+++			         * a new UDP socket for sending inside send_renew.
+++			         * I hazard to guess existing listening socket
+++			         * is somehow conflicting with it, but why is it
+++			         * not deterministic then?! Strange.
+++			         * Anyway, it does recover by eventually failing through
+++			         * into INIT_SELECTING state.
+++			         */
++ 					send_renew(xid, server_addr, requested_ip);
++ 					timeout >>= 1;
++ 					continue;
++@@ -1476,6 +1506,7 @@
++ 				/* Lease is *really* about to run out,
++ 				 * try to find DHCP server using broadcast */
++ 				if (timeout > 0) {
+++				    /* Switch to bcast receive */
++ 					/* send a broadcast renew request */
++ 					send_renew(xid, 0 /*INADDR_ANY*/, requested_ip);
++ 					timeout >>= 1;
++@@ -1502,8 +1533,17 @@
++ 		/* note: udhcp_sp_read checks FD_ISSET before reading */
++ 		switch (udhcp_sp_read(&rfds)) {
++ 		case SIGUSR1:
+++			requested_ip = 0; /// fuck that's a new one
+++			// so... someone has asked to get new IP using DHCP
+++			// We'll write to a special message queue to inform an external program about going things
+++			// First of all, we will tell current timeout parameters
+++			sent.mtype = 1; // always one
+++			snprintf(sent.cmd, 128, "got SIGUSR1; discover_timeout %i; discover_retries %i", discover_timeout, discover_retries);
+++			snprintf(sent.result, 5, "%s", "OK");
+++			nres = msgsnd(qid, &sent, mes_length, 0);
++ 			client_config.first_secs = 0; /* make secs field count from 0 */
++ 			already_waited_sec = 0;
+++			state = RENEW_REQUESTED; // [dsmover: 2013-12-16 Mon 02:25 PM]
++ 			perform_renew();
++ 			if (state == RENEW_REQUESTED) {
++ 				/* We might be either on the same network
++@@ -1614,7 +1654,6 @@
++ 				move_from_unaligned32(server_addr, temp);
++ 				/*xid = packet.xid; - already is */
++ 				requested_ip = packet.yiaddr;
++-
++ 				/* enter requesting state */
++ 				state = REQUESTING;
++ 				timeout = 0;
++@@ -1685,7 +1724,14 @@
++ 					inet_ntoa(temp_addr), (unsigned)lease_seconds);
++ 				requested_ip = packet.yiaddr;
++ 				udhcp_run_script(&packet, state == REQUESTING ? "bound" : "renew");
++-
+++				// here we are. At this point of time we've already got IP configured
+++				// [dsmover: 2013-12-13 Fri 03:00 PM]
+++				sent.mtype = 1; // always one
+++				struct in_addr adr;
+++				adr.s_addr = requested_ip;
+++				snprintf(sent.cmd, 128, "got IP; IP %s", inet_ntoa(adr));
+++				snprintf(sent.result, 5, "%s", "OK");
+++				nres = msgsnd(qid, &sent, mes_length, 0);
++ 				state = BOUND;
++ 				change_listen_mode(LISTEN_NONE);
++ 				if (opt & OPT_q) { /* quit after lease */
++@@ -1734,5 +1780,8 @@
++  ret:
++ 	/*if (client_config.pidfile) - remove_pidfile has its own check */
++ 		remove_pidfile(client_config.pidfile);
+++
+++	msgctl(qid, IPC_RMID, 0);
+++
++ 	return retval;
++ }

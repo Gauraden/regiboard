@@ -9,17 +9,20 @@ SRC_SHELL_DIR="../../src/shell"
 SRC_ETC_DIR="../../src/etc"
 
 PrintNotice 'Copying linux setup scripts...'
-ossetup_dir=${TARGET_DIR}/root/os_setup
-if ! IsFileExists "${ossetup_dir}"; then
-	mkdir "${ossetup_dir}" || PrintAndDie "Failed to create dir: ${ossetup_dir}"
-fi
+OS_SETUP_DIR=${TARGET_DIR}/root/os_setup
 USR_SBIN_DIR=${TARGET_DIR}/usr/sbin
-if ! IsFileExists "${USR_SBIN_DIR}"; then
-	PrintAndDie "Failed to find dir: ${USR_SBIN_DIR}"
-fi
-cp "${SRC_SHELL_DIR}/rb_functions.sh"   "${ossetup_dir}/" || PrintAndDie "Copy failed to: ${ossetup_dir}"
-cp "${SRC_SHELL_DIR}/rb_setup_linux.sh" "${ossetup_dir}/" || PrintAndDie "Copy failed to: ${ossetup_dir}"
-cp "${SRC_SHELL_DIR}/rb_fuses_imx53.sh" "${ossetup_dir}/" || PrintAndDie "Copy failed to: ${ossetup_dir}"
+#if ! IsFileExists "${OS_SETUP_DIR}"; then
+#	mkdir "${OS_SETUP_DIR}" || PrintAndDie "Failed to create dir: ${OS_SETUP_DIR}"
+#fi
+CreateDirIfNotExists "${OS_SETUP_DIR}"
+#if ! IsFileExists "${USR_SBIN_DIR}"; then
+#	PrintAndDie "Failed to find dir: ${USR_SBIN_DIR}"
+#fi
+IsFileExists "${USR_SBIN_DIR}" || PrintAndDie "Failed to find dir: ${USR_SBIN_DIR}"
+
+cp "${SRC_SHELL_DIR}/rb_functions.sh"   "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
+cp "${SRC_SHELL_DIR}/rb_setup_linux.sh" "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
+cp "${SRC_SHELL_DIR}/rb_fuses_imx53.sh" "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
 cp "${SRC_SHELL_DIR}/rb_update_kernel"  "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
 cp "${SRC_SHELL_DIR}/click"             "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
 cp "${SRC_SHELL_DIR}/led"               "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
@@ -34,7 +37,7 @@ cp "${SRC_ETC_DIR}/sshd_config"        "${TARGET_DIR}/etc/"
 cp "${SRC_ETC_DIR}/directfbrc"         "${TARGET_DIR}/etc/"
 
 PrintNotice 'Applying of hacks...'
-cd "${TARGET_DIR}/usr/share/directfb-1.4.16/" && mv ./cursor.dat ./cursor.dat.bak
+cd "${TARGET_DIR}/usr/share/directfb-1.4.16/" && mv ./cursor.dat ./cursor.dat.bak || echo
 # Hacks ------------------------------------------------------------------------
 # Samba is not working correct! Removing it from autorun.
 # mv "${TARGET_DIR}/etc/init.d/S91smb" "${TARGET_DIR}/root/"

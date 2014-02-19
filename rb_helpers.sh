@@ -40,6 +40,13 @@ if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	GCC_VER=$(echo ${_PROC_VERSION} | awk -F '(' '{print $3}' | grep -P -o '([0-9\.]+)')
 	LINUX_DIST=$(echo ${_PROC_VERSION} | awk -F '(' '{print $4}' | grep -P -o '^([a-zA-Z]+)')
 fi
+
+IsDefined() {
+	if [ "$1" = "" ]; then
+    return 1
+	fi	
+	return 0
+}
 # Function for translating english message to system locale by using google
 # translate.
 #   < message to be translated
@@ -58,11 +65,14 @@ TranslateByGoogle() {
 		# saving message to cache
 		echo "$1${delimiter}${result}" >> $cache_file
 	fi
-	if [ "$result" = "" ]; then
-		echo "$1"
-		return 1
-	fi
-	echo "$result"
+	IsDefined "$result" && echo "$result" && return 0
+	echo "$1"
+	return 1
+#	if [ "$result" = "" ]; then
+#		echo "$1"
+#		return 1
+#	fi
+#	echo "$result"
 }
 
 UseSudo() {
@@ -71,10 +81,17 @@ UseSudo() {
 # Function for notifying user about finishing of work
 #   < message
 NotifyUser() {
-	if [ "$1" = '' ]; then
-		return 0
-	fi
-	notify-send -u critical "$1"
+	IsDefined "$1" && notify-send -u critical "$1"
+}
+
+IgnoreErrOut() {
+  IsDefined "$1" && $1 2> ${_DEV_NULL} && return 0
+  return 1
+}
+
+IgnoreAllOut() {
+  IsDefined "$1" && $1 > ${_DEV_NULL} 2> ${_DEV_NULL} && return 0
+  return 1
 }
 
 IsItFunction() {
@@ -123,15 +140,17 @@ PrintAndDie() {
 #   < log file name
 #   < error message
 PrintErrLogAndDie() {
-	if [ "$2" != "" ]; then
-		PrintErr "$2"
-		NotifyUser "Error: $2"
-	fi
+  IsDefined "$2" && PrintErr "$2" && NotifyUser "Error: $2"
+#	if [ "$2" != "" ]; then
+#		PrintErr "$2"
+#		NotifyUser "Error: $2"
+#	fi
 	tail -n 50 "$1"
 	local errors=$(cat "$1" | grep -i 'error')
-	if [ "$errors" != "" ]; then
-		PrintWarn "$errors"
-	fi
+	IsDefined "$errors" && PrintWarn "$errors"
+#	if [ "$errors" != "" ]; then
+#		PrintWarn "$errors"
+#	fi
 	exit 1
 }
 # Function for executing command and collecting errors to log file.
@@ -150,30 +169,21 @@ IsFileExists() {
 	fi
 	return 0
 }
-
-IsDefined() {
-	if [ "$1" = "" ]; then
-    return 1
-	fi	
-	return 0
-}
 # Function for checking of defining variable.
 # If variable is not defined it will stop program execution!
 #   < variable value
 #   < message to describe variable
 DieIfNotDefined() {
-#	if [ "$1" = "" ]; then
-#		PrintAndDie "Variable is not defined: $2"
-#	fi	
-  IsDefined $1 || PrintAndDie "Variable is not defined: $2"
+  IsDefined "$1" || PrintAndDie "Variable is not defined: $2"
 }
 # Function for creating directory if it's not exists
 #   < path
 CreateDirIfNotExists() {
 	DieIfNotDefined "$1" "name of directory"
-	if ! IsFileExists "$1"; then
-		mkdir "$1" || PrintAndDie "Failed to create dir: $1"
-	fi
+	IsFileExists "$1" || mkdir "$1" || PrintAndDie "Failed to create dir: $1"
+#	if ! IsFileExists "$1"; then
+#		mkdir "$1" || PrintAndDie "Failed to create dir: $1"
+#	fi
 }
 # Function for making symlink to directory.
 #   < source directory
@@ -234,8 +244,8 @@ GetPathPart() {
 #   < value for variable
 CheckConfigBeforeEdit() {
 	DieIfNotDefined "$1" "path to config"
-	DieIfNotDefined "$2" "name of variable"
-	DieIfNotDefined "$3" "value of variable"
+	DieIfNotDefined "$2" "name of variable in \"$1\""
+	DieIfNotDefined "$3" "value of variable \"$2\""
 	if ! IsFileExists "$1"; then
 		PrintAndDie "Configuration file was not found: $1"
 	fi
