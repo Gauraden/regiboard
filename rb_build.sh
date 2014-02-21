@@ -37,7 +37,7 @@ SUBPROG_ARG="$2"
 SUBPROG_ARG1="$3"
 
 # Loading board configuration
-LoadBoardConfig ${CORE_SELECT_BOARD}
+LoadBoardConfig ${CORE_SELECT_BOARD} || SelectBoardConfig
 # Configurating (setting of special environment variables)
 ConfigurateToolchain
 ConfigurateUBoot

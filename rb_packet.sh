@@ -16,40 +16,29 @@ PacketConfigure() {
 	local build_dir="$1"
 	local rfs_include="${RFS_ROOT_DIR}/staging/usr/include"
 	local rfs_lib="${RFS_ROOT_DIR}/target/usr/lib"
-	if IsFileExists "$build_dir/autogen.sh"; then
-		./autogen.sh
-	fi
+	IsFileExists "$build_dir/autogen.sh" && ./autogen.sh
 	if IsFileExists "$build_dir/configure"; then
-	  if ! IsPacketForHost; then
-	    # target
-		  local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
-		  local conf_flags="--host=${TC_PREFIX} --prefix=${RFS_ROOT_DIR}/target"
-		  if [ "${PACKET_ENV_VARS}" != '' ]; then
-			  export ${PACKET_ENV_VARS}
-		  fi
-		  ./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config || \
-  ./configure ${PACKET_CONFIGURE}
-    else
-      # host
+	  # host
+	  IsPacketForHost && ./configure ${PACKET_CONFIGURE} && return
+    # target
+	  local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
+	  local conf_flags="--host=${TC_PREFIX} --prefix=${RFS_ROOT_DIR}/target"
+	  if [ "${PACKET_ENV_VARS}" != '' ]; then
+		  export ${PACKET_ENV_VARS}
+	  fi
+	  ./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config || \
       ./configure ${PACKET_CONFIGURE}
-    fi
 		return
 	fi
-	if IsFileExists "$build_dir/Makefile"; then
-		return
-	fi
-	if IsFileExists "$build_dir/CMakeLists.txt"; then
-	  if ! IsPacketForHost; then
-	    # target
-		  FLAGS="-I'${INCLUDE_DIR}' -I'${rfs_include}' -L'${rfs_lib}' ${PACKET_CONFIGURE}"
-		  export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
-		else
-		  # host
-  		cmake ./
-		fi
-		return
-	fi
-	PrintAndDie 'Do not know how to configurate Automake'
+	IsFileExists "$build_dir/Makefile" && return
+  IsFileExists "$build_dir/CMakeLists.txt" || \
+    PrintAndDie 'Do not know how to configurate Automake'
+  # host
+	IsPacketForHost && cmake ./ && return
+  # target
+	FLAGS="-I'${INCLUDE_DIR}' -I'${rfs_include}' -L'${rfs_lib}' ${PACKET_CONFIGURE}"
+	export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} \
+	  CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
 }
 
 PacketClean() {
@@ -59,11 +48,11 @@ PacketClean() {
 
 PacketMake() {
 	local build_dir=$1
-	if ! IsPacketForHost; then
-  	TcTargetMakeSources ${build_dir}
-  else
-    TcHostMakeSources ${build_dir}
-  fi
+#	if ! IsPacketForHost; then
+  IsPacketForHost || (TcTargetMakeSources ${build_dir} && return 0)
+#  else
+  TcHostMakeSources ${build_dir}
+#  fi
 }
 
 SetPacketControl() {
@@ -95,7 +84,7 @@ MakeIpkg() {
 	# creating ipkg
 	# archive is indeed a Debian[esque] package
 #	echo '2.0' > "$ipk_dir/debian-binary"
-	tar -C $ipk_dir -czf $ipk_dir/data.tar.gz --exclude=./CONTROL .
+	tar -C $ipk_dir -czf $ipk_dir/data.tar.gz --exclude=./CONTROL --exclude=./*.tar.gz .
 	tar -C $ipk_dir/CONTROL -czf $ipk_dir/control.tar.gz .
 	ar -r "${PACKETS_DIR}/${PACKET_NAME}.ipk" $ipk_dir/data.tar.gz $ipk_dir/control.tar.gz > ${_DEV_NULL}
 }
@@ -134,16 +123,15 @@ PacketBuild() {
 			else
 				tarball="${SRC_UTILS_DIR}/${PACKET_NAME}"
 				build_dir=${PACKET_NAME}
-				rm -rf "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
 			fi
 		fi
 		# Unpacking and patching
 		UnpackArchive "${tarball}" "${BUILD_DIR}"
 		ApplyAllPatchesFor "${build_dir}" "${BUILD_DIR}/${build_dir}"
 		if ! IsPacketForHost; then
-		  mv "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
+		  MoveDir "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
 		else
-		  mv "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
+		  MoveDir "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
 		fi
 		rebuild=true
 	fi
@@ -209,9 +197,10 @@ BuildAllPackets() {
 }
 
 BuidPackets() {
-	if ! IsFileExists "${PAK_CONF_DIR}"; then
+#	if ! IsFileExists "${PAK_CONF_DIR}"; then
+  IsFileExists "${PAK_CONF_DIR}" || \
 		PrintAndDie "Directory with config files for packets was not found: ${PAK_CONF_DIR}"
-	fi
+#	fi
 	case "$SUBPROG_ARG" in
 		''    ) PacketsList;;
 		'all' ) BuildAllPackets;;

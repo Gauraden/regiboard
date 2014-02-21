@@ -37,7 +37,7 @@ void parse_device(struct udev_monitor *mon) {
 			printf("    > '%s' [%s]\n", udev_list_entry_get_name(list_entry),
 				                          udev_list_entry_get_value(list_entry));
 	}
-	udev_device_unref(dev);_type = LabelToId(udev_device_get_devtype(dev), kTypeLabel, kAmountOfTypes);
+	udev_device_unref(dev);
 }
 
 int parse_queue(struct udev_queue *udev_queue) {

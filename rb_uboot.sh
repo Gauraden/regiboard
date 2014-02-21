@@ -15,11 +15,14 @@ ConvertBinToImx() {
 	IsFileExists ${output_dir} || (PrintErr "directory not found: ${output_dir}" && return)
 	local mkimg="${BIN_DIR}/${TARGET_NAME_CPU}/mkimage"
 	local nand_cfg="${CONF_DIR}/mkimage/imximage_nand.cfg"
-	local sd_cfg="${CONF_DIR}/mkimage/imximage.cfg"
+	local sd_cfg="${CONF_DIR}/mkimage/imximage_sd.cfg"
 	local bin_img="${UBOOT_IMG_DIR}/${UBOOT_IMG}"
 	local imx_img="${output_dir}/u-boot.${TARGET_NAME_CPU}"
-#	$mkimg -n $nand_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.nand.imx
-	$mkimg -n $sd_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.imx
+  $mkimg -n $nand_cfg -T imximage -e 0x77800000 -d $bin_img ${imx_img}.nand.imx
+  cksum ${imx_img}.nand.imx
+	$mkimg -n $sd_cfg   -T imximage -e 0x77800000 -d $bin_img ${imx_img}.sd.imx
+	cksum ${imx_img}.sd.imx
+	ln -s ${imx_img}.nand.imx ${imx_img}.imx 2> ${_DEV_NULL}
 }
 
 BuildUBoot() {

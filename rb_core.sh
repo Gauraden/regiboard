@@ -28,16 +28,14 @@ SelectBoardConfig() {
 	ListAllConfigs
 	PrintWarn "Please enter name of default configuration:"
 	read CORE_SELECT_BOARD
-	if [ "${CORE_SELECT_BOARD}" = '' ]; then
-		PrintErr 'You should enter the name of config file!'
-		SelectBoardConfig
-		return 0
-	fi
-	if ! IsFileExists "${BOARD_DIR}/${CORE_SELECT_BOARD}"; then
-		PrintErr "Config file \"${CORE_SELECT_BOARD}\" is not exists!"
-		SelectBoardConfig
-		return 0
-	fi
+  IsDefined ${CORE_SELECT_BOARD} || \
+	(	PrintErr 'You should enter the name of config file!' && \
+		SelectBoardConfig && \
+		return 0)
+  IsFileExists "${BOARD_DIR}/${CORE_SELECT_BOARD}" || \
+  (	PrintErr "Config file \"${CORE_SELECT_BOARD}\" is not exists!" && \
+		SelectBoardConfig && \
+		return 0)
 	DumpCoreSelects
 }
 
@@ -49,9 +47,7 @@ GetListOfUnits() {
 if IsFileExists "${CORE_SELECT_CONF}"; then
 	Print "Predefined settings:"
 	. "${CORE_SELECT_CONF}"
-	if [ "${CORE_SELECT_BOARD}" = '' ]; then
-		SelectBoardConfig
-	fi
+	IsDefined ${CORE_SELECT_BOARD} ||	SelectBoardConfig
 	PrintNotice "Board: ${CORE_SELECT_BOARD}"
 else
 	SelectBoardConfig

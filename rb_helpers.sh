@@ -40,7 +40,8 @@ if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	GCC_VER=$(echo ${_PROC_VERSION} | awk -F '(' '{print $3}' | grep -P -o '([0-9\.]+)')
 	LINUX_DIST=$(echo ${_PROC_VERSION} | awk -F '(' '{print $4}' | grep -P -o '^([a-zA-Z]+)')
 fi
-
+# Function for cheking variable definition.
+#   < value of variable
 IsDefined() {
 	if [ "$1" = "" ]; then
     return 1
@@ -68,13 +69,8 @@ TranslateByGoogle() {
 	IsDefined "$result" && echo "$result" && return 0
 	echo "$1"
 	return 1
-#	if [ "$result" = "" ]; then
-#		echo "$1"
-#		return 1
-#	fi
-#	echo "$result"
 }
-
+# Function for enabling SUDO mode for following calls
 UseSudo() {
 	_USE_SUDO='sudo'
 }
@@ -83,17 +79,23 @@ UseSudo() {
 NotifyUser() {
 	IsDefined "$1" && notify-send -u critical "$1"
 }
-
+# Function for executing command and skipping error output
+#   < string with command
 IgnoreErrOut() {
   IsDefined "$1" && $1 2> ${_DEV_NULL} && return 0
   return 1
 }
-
+# Function for executing command and skipping all output
+#   < string with command
 IgnoreAllOut() {
   IsDefined "$1" && $1 > ${_DEV_NULL} 2> ${_DEV_NULL} && return 0
   return 1
 }
-
+# Function for checking existence of function, which name was passed through
+# argument.
+#   < name of function
+#   > 0(true, it means no error) if function is existed; !=0(false, it means
+#     any error)
 IsItFunction() {
 	type -t "$1" > ${_DEV_NULL}
 	return $?
@@ -141,16 +143,9 @@ PrintAndDie() {
 #   < error message
 PrintErrLogAndDie() {
   IsDefined "$2" && PrintErr "$2" && NotifyUser "Error: $2"
-#	if [ "$2" != "" ]; then
-#		PrintErr "$2"
-#		NotifyUser "Error: $2"
-#	fi
 	tail -n 50 "$1"
 	local errors=$(cat "$1" | grep -i 'error')
 	IsDefined "$errors" && PrintWarn "$errors"
-#	if [ "$errors" != "" ]; then
-#		PrintWarn "$errors"
-#	fi
 	exit 1
 }
 # Function for executing command and collecting errors to log file.
@@ -164,10 +159,12 @@ LogIt() {
 #   < path to file or directory
 #   > result of check
 IsFileExists() {
-	if [ "$(ls -a -d $1 2> ${_DEV_NULL})" = "" ]; then
-		return 1
-	fi
-	return 0
+  IsDefined "$(ls -a -d $1 2> ${_DEV_NULL})" && return 0
+  return 1
+#	if [ "$(ls -a -d $1 2> ${_DEV_NULL})" = "" ]; then
+#		return 1
+#	fi
+#	return 0
 }
 # Function for checking of defining variable.
 # If variable is not defined it will stop program execution!
@@ -181,20 +178,28 @@ DieIfNotDefined() {
 CreateDirIfNotExists() {
 	DieIfNotDefined "$1" "name of directory"
 	IsFileExists "$1" || mkdir "$1" || PrintAndDie "Failed to create dir: $1"
-#	if ! IsFileExists "$1"; then
-#		mkdir "$1" || PrintAndDie "Failed to create dir: $1"
-#	fi
+}
+# Function for moving content of one directory to another
+#   < path to the directory, content of which need to be moved
+#   < path to the directory, for saving content
+MoveDir() {
+  DieIfNotDefined "$1" "name of source directory"
+  DieIfNotDefined "$2" "new name for directory"
+  CreateDirIfNotExists "$2"
+  IsFileExists "$1" || return 0
+  cp -ru $1/* $2/
+  rm -rf "$1"
 }
 # Function for making symlink to directory.
 #   < source directory
 #   < symlink path
 BindDirIfRequired() {
-	if ! IsFileExists "$1"; then
-		PrintAndDie "Source dir was not found: $1"
-	fi
-	if IsFileExists "$2"; then
-		return 0
-	fi
+#	if ! IsFileExists "$1"; then
+	IsFileExists "$1" || PrintAndDie "Source dir was not found: $1"
+#	fi
+#	if IsFileExists "$2"; then
+	IsFileExists "$2" && return 0
+#	fi
 	ln -s "$1" "$2"
 }
 # Function for creating symlink to directory, if source directory is defined.
@@ -212,7 +217,7 @@ BindOrCreateDir() {
 # It removes only symlinks, ignoring normal files and directories.
 #   < path to symlink
 RemoveIfSymLink() {
-	DieIfNotDefined "$1" "name of sym.link"
+	DieIfNotDefined "$1" "name of symlink"
 	if [ -h "$1" ]; then
 		rm "$1"
 	fi
@@ -246,9 +251,9 @@ CheckConfigBeforeEdit() {
 	DieIfNotDefined "$1" "path to config"
 	DieIfNotDefined "$2" "name of variable in \"$1\""
 	DieIfNotDefined "$3" "value of variable \"$2\""
-	if ! IsFileExists "$1"; then
-		PrintAndDie "Configuration file was not found: $1"
-	fi
+#	if ! IsFileExists "$1"; then
+	IsFileExists "$1" || PrintAndDie "Configuration file was not found: $1"
+#	fi
 	CONFIG_VAR_VAL="$3"
 	if [ ${#CONFIG_VAR_VAL} != 1 ]; then
 		CONFIG_VAR_VAL="\\\"$3\\\""
@@ -303,10 +308,10 @@ GetBinDirList() {
 # IF file is not found, it will stop program execution!
 #   < name of file
 DieIfNoTool() {
-	if IsFileExists "$(GetBinDirList $1)"; then
-		return 0
-	fi
-	PrintAndDie "Tool was not found: $1"
+#	if IsFileExists "$(GetBinDirList $1)"; then
+	IsFileExists "$(GetBinDirList $1)" || PrintAndDie "Tool was not found: $1"
+#	fi
+#	PrintAndDie "Tool was not found: $1"
 }
 # Function for retrieving name of file from URL.
 #   < URL
@@ -331,11 +336,12 @@ GetFileByUrl() {
 	DieIfNotDefined "$2" "destination directory"
 	CreateDirIfNotExists "$2"
 	FILE_NAME=$(GetFileNameFromUrl "$1")
-	if IsFileExists "$2/${FILE_NAME}"; then
-		return 0;
-	fi
+#	if IsFileExists "$2/${FILE_NAME}"; then
+	IsFileExists "$2/${FILE_NAME}" && return 0;
+#	fi
 	PrintNotice "Downloading: ${FILE_NAME} ..."
-	wget ${_WGET_ARGS} -O "$2/${FILE_NAME}" "$1" || PrintAndDie "Failed to download file: $1"
+	wget ${_WGET_ARGS} -O "$2/${FILE_NAME}" "$1" || \
+	  PrintAndDie "Failed to download file: $1"
 	return 0
 }
 # Function for downloading Git project.
@@ -360,9 +366,9 @@ AttachGitProject() {
 # It uses pkg-config util!
 #   < packet name
 PkgConfig() {
-	if ! IsFileExists "$(GetBinDirList 'pkg-config')"; then
-		return 1;
-	fi
+#	if ! IsFileExists "$(GetBinDirList 'pkg-config')"; then
+	IsFileExists "$(GetBinDirList 'pkg-config')" || return 1;
+#	fi
 	pkg-config --modversion $1 2> ${_DEV_NULL} | sed -r "s/\.//g"
 }
 # Function for checking version of executable file.
@@ -395,22 +401,24 @@ CreatePatch() {
   rm -f "$patch_file"
 	for src_file in $(find "$1" -name "*.orig" | sed -r 's/(.*)\.orig$/\1/'); do
 		src_file=$(echo "$src_file" | sed -r "s:${WORK_DIR}(.*):\1:g")
-		diff -urN ".$src_file.orig" ".$src_file" >> "$patch_file"
+		diff -Nur ".$src_file.orig" ".$src_file" >> "$patch_file"
 	done
-	mv "$patch_file" "$SRC_PATCHES_DIR/" || PrintAndDie 'Error while moving patch file!'
+	mv "$patch_file" "$SRC_PATCHES_DIR/" || \
+	  PrintAndDie 'Error while moving patch file!'
 }
 # Function for applying patch for some sources of code.
 # To create patch you can use command: diff -urN olddir newdir
 #   < directory of code sources, for patching
 #   < patch file name (diff file)
 ApplyPatch() {
-  if ! IsFileExists "${SRC_PATCHES_DIR}"; then
+#  if ! IsFileExists "${SRC_PATCHES_DIR}"; then
+  IsFileExists "${SRC_PATCHES_DIR}" || \
     PrintAndDie "Directory with patches was not found!"
-  fi
+#  fi
   DieIfNotDefined "$1" "directory of patch destination"
   DieIfNotDefined "$2" "diff file"
   PrintWarn "Applying patch \"$2\" to: $1"
-  $USE_SUDO patch -d "$1" -p3 < "${SRC_PATCHES_DIR}/$2"
+  $USE_SUDO patch -N -d "$1" -p3 < "${SRC_PATCHES_DIR}/$2"
  	USE_SUDO=''
 }
 # Function for applying group of patches for some sources.
@@ -418,23 +426,28 @@ ApplyPatch() {
 #   < directory of code sources, for patching
 ApplyAllPatchesFor() {
 	PrintNotice "Applying patches ($1*) from: ${SRC_PATCHES_DIR}"
-  if ! IsFileExists "${SRC_PATCHES_DIR}"; then
+#  if ! IsFileExists "${SRC_PATCHES_DIR}"; then
+  IsFileExists "${SRC_PATCHES_DIR}" || \
     PrintAndDie "Directory with patches was not found!"
-  fi
+#  fi
   local diff_file=''
   for diff_file in $(ls "${SRC_PATCHES_DIR}"); do
   	local is_equal=$(echo $diff_file | grep $1)
-		if [ "$is_equal" != "" ]; then
-			ApplyPatch "$2" "$diff_file"
-		fi
+#		if [ "$is_equal" != "" ]; then
+		IsDefined $is_equal && ApplyPatch "$2" "$diff_file"
+#		fi
   done
 }
-
+# Function for getting name of device mount point
+#   < name of device (/dev/...)
 GetMountPointOfDevice() {
 	DieIfNotDefined "$1" "device name"
-	echo $(mount | grep -P -o "^$1 on (.+) type $2" | sed -r "s;(.+) on (.+) type(.+);\2;g")
+	echo $(mount | grep -P -o "^$1 on (.+) type $2" | \
+	  sed -r "s;(.+) on (.+) type(.+);\2;g")
 }
-
+# Function for asking user a question, something like modal dialog (Yes/No)
+#   < question text
+#   > 0(true) user answer is "Yes"; !=0(false) answer is "No"
 DoYouWantContinue() {
 	PrintWarn "$1 y/N:"
 	read ANSWER
@@ -465,10 +478,11 @@ SwapConfig() {
 # Function for canceling swap operation for config.
 #   < directory for searching "swaped" files
 CancelSwapConfig() {
-	if IsFileExists "$1/.config.swap"; then
-		PrintWarn "Canceling of swaped configuration in: $1"
-		mv "$1/.config.swap" "$1/.config" 2> ${_DEV_NULL}
-	fi
+#	if IsFileExists "$1/.config.swap"; then
+  IsFileExists "$1/.config.swap" || return 0
+	PrintWarn "Canceling of swaped configuration in: $1"
+	mv "$1/.config.swap" "$1/.config" 2> ${_DEV_NULL}
+#	fi
 }
 
 ListAllConfigs() {
@@ -486,8 +500,8 @@ LoadBoardConfig() {
 		return
 	fi
 	PrintErr "Unknown configuration: ${BOARD_CONFIG}"
-	ListAllConfigs
-	exit 1
+#	ListAllConfigs
+	return 1
 }
 
 UnpackArchive() {
@@ -499,8 +513,7 @@ UnpackArchive() {
 	PrintNotice "Extracting \"$1\" to: ${dst_dir}"
 	if [ -d $1 ]; then
 	  PrintWarn "Directory is detected, it will be copied..."
-	  #${_USE_SUDO} cp -rP $1 $dst_dir
-	  ${_USE_SUDO} rsync -a --exclude='.git' --exclude='.gitignore' $1 $dst_dir
+	  ${_USE_SUDO} rsync -ura --exclude='.git' --exclude='.gitignore' $1 $dst_dir
 	else
 		${_USE_SUDO} tar -C "${dst_dir}" -xaf "$1"
 	fi
@@ -508,9 +521,9 @@ UnpackArchive() {
 }
 
 InstallPacket() {
-	if IsFileExists "$(GetBinDirList $1)"; then
-		return 0
-	fi
+#	if IsFileExists "$(GetBinDirList $1)"; then
+	IsFileExists "$(GetBinDirList $1)" && return 0
+#	fi
 	PrintNotice "Installing packet: $1 ..."
 	case "${LINUX_DIST}" in
 		'Ubuntu' ) sudo apt-get install "$1";;
@@ -525,7 +538,8 @@ UploadDataToRemoteRepo() {
 	PrintNotice "Uploading \"$1\" to: $REPO_URL_FTP/$2"
 	local user=$(echo "$REPO_URL_FTP" | sed -r 's/^([^@]+)@(.+)$/\1/')
 	local host=$(echo "$REPO_URL_FTP" | sed -r 's/^([^@]+)@(.+)$/\2/')
-	ncftpput -u$user -p"$REPO_PSW_FTP" -C "$host" $1 "/$2" || PrintWarn "Failed to upload file: $1"
+	ncftpput -u$user -p"$REPO_PSW_FTP" -C "$host" $1 "/$2" || \
+	  PrintWarn "Failed to upload file: $1"
 }
 
 FindUSBDevice() {
