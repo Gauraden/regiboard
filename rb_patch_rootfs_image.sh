@@ -11,22 +11,17 @@ SRC_ETC_DIR="../../src/etc"
 PrintNotice 'Copying linux setup scripts...'
 OS_SETUP_DIR=${TARGET_DIR}/root/os_setup
 USR_SBIN_DIR=${TARGET_DIR}/usr/sbin
-#if ! IsFileExists "${OS_SETUP_DIR}"; then
-#	mkdir "${OS_SETUP_DIR}" || PrintAndDie "Failed to create dir: ${OS_SETUP_DIR}"
-#fi
+
 CreateDirIfNotExists "${OS_SETUP_DIR}"
-#if ! IsFileExists "${USR_SBIN_DIR}"; then
-#	PrintAndDie "Failed to find dir: ${USR_SBIN_DIR}"
-#fi
 IsFileExists "${USR_SBIN_DIR}" || PrintAndDie "Failed to find dir: ${USR_SBIN_DIR}"
 
-cp "${SRC_SHELL_DIR}/rb_functions.sh"   "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
-cp "${SRC_SHELL_DIR}/rb_setup_linux.sh" "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
-cp "${SRC_SHELL_DIR}/rb_fuses_imx53.sh" "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
-cp "${SRC_SHELL_DIR}/rb_update_kernel"  "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
-cp "${SRC_SHELL_DIR}/click"             "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
-cp "${SRC_SHELL_DIR}/led"               "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
-cp "${SRC_SHELL_DIR}/udhcpc_renew"      "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
+#cp "${SRC_SHELL_DIR}/rb_functions.sh"   "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
+#cp "${SRC_SHELL_DIR}/rb_setup_linux.sh" "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
+#cp "${SRC_SHELL_DIR}/rb_fuses_imx53.sh" "${OS_SETUP_DIR}/" || PrintAndDie "Copy failed to: ${OS_SETUP_DIR}"
+#cp "${SRC_SHELL_DIR}/rb_update_kernel"  "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
+cp "${SRC_SHELL_DIR}/click"        "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
+cp "${SRC_SHELL_DIR}/led"          "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
+cp "${SRC_SHELL_DIR}/udhcpc_renew" "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
 
 PrintNotice 'Copying of system scripts and configs...'
 cp "${SRC_SHELL_DIR}/S00gpio_init"     "${TARGET_DIR}/etc/init.d/"

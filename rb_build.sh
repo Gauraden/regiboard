@@ -100,6 +100,8 @@ case "${SUBPROG_TYPE}" in
 	'initramfs' ) BuildInitRAMFS;;
 	# Building external applications and libraries
 	'packets'   ) BuidPackets;;
+	# Building firmware
+	'firmware'  ) BuildFirmware;;
 	# Creating rootfs image
 	'image'     );;
 	# Prepare MMC

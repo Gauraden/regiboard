@@ -163,7 +163,9 @@ BuildToolchain() {
 	make
 	make install
 	# remove existing toolchain
+	local kernel_symlink=${TC_BUILD_DIR}/.build/src/linux-custom/linux-${BOARD_KERNEL_VER}
 	rm -r -f "${TC_ROOT_DIR}/*"
+	IsFileExists $kernel_symlink && rm $kernel_symlink
 	# configuring of toolchain
 	TcPrepareConfig
 	local ctng_bin="${TC_CROSSTOOL_DIR}/bin/${TC_CTNG}"

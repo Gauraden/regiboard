@@ -1,0 +1,10 @@
+# Devices
+DEV_FUSE='/dev/mxc_iim'
+DEV_VIDEO='/dev/fb0'
+DEV_TOUCH='/dev/input/event0'
+# FTP
+FTP_REPO_URL='regiboard@jenny'
+FTP_REPO_PSW='12345'
+# MTD
+UBI_ROOTFS_SIZE='120MiB'
+UBI_STORAGE_SIZE='350MiB'

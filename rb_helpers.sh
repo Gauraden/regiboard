@@ -22,7 +22,8 @@ if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	BOARD_DIR="${WORK_DIR}/board"
 	DOWNLOAD_DIR="${WORK_DIR}/dl"
 	CONF_DIR="${WORK_DIR}/conf"
-	PAK_CONF_DIR="${WORK_DIR}/conf/packets"
+	CONF_PAK_DIR="${WORK_DIR}/conf/packets"
+	CONF_FIRMWARE_DIR="${WORK_DIR}/conf/firmware"
 	OUTPUT_DIR="${WORK_DIR}/output"
 	TOOLCHAIN_DIR="${OUTPUT_DIR}/toolchain"
 	BUILDROOT_DIR="${OUTPUT_DIR}/buildroot"
@@ -177,7 +178,7 @@ DieIfNotDefined() {
 #   < path
 CreateDirIfNotExists() {
 	DieIfNotDefined "$1" "name of directory"
-	IsFileExists "$1" || mkdir "$1" || PrintAndDie "Failed to create dir: $1"
+	IsFileExists "$1" || mkdir -p "$1" || PrintAndDie "Failed to create dir: $1"
 }
 # Function for moving content of one directory to another
 #   < path to the directory, content of which need to be moved

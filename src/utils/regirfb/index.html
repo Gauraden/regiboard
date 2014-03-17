@@ -1,0 +1,139 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>F1772 Online</title>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+	<script type="text/javascript">
+	  var kPollPeriod  = 250; // msec
+		var debug_node   = 0;
+		var canvas_node  = 0;
+		var canvas_ctx   = 0;
+		var ready        = true;
+		var frame        = new Image();
+		var timeout      = 0;
+		var disconnected = true;
+		var mouse        = {'x': 0, 'y': 0, 'state': 0, 'send': false};
+		var poll_tm_out  = 0;
+
+		function Debug(msg) {
+			if (debug_node == 0)
+				return;
+			var tm = new Date();
+			debug_node.innerHTML += '> ' + tm.toLocaleTimeString() +
+						                  ": " + msg + '</br>'
+		}
+
+    function DrawRect(x, y, w, h, color) {
+      if (canvas_ctx == 0)
+        return;
+      if (color == undefined)
+        color = '#000000';
+      canvas_ctx.fillStyle = color;
+      canvas_ctx.fillRect(x, y, w, h);
+//      canvas_ctx.beginPath();
+//      canvas_ctx.rect(x, y, x + w, y + h);
+//      canvas_ctx.closePath();
+//      canvas_ctx.clip();
+    }
+
+    function PrintText(msg, x, y, color) {
+      if (canvas_ctx == 0)
+        return;
+      if (color == undefined)
+        color = '#FFFFFF';
+      canvas_ctx.textAlign    = 'center';
+      canvas_ctx.textBaseline = 'top';
+      canvas_ctx.fillStyle    = color;
+      canvas_ctx.font="16px Arial";
+      canvas_ctx.fillText(msg, x, y);
+    }
+
+    function ShowMessage(msg) {
+      if (canvas_ctx == 0)
+        return;
+      var x = canvas_node.width / 2;
+      var y = canvas_node.height / 2;
+      var w = msg.length * 16;
+      var h = 20;
+      DrawRect(x - (w / 2), y - (h / 2), w, h);
+      PrintText(msg, x, y - (h / 2));
+    }
+
+		function ShowState() {
+      if (canvas_ctx == 0)
+        return;
+			if (disconnected)
+			  ShowMessage('Нет связи с устройством');
+		}
+
+    function GetReqParams() {
+      var req = '';//'?stamp=' + (new Date().getUTCSeconds()) + '&';
+			if (mouse.send != true)
+			  return req;
+      mouse.send = false;
+  		return ('?' + req + 'x=' + mouse.x + '&y=' + mouse.y + '&s=' + mouse.state);
+    }
+
+		function OnLoad() {
+			debug_node   = document.getElementById("debug");
+			canvas_node  = document.getElementById("screen");
+			canvas_ctx   = canvas_node.getContext('2d');
+		  
+			canvas_node.onmousedown = function(event) {
+		    mouse.x     = event.clientX;
+ 		    mouse.y     = event.clientY;
+ 		    mouse.state = 1;
+ 		    mouse.send  = true;
+		  };
+		  
+		  function UpdatePollTimeout() {
+		    if (poll_tm_out != undefined && poll_tm_out != 0)
+  			  clearTimeout(poll_tm_out);
+        poll_tm_out = setTimeout(PollFrame, kPollPeriod);
+		  }
+		  
+			function PollFrame() {
+				if (ready == false) {
+					timeout++;
+					if (timeout < 10) 
+						return UpdatePollTimeout();
+					timeout = 0;
+					disconnected = true;
+				}
+        ShowState();
+				ready = false;
+				frame.src = 'http://' + document.domain + ':8080' + GetReqParams();
+			}
+      
+		  frame.onload = function() {
+	    	canvas_ctx.save();
+		    canvas_ctx.drawImage(this, 0, 0);
+		    canvas_ctx.restore();
+	      ready        = true;
+		    disconnected = false;
+        UpdatePollTimeout();
+		  };
+		  
+		  frame.onerror = function() {
+	      ready        = false;
+		    disconnected = true;
+        UpdatePollTimeout();
+		  };
+		  
+		  frame.onabort = function() {
+	      ready        = false;
+		    disconnected = true;
+        UpdatePollTimeout();
+		  };
+		  
+      UpdatePollTimeout();
+		}
+		</script>
+	</head>
+	<body onload="OnLoad()" style="padding: 0px; margin: 0px">
+		<canvas id="screen" width="1024" height="768" style="border: 1px solid #000000;">
+		</canvas>
+		<!--<div id="debug" style="overflow:scroll"></div>-->
+	</body>
+</html>

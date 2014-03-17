@@ -24,7 +24,7 @@ mount -t sysfs none /sys
 mount -t devtmpfs devtmpfs /dev
 # ------------------------------------------------------------------------------
 # Do your stuff here.
-/bin/splash_scr /root/logo.bmp
+/bin/regisplash /root/vbr_splash.bmp
 # ------------------------------------------------------------------------------
 # Mount rootfs
 CMD_LINE=$(cat /proc/cmdline)

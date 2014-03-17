@@ -8,6 +8,7 @@
 . ./rb_initramfs.sh
 . ./rb_mmc.sh
 . ./rb_packet.sh
+. ./rb_firmware.sh
 
 CORE_SELECT_CONF="${TMP_DIR}/core_select.conf"
 CORE_SELECT_BOARD=''
