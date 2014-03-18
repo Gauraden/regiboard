@@ -1,4 +1,4 @@
-Directories:
+=Directories=:
 	* board........: for boards configurations
 	* build........: for unpacked sources
 	* conf.........: for storing configurations of kernels, tools, etc.
@@ -14,7 +14,7 @@ Directories:
 	* -> firmware..: binary files of firmwares for boards
 	* tmp..........: for temporary files, caches etc.
 	
-Units:
+=Units=:
 	* rb_build.sh................: Main script, all commands are executed through it
 	* rb_core.sh.................: Core functions for primary initialisation
 	* rb_helpers.sh..............: Pack of commonly used functions
@@ -27,23 +27,24 @@ Units:
 	* rb_toolchain.sh............: Functions for building toolchain
 	* rb_uboot.sh................: Functions for building bootloader 'U-Boot'
 	
-How to use:
+=How to use=:
 	Format....: ./rb_build <unit> <args>
 		<unit>..: name of executable unit
 		  * help.....: for printing this help
 		  * board....: for selecting target board
-			* toolchain:
-			* uboot....:
-			* kernel...:
-			* rootfs...:
-			* initramfs:
-			* packets..:
-			* image....: [NOT READY]
-			* mmc......: for writing all binaries and images to MMC
+		  * toolchain:
+		  * uboot....: for building uboot
+		  * kernel...:
+		  * rootfs...:
+		  * initramfs:
+		  * packets..:
+		  * image....: [NOT READY]
+		  * mmc......: for writing all binaries and images to MMC
+		  * usb-boot.: for booting board over USB cable
 		<args>..: arguments for executable unit, if it is empty then default build 
 		          programm will be executed.
-			* config...: for configurating of unit
-			* mkpatch..: for generating of patch file, it will check only *.orig files.
-			             This patch will be automaticaly applyed in future builds!
-			* clean....: for cleaning of build files.
-			             After cleaning building of programm will be executed.
+		  * config...: for configurating of unit
+		  * mkpatch..: for generating of patch file, it will check only *.orig files.
+		               This patch will be automaticaly applyed in future builds!
+		  * clean....: for cleaning of build files.
+		               After cleaning building of programm will be executed.

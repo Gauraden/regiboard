@@ -113,5 +113,5 @@ case "${SUBPROG_TYPE}" in
 	# Starting openOCD server and/or client
 	'debug'     ) ConnectToOpenOCD;;
 	# default
-	*           ) PrintWarn "Unknown subprogram: ${SUBPROG_TYPE}";;
+	*           ) PrintWarn "Unknown subprogram: ${SUBPROG_TYPE}"; PrintHelp;;
 esac

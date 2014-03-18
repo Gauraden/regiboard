@@ -22,7 +22,7 @@ PrintHelp() {
 	if ! IsFileExists $help_file; then
 		help_file="${WORK_DIR}/readme_en.txt"
 	fi
-	cat $help_file
+	PrintWithColors $help_file
 }
 
 SelectBoardConfig() {

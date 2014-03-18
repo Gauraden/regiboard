@@ -1,0 +1,1 @@
+git clone git://git.pengutronix.de/git/tools/imx-usb-loader.git
