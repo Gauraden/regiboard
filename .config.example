@@ -1,12 +1,19 @@
-# Number of tries while downloading any tarball
+# Количество попыток скачать файл с удалённого хоста
 WGET_TRIES=3
 
-# Number of seconds for waiting between tries
+# Задержка между попытками скачать файл с удалённого хоста (сек.)
 WGET_WAIT=10 #seconds
 
-# External directory for storing downloaded files
+# Путь к директории для хранения скаченых файлов
 # EXT_DOWNLOAD_DIR='/home/ftp/distfiles'
 EXT_DOWNLOAD_DIR='/home/denis/CrossTools/dl'
 
-# Flag for enabling (y) google translating of all messages
+# Флаг для включения/отключения автоматического перевода системных сообщений
 TRANSLATING_MESSAGES=n
+
+# Параметры подключения к FTP серверу, для записи собранных образов
+REPO_URL_FTP='regiboard@jenny'
+REPO_PSW_FTP=12345
+
+# Пути к проектам, чьи файлы используются при сборке образов
+EXT_PROJECT_REGIGRAF='../regigraf'

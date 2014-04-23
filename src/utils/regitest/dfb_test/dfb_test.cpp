@@ -69,7 +69,42 @@ void check_ftdi() {
 //  close_uart();
 }
 
+class Color {
+  public:
+    Color(int r, int g, int b, int a): _r(r), _g(g), _b(b), _a(a) {}
+    void ApplyTo(IDirectFBSurface *surf) const {
+      surf->SetColor(_r, _g, _b, _a);
+    }
+  private:
+    int _r;
+    int _g;
+    int _b;
+    int _a;
+};
+
+struct Point {
+  Point(): x(0), y(0) {}
+  Point(int _x, int _y): x(_x), y(_y) {}
+  int x;
+  int y;
+};
+
+class Line {
+  public:
+    Line(const Point &p1, const Point &p2) {
+      _pts[0] = p1;
+      _pts[1] = p2;
+    }
+    void ApplyTo(IDirectFBSurface *surf) const {
+      surf->DrawLine(_pts[0].x, _pts[0].y,
+                     _pts[1].x, _pts[1].y);
+    }
+  private:
+    Point _pts[2];
+};
+
 void check_aliasing(IDirectFBSurface *primary) {
+    /*
     primary->SetColor(0xFF, 0x00, 0x00, 0xFF);
     primary->DrawLine(30, 10, 720, 300);
     
@@ -78,6 +113,13 @@ void check_aliasing(IDirectFBSurface *primary) {
     primary->SetRenderOptions(render_options);
     primary->SetColor(0xFF, 0xFF, 0xFF, 0xFF);
     primary->DrawLine(10, 10, 700, 300);
+    */
+    const Color kRed(0xFF, 0x00, 0x00, 0xFF);
+    const Color kWhite(0xFF, 0xFF, 0xFF, 0xFF);
+    kRed.ApplyTo(primary);
+    Line(Point(30, 10), Point(720, 300)).ApplyTo(primary);
+    kWhite.ApplyTo(primary);
+    Line(Point(10, 10), Point(700, 300)).ApplyTo(primary);
     primary->Flip();
     sleep(5);
 }

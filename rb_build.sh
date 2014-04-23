@@ -24,6 +24,7 @@ CreateDirIfNotExists "${TOOLCHAIN_DIR}"
 CreateDirIfNotExists "${BUILDROOT_DIR}"
 CreateDirIfNotExists "${PACKETS_DIR}"
 CreateDirIfNotExists "${INCLUDE_DIR}"
+CreateDirIfNotExists "${FIRMWARE_DIR}"
 BindOrCreateDir "${DOWNLOAD_DIR}" "${EXT_DOWNLOAD_DIR}"
 
 # Default values

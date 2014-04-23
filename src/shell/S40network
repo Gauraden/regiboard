@@ -10,6 +10,7 @@ case "$1" in
   start)
  	echo "Starting network..."
 	#/sbin/ifup -a
+	/sbin/ifconfig lo up 127.0.0.1
 	/sbin/ifconfig eth0 up hw ether $HW_ADDR
 	# Hack
 	if [ "$BOARD_NAME" != 'MX53 Regiboard' ]; then

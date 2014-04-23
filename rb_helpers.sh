@@ -32,6 +32,7 @@ if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	ROOTFS_IMG_DIR="${OUTPUT_DIR}/rootfs"
 	PACKETS_DIR="${OUTPUT_DIR}/packets"
 	INCLUDE_DIR="${OUTPUT_DIR}/include"
+  FIRMWARE_DIR="${OUTPUT_DIR}/firmware"
 	SRC_ETC_DIR="${WORK_DIR}/src/etc"
 	SRC_SHELL_DIR="${WORK_DIR}/src/shell"
 	SRC_PATCHES_DIR="${WORK_DIR}/src/patches"

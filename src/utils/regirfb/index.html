@@ -11,6 +11,7 @@
 		var canvas_ctx   = 0;
 		var ready        = true;
 		var frame        = new Image();
+		var video_scheme = new Image();
 		var timeout      = 0;
 		var disconnected = true;
 		var mouse        = {'x': 0, 'y': 0, 'state': 0, 'send': false};
@@ -63,8 +64,13 @@
 		function ShowState() {
       if (canvas_ctx == 0)
         return;
-			if (disconnected)
-			  ShowMessage('Нет связи с устройством');
+			if (!disconnected)
+			  return
+			canvas_ctx.save();
+		  canvas_ctx.drawImage(video_scheme, 0, 0, canvas_node.width,
+		                                           canvas_node.height);
+		  canvas_ctx.restore();
+		  ShowMessage('Нет связи с устройством');
 		}
 
     function GetReqParams() {
@@ -79,6 +85,8 @@
 			debug_node   = document.getElementById("debug");
 			canvas_node  = document.getElementById("screen");
 			canvas_ctx   = canvas_node.getContext('2d');
+		  
+		  video_scheme.src = 'http://' + document.domain + '/video_calib_scheme.svg'
 		  
 			canvas_node.onmousedown = function(event) {
 		    mouse.x     = event.clientX;
