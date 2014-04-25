@@ -89,6 +89,7 @@ static void WaitForRequest(int socket, fb::Screen &screen) {
 	      SendNewCoords(x, y, s);
     }
     screen.SendFrameAsBmp(clientSock);
+    usleep(10000);
 		close(clientSock);
 }
 
