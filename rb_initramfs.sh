@@ -35,18 +35,24 @@ BuildBusyBoxOld() {
 BuildBusyBox() {
   ./rb_build.sh packets busybox
  	PrintNotice "Creating busybox symlinks..."
- 	local busybox="${IRAMFS_BUILD_DIR}/bin/busybox"
- 	local symlink="${IRAMFS_BUILD_DIR}/bin"
- 	ln -s $busybox "${symlink}/init/cat"
- 	ln -s $busybox "${symlink}/init/echo"
- 	ln -s $busybox "${symlink}/init/ls"
- 	ln -s $busybox "${symlink}/init/mkdir"
- 	ln -s $busybox "${symlink}/init/mount"
- 	ln -s $busybox "${symlink}/init/sed"
- 	ln -s $busybox "${symlink}/init/sh"
- 	ln -s $busybox "${symlink}/init/sleep"
- 	ln -s $busybox "${symlink}/init/switch_root"
- 	ln -s $busybox "${symlink}/init/umount"
+# 	local busybox="${IRAMFS_BUILD_DIR}/bin/busybox"
+# 	local symlink="${IRAMFS_BUILD_DIR}/bin/"
+ 	local busybox="busybox"
+ 	local symlink=""
+ 	cd "${IRAMFS_BUILD_DIR}/bin/"
+ 	ln -sf $busybox "${symlink}cat"
+ 	ln -sf $busybox "${symlink}echo"
+ 	ln -sf $busybox "${symlink}ls"
+ 	ln -sf $busybox "${symlink}ln"
+ 	ln -sf $busybox "${symlink}mkdir"
+ 	ln -sf $busybox "${symlink}mount"
+ 	ln -sf $busybox "${symlink}sed"
+ 	ln -sf $busybox "${symlink}sh"
+ 	ln -sf $busybox "${symlink}sleep"
+ 	ln -sf $busybox "${symlink}switch_root"
+ 	ln -sf $busybox "${symlink}umount"
+# 	ln -sf $busybox "${symlink}fsck"
+# 	ln -sf $busybox "${symlink}fsck.ext2"
 }
 
 PrepareInitRAMFS() {
@@ -95,6 +101,8 @@ BuildInitRAMFS() {
 	# prepare utils and scripts
 	PrintNotice "Installing utils and scripts..."
 	cp "${init_file}" "${IRAMFS_BUILD_DIR}/sbin/"
-	ln -s "${IRAMFS_BUILD_DIR}/sbin/init" "${IRAMFS_BUILD_DIR}/init"
+	cd ${IRAMFS_BUILD_DIR}
+	ln -sf sbin/init init
+#	ln -sf "${IRAMFS_BUILD_DIR}/sbin/init" "${IRAMFS_BUILD_DIR}/init"
 	NotifyUser "Building of init RAM FS for \"${TARGET_NAME_PREFIX}\" was finished!"
 }

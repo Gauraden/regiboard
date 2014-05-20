@@ -170,13 +170,18 @@ void Screen::InitHttpHeader(int         socket,
 }
 
 void Screen::SendUData(int socket) {
-  ssize_t sended = 0;
+  ssize_t sended  = 0;
+  int     err_num = 0;
   while (sended < _png_udata.offs) {
     const ssize_t kResult = send(socket, _png_buf.get() + sended,
                                          _png_udata.offs - sended,
                                          MSG_NOSIGNAL);
-    if (kResult < 0)
-      break;
+    if (kResult < 0) {
+      err_num++;
+      if (err_num > 3)
+        break;
+      continue;
+    }
     sended += kResult;
   }
 }

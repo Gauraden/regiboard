@@ -13,9 +13,9 @@ case "$1" in
 	/sbin/ifconfig lo up 127.0.0.1
 	/sbin/ifconfig eth0 up hw ether $HW_ADDR
 	# Hack
-	if [ "$BOARD_NAME" != 'MX53 Regiboard' ]; then
-		ethtool -s eth0 speed 10 duplex half
-	fi
+#	if [ "$BOARD_NAME" != 'MX53 Regiboard' ]; then
+#		ethtool -s eth0 speed 10 duplex half
+#	fi
 	udhcpc -b -A 2147483647
 	;;
   stop)

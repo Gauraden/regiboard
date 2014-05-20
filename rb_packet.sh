@@ -29,8 +29,9 @@ PacketConfigure() {
 	  if [ "${PACKET_ENV_VARS}" != '' ]; then
 		  export ${PACKET_ENV_VARS}
 	  fi
-	  ./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config || \
-      ./configure ${PACKET_CONFIGURE}
+	  ./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config # || \
+      #./configure ${PACKET_CONFIGURE}
+    PACKET_CONFIGURE=''
 		return
 	fi
 	# Running: make
@@ -57,9 +58,9 @@ PacketClean() {
 
 PacketMake() {
 	local build_dir=$1
-	PrintNotice 'Building...'
-  IsPacketForHost || (TcTargetMakeSources ${build_dir} && return 0)
-  TcHostMakeSources ${build_dir}
+	PrintNotice "Building..."
+  IsPacketForHost && TcHostMakeSources ${build_dir} \
+  || TcTargetMakeSources ${build_dir}
 }
 
 SetPacketControl() {
