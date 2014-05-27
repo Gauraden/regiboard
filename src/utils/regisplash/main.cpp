@@ -7,7 +7,7 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <memory>
-#include <time.h>
+//#include <time.h>
 
 #pragma pack(push, 1)
 
@@ -35,7 +35,8 @@ struct Screen {
 	Screen(uint32_t w, uint32_t h, uint8_t d)
 		: width(w),
 		  height(h),
-		  depth(d) {}
+		  depth(d),
+		  buffer(0) {}
 		  
 	uint32_t  width;
 	uint32_t  height;
@@ -78,13 +79,15 @@ bool GetVideoMode(int fbdev, struct fb_var_screeninfo *info) {
 	return true;
 }
 
-bool SetVideoMode(int fbdev, int width, int height, int depth) {
+bool SetVideoMode(int fbdev, Screen *scr) {
+  if (scr == 0 || fbdev < 0)
+    return false;
 	struct fb_var_screeninfo fb_scr_info;
 	if (not GetVideoMode(fbdev, &fb_scr_info))
 		return false;
-	fb_scr_info.xres           = width;
-	fb_scr_info.yres           = height;
-	fb_scr_info.bits_per_pixel = depth;
+	scr->width  = fb_scr_info.xres;
+	scr->height = fb_scr_info.yres;
+	fb_scr_info.bits_per_pixel = scr->depth * 8;
 	fb_scr_info.activate       = FB_ACTIVATE_NOW;
 	if (ioctl(fbdev, FBIOPUT_VSCREENINFO, &fb_scr_info) < 0) {
 		ERROR("Ошибка " << strerror(errno));
@@ -134,55 +137,21 @@ bool PrintBMP(const char *name, Screen *screen) {
 	close(kBMPFile);
 	return true;
 }
-/*
-void PrintScreenBorder(Screen *screen) {
-	const PixelRGB kPixel(0, 0, 255);
-	const PixelRGB kBgPixel(0, 255, 0);
-	const unsigned kLastRow = (screen->height - 1) * screen->width * screen->depth;
-	for (int row = 0; row < screen->height; row++) {
-		const int kOffset = row * screen->width * screen->depth;
-		for (int col = 0; col < screen->width; col++) {
-		memcpy(&screen->buffer[kOffset + (col * screen->depth)], &kBgPixel.r, 3);	
-		}
-	}
-	// top & bottom lines
-	for (int col = 0; col < screen->width; col++) {
-		memcpy(&screen->buffer[col * screen->depth], &kPixel.r, 3);
-		memcpy(&screen->buffer[kLastRow + (col * screen->depth)], &kPixel.r, 3);
-	}
-	// left & right lines
-	for (int row = 0; row < screen->height; row++) {
-		const int kOffset = row * screen->width * screen->depth;
-		memcpy(&screen->buffer[kOffset], &kPixel.r, 3);
-		memcpy(&screen->buffer[kOffset + ((screen->width - 1) * screen->depth)], &kPixel.r, 3);
-	}
-}
-*/
+
 int main(int argc, char *argv[]) {
-//	Screen screen(800, 480, 3);
-	Screen screen(1024, 768, 3);
+	Screen screen(800, 600, 3);
 	if (argc < 2) {
 		ERROR("Не указан BMP файл!");
 		return 0;
 	}
 	const int kFBDev = open("/dev/fb0", O_RDWR);
-	const int kSize  = screen.width * screen.height * screen.depth;
-	if (not SetVideoMode(kFBDev,
-	                     screen.width,
-	                     screen.height,
-	                     (screen.depth * 8))) {
+	if (not SetVideoMode(kFBDev, &screen)) {
 		close(kFBDev);
 		return 0;
 	}
+	const int kSize = screen.width * screen.height * screen.depth;
 	screen.buffer = (uint8_t*)mmap(0, kSize, PROT_WRITE, MAP_SHARED, kFBDev, 0);
 	PrintBMP(argv[1], &screen);
-//	PrintScreenBorder(&screen);
-	struct timespec tm;
-	tm.tv_sec  = 0;
-	tm.tv_nsec = 10;
-	while (1) {
-//		nanosleep(&tm, 0);
-	}
 	munmap(screen.buffer, kSize);
 	close(kFBDev);
 	return 0;
