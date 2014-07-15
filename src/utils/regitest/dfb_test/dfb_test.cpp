@@ -114,14 +114,23 @@ void check_aliasing(IDirectFBSurface *primary) {
     primary->SetColor(0xFF, 0xFF, 0xFF, 0xFF);
     primary->DrawLine(10, 10, 700, 300);
     */
+    DFBSurfaceRenderOptions render_options = DSRO_ANTIALIAS;
+    primary->SetDrawingFlags(DSDRAW_BLEND);        
+    primary->SetRenderOptions(render_options);
     const Color kRed(0xFF, 0x00, 0x00, 0xFF);
     const Color kWhite(0xFF, 0xFF, 0xFF, 0xFF);
-    kRed.ApplyTo(primary);
-    Line(Point(30, 10), Point(720, 300)).ApplyTo(primary);
+    DFBRegion region;
+    region.x1 = 10;
+    region.y1 = 0;
+    region.x2 = 700;
+    region.y2 = 10;
+    primary->SetClip(&region);
+//    kRed.ApplyTo(primary);
+//    Line(Point(30, 10), Point(720, 11)).ApplyTo(primary);
     kWhite.ApplyTo(primary);
-    Line(Point(10, 10), Point(700, 300)).ApplyTo(primary);
+    Line(Point(700, 11), Point(10, 9)).ApplyTo(primary);
     primary->Flip();
-    sleep(5);
+    sleep(15);
 }
 
 int main (int argc, char **argv) {
