@@ -1,8 +1,8 @@
 #!/bin/sh
 
 FBREC_NAME='framebuffer recorder'
-FBREC_DIR='/root'
-FBREC_BIN="fb_recorder"
+FBREC_DIR='/usr/bin'
+FBREC_BIN="regirfb"
 
 StartCmd() {
 	echo -n "Starting $FBREC_NAME: "

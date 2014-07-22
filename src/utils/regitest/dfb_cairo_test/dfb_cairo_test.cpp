@@ -154,7 +154,7 @@ bool check_cairo(IDirectFB *dfb, IDirectFBSurface *primary) {
       return false;
     }
     
-//    show_rotated_text(cairo_context, primary, &dfb_buf);
+    show_rotated_text(cairo_context, primary, &dfb_buf);
 //    show_trend(cairo_context, primary, &dfb_buf);
 /*
   	cairo_save(cairo_context);
@@ -178,6 +178,7 @@ bool check_cairo(IDirectFB *dfb, IDirectFBSurface *primary) {
 	  cairo_show_text(cairo_context, "Hello World!");
     cairo_restore(cairo_context);
     */	  
+    /*
    	cairo_save(cairo_context);
 	  cairo_set_source_rgb(cairo_context, 0.0, 1.0, 0.0);
     cairo_set_line_width(cairo_context, 1);
@@ -193,7 +194,7 @@ bool check_cairo(IDirectFB *dfb, IDirectFBSurface *primary) {
 	  cairo_rotate(cairo_context, (45*0.0174) );
 	  cairo_show_text(cairo_context, "WAZZZZAAAAAAP!");
     cairo_restore(cairo_context);
-	  
+	  */
     primary->Blit(dfb_buf);
     primary->Flip();
     

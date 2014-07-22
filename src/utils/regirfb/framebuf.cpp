@@ -178,8 +178,10 @@ void Screen::SendUData(int socket) {
                                          MSG_NOSIGNAL);
     if (kResult < 0) {
       err_num++;
-      if (err_num > 3)
+      if (err_num > 3) {
+        ERROR("Ошибка при отправки кадра! sended = " << (long int)sended);
         break;
+      }
       continue;
     }
     sended += kResult;
