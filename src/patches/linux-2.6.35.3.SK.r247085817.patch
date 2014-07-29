@@ -791,7 +791,7 @@
  /* MX53 ROM require the boot FCB/DBBT support which need
   * more space to store such info on NAND boot partition.
   * 16M should cover all kind of NAND boot support on MX53.
-@@ -913,6 +924,7 @@
+@@ -915,6 +926,7 @@
  	.width = 1,
  	.init = nand_init,
  };
@@ -799,7 +799,7 @@
  
  static struct mxc_asrc_platform_data mxc_asrc_data = {
  	.channel_bits = 4,
-@@ -1100,6 +1112,8 @@
+@@ -1102,6 +1114,8 @@
  		}
  #if defined(CONFIG_FB_MXC_SYNC_PANEL) || \
  	defined(CONFIG_FB_MXC_SYNC_PANEL_MODULE)
@@ -808,7 +808,7 @@
  		if (fb_mem) {
  			mxcfb_resources[0].start =
  				gpu_data.enable_mmu ?
-@@ -1111,23 +1125,27 @@
+@@ -1113,23 +1127,27 @@
  			mxcfb_resources[0].start = 0;
  			mxcfb_resources[0].end = 0;
  		}
@@ -838,7 +838,7 @@
  	gpio_request(TS0_PENIRQ, "ts0-penirq");
  	gpio_direction_input(TS0_PENIRQ);
  
-@@ -1180,7 +1198,9 @@
+@@ -1182,7 +1200,9 @@
  
  	mxc_cpu_common_init();
  	mx53_loco_io_init();
@@ -849,7 +849,7 @@
  	mxc_register_device(&mxc_dma_device, NULL);
  	mxc_register_device(&mxc_wdt_device, NULL);
  	mxc_register_device(&mxci2c_devices[0], &mxci2c_data);
-@@ -1217,8 +1237,9 @@
+@@ -1219,8 +1239,9 @@
  		bus_freq_data.lp_reg_id = "DA9052_BUCK_PRO";
  	}
  #endif
@@ -860,7 +860,7 @@
  	mxc_register_device(&mxc_ipu_device, &mxc_ipu_data);
  	mxc_register_device(&mxc_ldb_device, &ldb_data);
  //	mxc_register_device(&mxc_tve_device, &tve_data);
-@@ -1256,7 +1277,7 @@
+@@ -1258,7 +1279,7 @@
  		mxc_register_device(&mxc_asrc_device, &mxc_asrc_data);
  	}
  
@@ -869,7 +869,7 @@
  //	spi_register_board_info(mxc_ts_device,
  //				ARRAY_SIZE(mxc_ts_device));
    //  platform_device_register(&sk_spi_gpio_device);
-@@ -1265,13 +1286,14 @@
+@@ -1267,13 +1288,14 @@
      platform_device_register(&sk_spi1_gpio_device);
      platform_device_register(&sk_spi2_gpio_device);
  #endif
@@ -885,7 +885,7 @@
  	sgtl5000_data.ext_ram_clk = clk_get(NULL, "emi_fast_clk");
  	clk_put(sgtl5000_data.ext_ram_clk);
  	mxc_register_device(&mxc_sgtl5000_device, &sgtl5000_data);
-@@ -1284,12 +1306,17 @@
+@@ -1286,12 +1308,17 @@
  	mx5_usb_dr_init();
  	mx5_set_host1_vbus_func(mx53_loco_usbh1_vbus);
  	mx5_usbh1_init();
@@ -903,7 +903,7 @@
  }
  
  static void __init mx53_loco_timer_init(void)
-@@ -1300,6 +1327,9 @@
+@@ -1302,6 +1329,9 @@
  
  	uart_clk = clk_get_sys("mxcintuart.0", NULL);
  	early_console_setup(MX53_BASE_ADDR(UART1_BASE_ADDR), uart_clk);
@@ -913,7 +913,7 @@
  }
  
  static struct sys_timer mxc_timer = {
-@@ -1310,7 +1340,11 @@
+@@ -1312,7 +1342,11 @@
   * The following uses standard kernel macros define in arch.h in order to
   * initialize __mach_desc_MX53_LOCO data structure.
   */
@@ -945,7 +945,7 @@
  	.matrix = keymapping,
  };
 -
-+#ifndef REGIBOARD
++#ifndef MX51_REGIBOARD
  static struct platform_pwm_backlight_data mxc_pwm_backlight_data = {
  	.pwm_id = 0,
  	.max_brightness = 255,
@@ -1097,17 +1097,6 @@
  	MXC_NFC_SYM(0);        // set 2 clock per RE#WE# (asymmetric RE waveform)
  	MXC_NFC_PS(3);         // set 4KB page (11)
  //	MXC_NFC_RBB_MODE(0);       // NFC monitors ready-busy status by doing a status-read command.
---- ./build/linux-2.6.35.3.SK/drivers/video/Kconfig.orig	2011-11-10 01:51:30.000000000 +0400
-+++ ./build/linux-2.6.35.3.SK/drivers/video/Kconfig	2013-07-03 15:38:54.867572961 +0400
-@@ -207,7 +207,7 @@
-        default n
- 
- config FB_BACKLIGHT
--	bool
-+	bool "Enable backlight control for FB"
- 	depends on FB
- 	select BACKLIGHT_LCD_SUPPORT
- 	select BACKLIGHT_CLASS_DEVICE
 --- ./build/linux-2.6.35.3.SK/drivers/mtd/nand/nand_device_info.c.orig	2013-06-24 10:37:02.000000000 +0400
 +++ ./build/linux-2.6.35.3.SK/drivers/mtd/nand/nand_device_info.c	2013-08-30 10:09:35.191165510 +0400
 @@ -951,24 +951,24 @@

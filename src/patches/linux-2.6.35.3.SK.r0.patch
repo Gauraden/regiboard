@@ -167,15 +167,6 @@
  	/* reset FM */
  	gpio_request(BABBAGE_FM_RESET, "fm-reset");
  	gpio_direction_output(BABBAGE_FM_RESET, 0);
-@@ -1241,7 +1250,7 @@
- 	mxc_register_device(&mxc_ssi2_device, NULL);
- 	mxc_register_device(&mxc_ssi3_device, NULL);
- 	mxc_register_device(&mxc_alsa_spdif_device, &mxc_spdif_data);
--	mxc_register_device(&mxc_fec_device, NULL);
-+//	mxc_register_device(&mxc_fec_device, NULL); // look at mx51_regigraf.c
- 	mxc_register_device(&mxc_v4l2_device, NULL);
- 	mxc_register_device(&mxc_v4l2out_device, NULL);
- 	mxc_register_device(&mxc_powerkey_device, &pwrkey_data);
 @@ -1282,6 +1291,7 @@
  
  	mx5_usb_dr_init();

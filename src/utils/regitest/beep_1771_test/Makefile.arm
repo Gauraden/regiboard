@@ -1,0 +1,27 @@
+TOOLCHAIN=~/arm
+BIN=$(TOOLCHAIN)/usr/bin
+INCLUDE=$(TOOLCHAIN)/usr/include
+
+CC=$(BIN)/arm-linux-gcc
+RM=rm -f
+CFLAGS=-Wall -I$(INCLUDE) -s
+TARGET=regi_beep
+SOURCES=regi_beep.c
+
+
+all: $(TARGET)
+
+
+clean:
+	$(RM) *.o
+	$(RM) *.core
+
+
+distclean: clean
+	$(RM) $(TARGET)
+
+
+$(TARGET): $(SOURCES:.c=.o)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES:.c=.o)
+
+
