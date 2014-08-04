@@ -1,0 +1,249 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2014-07-29 15:42:23.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2014-08-04 10:53:38.459178821 +0400
+@@ -146,6 +146,9 @@
+ 	MX53_PAD_NANDF_WP_B__EMI_NANDF_WP_B,  // WP
+ 	MX53_PAD_NANDF_RB0__EMI_NANDF_RB_0,   // R/B
+ 	MX53_PAD_NANDF_CS0__EMI_NANDF_CS_0,   // CE
++	// PSU (Power Supply Unit)
++	MX53_PAD_PATA_DATA8__GPIO2_8, // PATA_DATA8 -> GPIO2_8(X2) -> Reset
++	MX53_PAD_PATA_DATA9__GPIO2_9, // PATA_DATA9 -> GPIO2_9(X2) -> Save
+ };
+ /* PWM backlight **************************************************************/
+ #define BACKLIGHT_ENABLE (6*32 + 2) // GPIO-7.2
+@@ -503,7 +506,7 @@
+ // Bus  : I2C
+ // Addr : 0x68
+ #define RTC_INT (6*32 + 11) // GPIO-7.11 -> _INT_RTC
+-#define RTC_RST (6*32 + 12) // GPIO-7.12 -> RST_RTC
++#define RTC_RST (6*32 + 12) // GPIO-7.12 -> _RST_RTC
+ 
+ static struct i2c_board_info mxc_i2c_board_info[] = {
+ 	{
+@@ -511,6 +514,14 @@
+ 		.addr = 0x68,
+ 		.irq  = gpio_to_irq(RTC_INT)
+ 	},
++	{
++		.type = "lm92",
++		.addr = 0x4b,
++	},
++	{
++		.type = "lm92",
++		.addr = 0x48,
++	},
+ };
+ /* Setup of clocks ************************************************************/
+ void mx53_regigraf_clock_init(void) {
+@@ -585,7 +596,7 @@
+ 
+ void mx53_regigraf_devices(void) {
+ 	printk("Regiboard devices init...\n");
+-	/* I2C-1: RTC */
++	/* I2C-1: RTC, PSU (thermo sensor) */
+ 	i2c_register_board_info(0, mxc_i2c_board_info, ARRAY_SIZE(mxc_i2c_board_info));
+ 	/* PWM backlight */
+ 	mxc_register_device(&mxc_pwm1_device, NULL);
+--- ./build/linux-2.6.35.3.SK/drivers/rtc/rtc-ds1307.c.orig	2010-08-20 22:55:55.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/rtc/rtc-ds1307.c	2014-07-31 14:58:08.529029639 +0400
+@@ -86,6 +86,9 @@
+ #	define DS1337_BIT_A2I		0x02
+ #	define DS1337_BIT_A1I		0x01
+ #define DS1339_REG_ALARM1_SECS	0x07
++#define DS1339_REG_ALARM1_MIN   0x08
++#define DS1339_REG_ALARM1_HOUR	0x09
++#define DS1339_REG_ALARM1_DAY 	0x0A
+ #define DS1339_REG_TRICKLE	0x10
+ 
+ #define RX8025_REG_CTRL1	0x0e
+@@ -95,12 +98,29 @@
+ #	define RX8025_BIT_VDET		0x40
+ #	define RX8025_BIT_XST		0x20
+ 
++#define DS3231MZ_IRQ_POLL
++
++#ifdef DS3231MZ_IRQ_POLL
++// IOCtl function for reading temperature
++#define RTC_TEMP_GET _IOR('p', 0x13, int)
++// Temperature
++#define DS3231MZ_REG_TEMP_MSB 0x11
++#define DS3231MZ_REG_TEMP_LSB 0x12
++#endif
++
++static const int kDS3231MZRegsSize = 0x12;
+ 
+ struct ds1307 {
+ 	u8			offset; /* register's offset */
+-	u8			regs[11];
++	u8			regs[0x12];
+ 	enum ds_type		type;
+ 	unsigned long		flags;
++#ifdef DS3231MZ_IRQ_POLL
++  bool              irq_poll;
++  int               temperature;
++  wait_queue_head_t wqueue;
++  struct mutex      poll_mutex;
++#endif
+ #define HAS_NVRAM	0		/* bit 0 == sysfs file active */
+ #define HAS_ALARM	1		/* bit 1 == irq claimed */
+ 	struct i2c_client	*client;
+@@ -249,9 +269,13 @@
+ 
+ 	ds1307 = container_of(work, struct ds1307, work);
+ 	client = ds1307->client;
++#ifndef DS3231MZ_IRQ_POLL
+ 	lock = &ds1307->rtc->ops_lock;
+ 
+ 	mutex_lock(lock);
++#else
++	mutex_lock(&ds1307->poll_mutex);
++#endif
+ 	stat = i2c_smbus_read_byte_data(client, DS1337_REG_STATUS);
+ 	if (stat < 0)
+ 		goto out;
+@@ -259,21 +283,28 @@
+ 	if (stat & DS1337_BIT_A1I) {
+ 		stat &= ~DS1337_BIT_A1I;
+ 		i2c_smbus_write_byte_data(client, DS1337_REG_STATUS, stat);
+-
++#ifndef DS3231MZ_IRQ_POLL
+ 		control = i2c_smbus_read_byte_data(client, DS1337_REG_CONTROL);
+ 		if (control < 0)
+ 			goto out;
+-
+ 		control &= ~DS1337_BIT_A1IE;
+ 		i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL, control);
+-
++#else
++    if (ds1307->irq_poll) {
++      wake_up_interruptible(&ds1307->wqueue);
++    }
++#endif
+ 		rtc_update_irq(ds1307->rtc, 1, RTC_AF | RTC_IRQF);
+ 	}
+ 
+ out:
+ 	if (test_bit(HAS_ALARM, &ds1307->flags))
+ 		enable_irq(client->irq);
++#ifndef DS3231MZ_IRQ_POLL
+ 	mutex_unlock(lock);
++#else
++  mutex_unlock(&ds1307->poll_mutex);
++#endif
+ }
+ 
+ static irqreturn_t ds1307_irq(int irq, void *dev_id)
+@@ -292,15 +323,32 @@
+ {
+ 	struct ds1307	*ds1307 = dev_get_drvdata(dev);
+ 	int		tmp;
+-
++#ifdef DS3231MZ_IRQ_POLL
++  const int kBlockSize = kDS3231MZRegsSize;
++  if (ds1307->irq_poll) {
++    interruptible_sleep_on_timeout(&ds1307->wqueue, 1000);
++    mutex_lock(&ds1307->poll_mutex);
++  }
++#else
++  const int kBlockSize = 7;
++#endif
+ 	/* read the RTC date and time registers all at once */
+ 	tmp = ds1307->read_block_data(ds1307->client,
+-		ds1307->offset, 7, ds1307->regs);
+-	if (tmp != 7) {
++		ds1307->offset, kBlockSize, ds1307->regs);
++	if (tmp != kBlockSize) {
+ 		dev_err(dev, "%s error %d\n", "read", tmp);
++#ifdef DS3231MZ_IRQ_POLL
++    if (ds1307->irq_poll)
++      mutex_unlock(&ds1307->poll_mutex);
++#endif
+ 		return -EIO;
+ 	}
+-
++#ifdef DS3231MZ_IRQ_POLL
++  ds1307->temperature = (ds1307->regs[DS3231MZ_REG_TEMP_MSB] << 2) |
++                         ((ds1307->regs[DS3231MZ_REG_TEMP_LSB] >> 6) & 0x3);
++  if (ds1307->irq_poll)
++    mutex_unlock(&ds1307->poll_mutex);
++#endif
+ 	dev_dbg(dev, "%s: %02x %02x %02x %02x %02x %02x %02x\n",
+ 			"read",
+ 			ds1307->regs[0], ds1307->regs[1],
+@@ -325,7 +373,6 @@
+ 		"read", t->tm_sec, t->tm_min,
+ 		t->tm_hour, t->tm_mday,
+ 		t->tm_mon, t->tm_year, t->tm_wday);
+-
+ 	/* initial clock setting can be undefined */
+ 	return rtc_valid_tm(t);
+ }
+@@ -371,9 +418,16 @@
+ 	dev_dbg(dev, "%s: %02x %02x %02x %02x %02x %02x %02x\n",
+ 		"write", buf[0], buf[1], buf[2], buf[3],
+ 		buf[4], buf[5], buf[6]);
+-
++#ifdef DS3231MZ_IRQ_POLL
++  if (ds1307->irq_poll)
++    mutex_lock(&ds1307->poll_mutex);
++#endif
+ 	result = ds1307->write_block_data(ds1307->client,
+ 		ds1307->offset, 7, buf);
++#ifdef DS3231MZ_IRQ_POLL
++  if (ds1307->irq_poll)
++    mutex_unlock(&ds1307->poll_mutex);
++#endif
+ 	if (result < 0) {
+ 		dev_err(dev, "%s error %d\n", "write", result);
+ 		return result;
+@@ -535,7 +589,23 @@
+ 			return ret;
+ 
+ 		break;
+-
++#ifdef DS3231MZ_IRQ_POLL
++  case RTC_UIE_ON:
++    ds1307->irq_poll = true;
++      const u8  ctl_val    = DS1337_BIT_INTCN | DS1337_BIT_A1IE | DS3231_BIT_BBSQW;
++      const u32 alarm_mask = 0x80808080; // mask for once a second alarm
++      ds1307->write_block_data(client, DS1339_REG_ALARM1_SECS, 4, (const u8*)&alarm_mask);
++   		i2c_smbus_write_byte_data(client, DS1337_REG_CONTROL, ctl_val);
++    break;
++  case RTC_UIE_OFF:
++    ds1307->irq_poll = false;
++    break;
++  case RTC_TEMP_GET: {
++    int *out_ptr = (int*)arg;
++    (*out_ptr) = ds1307->temperature;
++    return 0;
++  }
++#endif
+ 	default:
+ 		return -ENOIOCTLCMD;
+ 	}
+@@ -687,8 +757,7 @@
+ 		 * running on Vbackup (BBSQI/BBSQW)
+ 		 */
+ 		if (want_irq) {
+-			ds1307->regs[0] |= DS1337_BIT_INTCN
+-					| bbsqi_bitpos[ds1307->type];
++			ds1307->regs[0] |= DS1337_BIT_INTCN | bbsqi_bitpos[ds1307->type];
+ 			ds1307->regs[0] &= ~(DS1337_BIT_A2IE | DS1337_BIT_A1IE);
+ 		}
+ 
+@@ -876,8 +945,16 @@
+ 	}
+ 
+ 	if (want_irq) {
++#ifdef DS3231MZ_IRQ_POLL
++    ds1307->irq_poll = false;
++    mutex_init(&ds1307->poll_mutex);
++    init_waitqueue_head(&ds1307->wqueue);
++		err = request_irq(client->irq, ds1307_irq, IRQF_TIMER,
++			  ds1307->rtc->name, client);
++#else
+ 		err = request_irq(client->irq, ds1307_irq, IRQF_SHARED,
+ 			  ds1307->rtc->name, client);
++#endif
+ 		if (err) {
+ 			dev_err(&client->dev,
+ 				"unable to request IRQ!\n");

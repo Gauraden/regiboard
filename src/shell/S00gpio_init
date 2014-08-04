@@ -4,6 +4,8 @@ GPIO_SYS_DIR='/sys/class/gpio/'
 VD1_2=110
 VD3_4=109
 SPEAKER=111
+PSU_SAVE=41
+PSU_RESET=40
 
 GPIOexport() {
     local pin_id=$1
@@ -16,6 +18,16 @@ GPIOexport() {
     echo $val > $GPIO_SYS_DIR/gpio${pin_id}/value
 }
 
+GPIOintExport() {
+    local pin_id=$1
+    echo $pin_id   > $GPIO_SYS_DIR/export
+    echo "in"      > $GPIO_SYS_DIR/gpio${pin_id}/direction
+    echo "falling" > $GPIO_SYS_DIR/gpio${pin_id}/edge
+}
+
 GPIOexport $VD1_2 out 0 0
 GPIOexport $VD3_4 out 0 1
 GPIOexport $SPEAKER out 0 1 
+
+GPIOintExport $PSU_SAVE
+GPIOintExport $PSU_RESET
