@@ -8,12 +8,16 @@ ResetFirmwareConfig() {
   unset FIRMWARE_SIZE_KB
 }
 
+ConfigurateFirmware() {
+  FIRMWARE_INFO="${PACKETS_DIR}/${BOARD_NAME}.info"
+}
+
 FirmwareList() {
 	Print "Доступные прошивки:"
-	for firmws in $(ls "${CONF_FIRMWARE_DIR}" | sed -r 's:(.+)\.conf:\1:'); do
+	for firmws in $(ls "${CONF_FIRMWARE_DIR}"); do
   	ResetFirmwareConfig
-  	. "${CONF_FIRMWARE_DIR}/${firmws}.conf"
-		PrintNotice "$firmws: плата [$FIRMWARE_BOARD]"
+  	. "${CONF_FIRMWARE_DIR}/${firmws}"
+		PrintNotice "${firmws/.conf}: плата [$FIRMWARE_BOARD]"
 	done
 	ResetFirmwareConfig
 }
@@ -21,15 +25,30 @@ FirmwareList() {
 CopyListOfFiles() {
   DieIfNotDefined $3 "директория куда требуется копировать файлы"  
   for file_name in $1; do
-    local file_path=$(echo "$2" | sed -r "s:%file_name%:$file_name:")
+    # копирование пакета в образ прошивки
+    local file_path=${2/\%file_name\%/$file_name}
     local result="[${RED}ошибка   ${MAGENTA}]"
     if IsFileExists "$file_path"; then
       result="[выполнено]"
-      $_USE_SUDO cp $file_path $3 > $_DEV_NULL
+      sudo cp $file_path $3 > $_DEV_NULL
     fi
     Print "$result $file_name" $MAGENTA ' < '
   done
-  _USE_SUDO=''
+}
+
+CreatePackagesFile() {
+  local ipkg_dir=$1
+  local repo_file="${FIRMWARE_INFO}/Packages"
+  local tmp_dir="${TMP_DIR}/pkt_info"
+  rm $repo_file
+  mkdir -p $tmp_dir
+  cd $tmp_dir
+  for pkg in $(ls "$ipkg_dir"); do
+    test "${pkg#*.ipk}" != '' && continue
+    ar -x "$ipkg_dir/$pkg" control.tar.gz && tar xvf ./control.tar.gz > ${_DEV_NULL}
+    cat ./control >> $repo_file
+  done
+  rm -r $tmp_dir
 }
 
 FirmwareCreate() {
@@ -55,16 +74,18 @@ FirmwareCreate() {
   sudo mkfs -t $fs_type -m 1 -v /dev/$loop_dev
   CreateDirIfNotExists "$tmp_dir"
   sudo mount -t $fs_type /dev/$loop_dev $tmp_dir
-  # копирование системных пакетов
-  PrintNotice "Копирование системных пакетов:"
-  UseSudo
+  # копирование пакетов
+  PrintNotice "Копирование пакетов:"
   CopyListOfFiles "$FIRMWARE_IPK" "${PACKETS_DIR}/%file_name%.ipk" "$tmp_dir"
-  # копирование внешних файлов
-  PrintNotice "Копирование внешних файлов ($EXT_PROJECT_REGIGRAF):"
-  UseSudo
-  CopyListOfFiles "$FIRMWARE_FILES" "${EXT_PROJECT_REGIGRAF}/%file_name%" "$tmp_dir"
+  # создание файла-репозитория
+  PrintNotice "Создание файла-репозитория..."
+  CreatePackagesFile "$tmp_dir"
+  # копирование файлов с метаданными прошивки
+  PrintNotice "Копирование метаданных..."
+  sudo cp ${FIRMWARE_INFO}/* $tmp_dir
   # упаковка
   PrintNotice "Упаковка образа..."
+  sync
   sudo umount $tmp_dir
   sudo losetup -d /dev/$loop_dev
 }

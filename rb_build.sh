@@ -45,6 +45,7 @@ ConfigurateUBoot
 ConfigurateKernel
 ConfigurateRootFS
 ConfigurateInitRAMFS
+ConfigurateFirmware
 # Method for canceling of not finished operations
 CancelKernel
 CancelRootFS

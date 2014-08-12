@@ -98,7 +98,7 @@ MakeIpkg() {
 	ar -r "${PACKETS_DIR}/${PACKET_NAME}.ipk" $ipk_dir/data.tar.gz $ipk_dir/control.tar.gz > ${_DEV_NULL}
 }
 
-PacketBuild() {
+PacketResetConfig() {
 	unset PACKET_NAME
 	unset PACKET_VERSION
 	unset PACKET_DESCRIPTION
@@ -107,15 +107,24 @@ PacketBuild() {
 	unset PACKET_CLEAN
 	unset PACKET_BUILD
 	unset PACKET_CONFIGURE
+}
+
+PacketBuild() {
+  PacketResetConfig
 	PacketInstall() {
 		PrintWarn "Skipping installation to: $1"
 	}
 	local packet=$1
 	. "${CONF_PAK_DIR}/$packet"
 	DieIfNotDefined "${PACKET_NAME}"    'Name of packet'
-	DieIfNotDefined "${PACKET_TARBALL}" 'Name of tarball'
-
 	PrintNotice "Packet: ---==< ${PACKET_NAME} >==---"
+	# Maybe there is no need to build the packet. It will be marked as external!
+	if [ "$PACKET_EXTERN" = 'true' ]; then
+	  PacketInstall
+	  return
+	fi
+	# Trying to build the packet...
+	DieIfNotDefined "${PACKET_TARBALL}" 'Name of tarball'
 	local build_dir=$(GetPacketBuildDir $PACKET_TARBALL)
 	local tarball="${DOWNLOAD_DIR}/${PACKET_TARBALL}"
 	local rebuild=false
