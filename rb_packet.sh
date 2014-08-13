@@ -68,6 +68,7 @@ SetPacketControl() {
 	echo -e \
 "Package: ${PACKET_NAME}\n"\
 "Version: ${PACKET_VERSION}\n"\
+"Filename: ${PACKET_NAME}.ipk\n"\
 "Description: ${PACKET_DESCRIPTION}\n"\
 "Section: regiboard/apps\n"\
 "Priority: optional\n"\

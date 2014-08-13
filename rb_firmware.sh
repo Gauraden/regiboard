@@ -51,6 +51,12 @@ CreatePackagesFile() {
   rm -r $tmp_dir
 }
 
+FirmwareRebuildPackets() {
+  for file_name in $1; do
+    PacketBuild "${file_name}.conf"
+  done
+}
+
 FirmwareCreate() {
   local firmw_conf=$1
   DieIfNotDefined $firmw_conf "имя конфигурации прошивки"
@@ -74,6 +80,9 @@ FirmwareCreate() {
   sudo mkfs -t $fs_type -m 1 -v /dev/$loop_dev
   CreateDirIfNotExists "$tmp_dir"
   sudo mount -t $fs_type /dev/$loop_dev $tmp_dir
+  # сборка требуемых пакетов
+  PrintNotice "Сборка пакетов:"
+  FirmwareRebuildPackets "$FIRMWARE_REBUILD"
   # копирование пакетов
   PrintNotice "Копирование пакетов:"
   CopyListOfFiles "$FIRMWARE_IPK" "${PACKETS_DIR}/%file_name%.ipk" "$tmp_dir"
