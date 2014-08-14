@@ -1,0 +1,13 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2014-08-14 08:48:42.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2014-08-14 09:55:03.570080137 +0400
+@@ -83,8 +83,8 @@
+ 	MX53_PAD_GPIO_10__GPIO4_0,           // GPIO_10 -> LVDS0_DPS   -> 4
+ 	MX53_PAD_GPIO_11__GPIO4_1,           // GPIO_11 -> LVDS0_SEL68 -> 20
+ 	// Front USB/LED
+-	MX53_PAD_KEY_ROW3__GPIO4_13, // KEY_ROW3 -> VD3_4(GPIO4_13)   -> 7
+-	MX53_PAD_KEY_COL4__GPIO4_14, // KEY_ROW3 -> VD1_2(GPIO4_14)   -> 8
++	MX53_PAD_KEY_ROW3__GPIO4_13, // KEY_ROW3 -> VD3_4(GPIO4_13)   -> 7 (GREEN)
++	MX53_PAD_KEY_COL4__GPIO4_14, // KEY_ROW3 -> VD1_2(GPIO4_14)   -> 8 (RED)
+ 	MX53_PAD_KEY_ROW4__GPIO4_15, // KEY_ROW3 -> Dinamic(GPIO4_15) -> 9
+ 	// SD 1
+ 	MX53_PAD_PATA_DIOW__GPIO6_17,  // PATA_DIOW  -> SD1_CD_GPIO6_17

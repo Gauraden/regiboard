@@ -1,0 +1,80 @@
+--- ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/mx53_regigraf.c.orig	2014-05-07 16:30:15.000000000 +0400
++++ ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/mx53_regigraf.c	2014-08-14 09:54:54.390195543 +0400
+@@ -411,6 +411,9 @@
+ 		break;
+ 	case I2C2_BASE_ADDR:
+ 		/* i2c2 SDA */
++		// MX53_PIN_KEY_ROW3 is configured as GPIO for front LED (GREEN)
++		// Go to: setup_front_led()
++/*
+ 		mxc_request_iomux(MX53_PIN_KEY_ROW3,
+ 				IOMUX_CONFIG_ALT4 | IOMUX_CONFIG_SION);
+ 		mxc_iomux_set_input(MUX_IN_I2C2_IPP_SDA_IN_SELECT_INPUT,
+@@ -420,8 +423,9 @@
+ 				PAD_CTL_ODE_OPENDRAIN_ENABLE |
+ 				PAD_CTL_DRV_HIGH | PAD_CTL_100K_PU |
+ 				PAD_CTL_HYS_ENABLE);
+-
++*/
+ 		/* i2c2 SCL */
++/*
+ 		mxc_request_iomux(MX53_PIN_KEY_COL3,
+ 				IOMUX_CONFIG_ALT4 | IOMUX_CONFIG_SION);
+ 		mxc_iomux_set_input(MUX_IN_I2C2_IPP_SCL_IN_SELECT_INPUT,
+@@ -431,7 +435,7 @@
+ 				PAD_CTL_ODE_OPENDRAIN_ENABLE |
+ 				PAD_CTL_DRV_HIGH | PAD_CTL_100K_PU |
+ 				PAD_CTL_HYS_ENABLE);
+-
++*/
+ 		break;
+ 	case I2C3_BASE_ADDR:
+ 		break;
+@@ -887,6 +891,37 @@
+ 
+ #endif
+ 
++void setup_front_led(void)
++{
++  volatile unsigned int reg;
++  // ALT1 - GPIO-4
++	mxc_request_iomux(MX53_PIN_KEY_ROW3, IOMUX_CONFIG_ALT1); // GPIO-4.13
++	mxc_request_iomux(MX53_PIN_KEY_COL4, IOMUX_CONFIG_ALT1); // GPIO-4.14
++	// Setup pins: 13, 14; as output
++	reg = readl(GPIO4_BASE_ADDR + 0x4);
++	reg |= (1 << 13) | (1 << 14);
++	writel(reg, GPIO4_BASE_ADDR + 0x4);
++	// Make LED red	
++	reg = readl(GPIO4_BASE_ADDR + 0x0);
++	reg &= ~(1 << 13); // GPIO-4_13 (0) GREEN
++	reg |= (1 << 14);  // GPIO-4_14 (1) RED
++	writel(reg, GPIO4_BASE_ADDR + 0x0);
++}
++
++void setup_backlight_pwm(void)
++{
++  volatile unsigned int reg;
++  // ALT1 - GPIO-7.2
++ 	mxc_request_iomux(MX53_PIN_ATA_INTRQ, IOMUX_CONFIG_ALT1);
++	// Setup pin: 2; as output
++	reg = readl(GPIO7_BASE_ADDR + 0x4);
++	reg |= (1 << 2);
++	writel(reg, GPIO7_BASE_ADDR + 0x4);
++	// Turn off backlight
++	reg = readl(GPIO7_BASE_ADDR + 0x0);
++	reg &= ~(1 << 2); // GPIO-7_2 (0) BACKLIGHT_ENABLE
++	writel(reg, GPIO7_BASE_ADDR + 0x0);
++}
+ 
+ int board_init(void)
+ {
+@@ -904,7 +939,8 @@
+ 
+ 	/* address of boot parameters */
+ 	gd->bd->bi_boot_params = PHYS_SDRAM_1 + 0x100;
+-
++	setup_backlight_pwm();
++  setup_front_led();
+ 	setup_uart();
+ 	/* For debuging of Regiboard */
+ //	clk_config(NULL, 400, DDR_CLK);
