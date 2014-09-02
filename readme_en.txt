@@ -48,3 +48,4 @@
 		               This patch will be automaticaly applyed in future builds!
 		  * clean....: for cleaning of build files.
 		               After cleaning building of programm will be executed.
+		  * once.....: for executing unit only once, if it's required

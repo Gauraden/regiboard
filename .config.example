@@ -14,6 +14,7 @@ TRANSLATING_MESSAGES=n
 # Параметры подключения к FTP серверу, для записи собранных образов
 REPO_URL_FTP='regiboard@jenny'
 REPO_PSW_FTP=12345
+REPO_PACKETS='packets'
 
 # Пути к проектам, чьи файлы используются при сборке образов
 EXT_PROJECT_REGIGRAF='../regigraf'

@@ -248,11 +248,11 @@ void InteractWithFTDIDevice(Ftdi::Context *ctx, struct usb_device *usb_dev) {
 	Config[kCRS485]       = 1;
 	Config[kDRS485]       = 1;
 	Config[kEEPROMChip]   = 0x46; // EEPROM Type 0x46 for 93xx46, 0x56 for 93xx56 and 0x66 for 93xx66
-/*	if (usb_dev->devnum == NeedConfig) {
+	if (usb_dev->devnum == NeedConfig) {
 		WriteFTDIConfig(ctx, kEEPROMSize);
 		std::cout << "Проверка конфигурации..." << std::endl;
 		PrintFTDIDevice(ctx, kEEPROMSize);
-	}*/
+	}
 	/*std::cout << "Установка режимов: " << std::endl;
 	// HIGH/ON value configures a line as output.
 	//         TX RX RTS CTS DTR DSR DCD EX_TX

@@ -522,11 +522,33 @@ InstallPacket() {
 	return 0
 }
 
+GetUserFromUrl() {
+  echo "$1" | sed -r 's/^([^@]+)@(.+)$/\1/'
+}
+
+GetHostFromUrl() {
+  echo "$1" | sed -r 's/^([^@]+)@(.+)$/\2/'
+}
+
+GetFtpDir() {
+  local ftp_url="ftp://${REPO_URL_FTP}/${1}"
+  PrintNotice "Downloading files from: $ftp_url -> $2"
+  cd $2
+  wget -r -nH --cut-dirs=1 ${ftp_url}/*
+}
+
+GetFtpDirList() {
+  cd $TMP_DIR
+  wget --spider --no-remove-listing --password=$REPO_PSW_FTP \
+    ftp://${REPO_URL_FTP}/${1}/
+  echo "${TMP_DIR}/.listing"
+}
+
 UploadDataToRemoteRepo() {
 	DieIfNoTool 'ncftp'
 	PrintNotice "Uploading \"$1\" to: $REPO_URL_FTP/$2"
-	local user=$(echo "$REPO_URL_FTP" | sed -r 's/^([^@]+)@(.+)$/\1/')
-	local host=$(echo "$REPO_URL_FTP" | sed -r 's/^([^@]+)@(.+)$/\2/')
+	local user=$(GetUserFromUrl $REPO_URL_FTP)
+	local host=$(GetHostFromUrl $REPO_URL_FTP)
 	ncftpput -u$user -p"$REPO_PSW_FTP" -C "$host" $1 "/$2" || \
 	  PrintWarn "Failed to upload file: $1"
 }

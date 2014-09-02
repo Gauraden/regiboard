@@ -12,6 +12,7 @@
 
 CORE_SELECT_CONF="${TMP_DIR}/core_select.conf"
 CORE_SELECT_BOARD=''
+REMOTE_REPO_LIST="${TMP_DIR}/.listing"
 
 DumpCoreSelects() {
 	echo "CORE_SELECT_BOARD=\"${CORE_SELECT_BOARD}\"" > "${CORE_SELECT_CONF}"
@@ -43,6 +44,20 @@ SelectBoardConfig() {
 GetListOfUnits() {
 	PrintNotice "List of available units"
 	# TODO
+}
+
+CheckSourcesOfPackets() {
+  local list_old="$REMOTE_REPO_LIST.old"
+  local dl_empty=true
+  Print "Detecting sources..."
+  find $DOWNLOAD_DIR -mindepth 1 -print -quit | grep -q . && dl_empty=false
+  mv -f $REMOTE_REPO_LIST $list_old 2> $_DEV_NULL
+  if [ -f $list_old ] && [ $dl_empty == false ]; then
+    GetFtpDirList $REPO_PACKETS
+    local is_diff=$(diff -q -w -B -Z -E "$REMOTE_REPO_LIST" "$list_old" 2> $_DEV_NULL)
+    test "$is_diff" == '' && return
+  fi
+  GetFtpDir $REPO_PACKETS $DOWNLOAD_DIR
 }
 
 if IsFileExists "${CORE_SELECT_CONF}"; then

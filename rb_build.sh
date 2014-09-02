@@ -37,6 +37,8 @@ SUBPROG_TYPE="$1"
 SUBPROG_ARG="$2"
 SUBPROG_ARG1="$3"
 
+# Checking packets sources for update
+CheckSourcesOfPackets
 # Loading board configuration
 LoadBoardConfig ${CORE_SELECT_BOARD} || SelectBoardConfig
 # Configurating (setting of special environment variables)

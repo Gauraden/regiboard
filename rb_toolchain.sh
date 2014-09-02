@@ -135,6 +135,10 @@ BuildToolchain() {
 	if [ "${BOARD_TOOLCHAIN}" != "" ]; then
 		return 0
 	fi
+	if [ "${SUBPROG_ARG}" = 'once' ] && $TC_C --version | grep -q .; then
+	  PrintWarn "Building of toolchain was skipped"
+	  return 0
+	fi
 	local autoconf_tar="autoconf-${TC_AUTOCONF_VER}.tar.gz"
 	local crosstool_tar="crosstool-ng-${BOARD_CTNG_VER}.tar.bz2"
 	# updating autoconf 
