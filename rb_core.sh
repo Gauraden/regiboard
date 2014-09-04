@@ -27,6 +27,11 @@ PrintHelp() {
 }
 
 SelectBoardConfig() {
+  if [ "$1" != '' ]; then
+    CORE_SELECT_BOARD=$1
+    DumpCoreSelects
+    return
+  fi
 	ListAllConfigs
 	PrintWarn "Please enter name of default configuration:"
 	read CORE_SELECT_BOARD

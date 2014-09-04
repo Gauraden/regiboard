@@ -91,7 +91,7 @@ case "${SUBPROG_TYPE}" in
 	# Printing help
 	'help'      ) PrintHelp;;
 	# Select board config
-	'board'     ) SelectBoardConfig;;
+	'board'     ) SelectBoardConfig $SUBPROG_ARG;;
 	# Building toolchain
 	'toolchain' ) BuildToolchain;;
 	# Building u-boot
