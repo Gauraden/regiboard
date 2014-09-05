@@ -512,7 +512,8 @@ UnpackArchive() {
 }
 
 InstallPacket() {
-	IsFileExists "$(GetBinDirList $1)" && return 0
+#	IsFileExists "$(GetBinDirList $1)" && return 0
+  whereis -b $1 | grep -q '/.*' && return 0
 	PrintNotice "Installing packet: $1 ..."
 	case "${LINUX_DIST}" in
 		'Ubuntu' ) sudo apt-get install "$1";;

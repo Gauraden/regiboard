@@ -9,6 +9,7 @@ InstallPacket 'bison'
 InstallPacket 'makeinfo'
 InstallPacket 'pkg-config'
 InstallPacket 'subversion'
+InstallPacket 'flex'
 
 # Directories
 CreateDirIfNotExists "${TMP_DIR}"
