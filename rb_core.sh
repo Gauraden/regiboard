@@ -65,11 +65,3 @@ CheckSourcesOfPackets() {
   GetFtpDir $REPO_PACKETS $DOWNLOAD_DIR
 }
 
-if IsFileExists "${CORE_SELECT_CONF}"; then
-	Print "Predefined settings:"
-	. "${CORE_SELECT_CONF}"
-	IsDefined ${CORE_SELECT_BOARD} ||	SelectBoardConfig
-	PrintNotice "Board: ${CORE_SELECT_BOARD}"
-else
-	SelectBoardConfig
-fi

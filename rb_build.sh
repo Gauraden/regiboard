@@ -37,6 +37,19 @@ SUBPROG_TYPE="$1"
 SUBPROG_ARG="$2"
 SUBPROG_ARG1="$3"
 
+if [ "${SUBPROG_TYPE}" == 'board' ]; then
+  SelectBoardConfig $SUBPROG_ARG
+fi
+
+if IsFileExists "${CORE_SELECT_CONF}"; then
+	Print "Predefined settings:"
+	. "${CORE_SELECT_CONF}"
+	IsDefined ${CORE_SELECT_BOARD} ||	SelectBoardConfig
+	PrintNotice "Board: ${CORE_SELECT_BOARD}"
+else
+	SelectBoardConfig
+fi
+
 # Checking packets sources for update
 CheckSourcesOfPackets
 # Loading board configuration
