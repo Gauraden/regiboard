@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Service variables
-_RUN_ID=$(date +%j%H%M%S)
+_RUN_ID=$(date +%Y%j%H%M%S)
 _BIN_DIR=$PATH
 _INC_DIR='/usr/include'
 _DEV_NULL='/dev/null'
