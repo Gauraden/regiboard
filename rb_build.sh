@@ -12,7 +12,6 @@ InstallPacket 'subversion'
 InstallPacket 'flex'
 InstallPacket 'texinfo'
 InstallPacket 'gawk'
-InstallPacket 'libnotify-bin'
 
 # Directories
 CreateDirIfNotExists "${TMP_DIR}"
