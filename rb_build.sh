@@ -12,6 +12,8 @@ InstallPacket 'subversion'
 InstallPacket 'flex'
 InstallPacket 'texinfo'
 InstallPacket 'gawk'
+# Installing libnotify only if X is available
+whereis -b 'xterm' | grep -q '/.*' && InstallPacket 'libnotify-bin'
 
 # Directories
 CreateDirIfNotExists "${TMP_DIR}"

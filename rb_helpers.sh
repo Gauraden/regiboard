@@ -91,8 +91,7 @@ UseSudo() {
 # Function for notifying user about finishing of work
 #   < message
 NotifyUser() {
-  test "$TERM" == 'xterm' && whereis -b $TERM | grep -q '/.*' && return 0
-  InstallPacket 'libnotify-bin'
+  test "$TERM" == 'xterm' && whereis -b $TERM | grep -q '/.*' || return 0
  	IsDefined "$1" && notify-send -u critical "$1"
 }
 # Function for executing command and skipping error output
