@@ -12,6 +12,7 @@ InstallPacket 'subversion'
 InstallPacket 'flex'
 InstallPacket 'texinfo'
 InstallPacket 'gawk'
+InstallPacket 'cmake'
 # Installing libnotify only if X is available
 whereis -b 'xterm' | grep -q '/.*' && InstallPacket 'libnotify-bin'
 
