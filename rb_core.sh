@@ -54,6 +54,10 @@ GetListOfUnits() {
 CheckSourcesOfPackets() {
   local list_old="$REMOTE_REPO_LIST.old"
   local dl_empty=true
+  if [ -f $REMOTE_REPO_LIST ]; then
+    local list_dt=$(date -d @$(stat -c%Z $REMOTE_REPO_LIST) +%D)
+    test "$list_dt" == "$(date +%D)" && return
+  fi
   Print "Detecting sources..."
   find $DOWNLOAD_DIR -mindepth 1 -print -quit | grep -q . && dl_empty=false
   mv -f $REMOTE_REPO_LIST $list_old 2> $_DEV_NULL
