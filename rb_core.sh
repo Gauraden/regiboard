@@ -62,8 +62,8 @@ CheckSourcesOfPackets() {
   Print "Detecting sources..."
   find $DOWNLOAD_DIR/* -print -quit | grep -q . && dl_empty=false
   mv -f $REMOTE_REPO_LIST $list_old 2> $_DEV_NULL
+  GetFtpDirList $REPO_PACKETS
   if [ -f $list_old ] && [ $dl_empty == false ]; then
-    GetFtpDirList $REPO_PACKETS
     local is_diff=$(diff -q -w -B -Z -E "$REMOTE_REPO_LIST" "$list_old" 2> $_DEV_NULL)
     test "$is_diff" == '' && return
   fi
