@@ -2,19 +2,6 @@
 
 . ./rb_core.sh
 
-# Needed tools
-InstallPacket 'wget'
-InstallPacket 'gperf'
-InstallPacket 'bison'
-InstallPacket 'makeinfo'
-InstallPacket 'pkg-config'
-InstallPacket 'subversion'
-InstallPacket 'flex'
-InstallPacket 'texinfo'
-InstallPacket 'gawk'
-# Installing libnotify only if X is available
-whereis -b 'xterm' | grep -q '/.*' && InstallPacket 'libnotify-bin'
-
 # Directories
 CreateDirIfNotExists "${TMP_DIR}"
 CreateDirIfNotExists "${LOG_DIR}"
@@ -70,6 +57,21 @@ ConfigurateFirmware
 CancelKernel
 CancelRootFS
 
+CheckPackets() {
+  # Needed tools
+  InstallPacket 'wget'
+  InstallPacket 'gperf'
+  InstallPacket 'bison'
+  InstallPacket 'makeinfo'
+  InstallPacket 'pkg-config'
+  InstallPacket 'subversion'
+  InstallPacket 'flex'
+  InstallPacket 'texinfo'
+  InstallPacket 'gawk'
+  # Installing libnotify only if X is available
+  whereis -b 'xterm' | grep -q '/.*' && InstallPacket 'libnotify-bin'
+}
+
 UploadImages() {
 	UBootToRemoteRepo
 	KernelToRemoteRepo
@@ -110,6 +112,8 @@ case "${SUBPROG_TYPE}" in
 	'help'      ) PrintHelp;;
 	# Select board config
 	'board'     ) SelectBoardConfig $SUBPROG_ARG;;
+	# Installing of dependencies
+	'3dparty'   ) CheckPackets;;
 	# Building toolchain
 	'toolchain' ) BuildToolchain;;
 	# Building u-boot
