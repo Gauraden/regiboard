@@ -58,10 +58,9 @@ CheckSourcesOfPackets() {
     local list_dt=$(date -d @$(stat -c%Z $REMOTE_REPO_LIST) +%D)
     Warn "$REMOTE_REPO_LIST: \"${list_dt}\" == \"$(date +%D)\""
     test "$list_dt" == "$(date +%D)" && return
-    return
   fi
   Print "Detecting sources..."
-  find $DOWNLOAD_DIR -mindepth 1 -print -quit | grep -q . && dl_empty=false
+  find $DOWNLOAD_DIR/* -print -quit | grep -q . && dl_empty=false
   mv -f $REMOTE_REPO_LIST $list_old 2> $_DEV_NULL
   if [ -f $list_old ] && [ $dl_empty == false ]; then
     GetFtpDirList $REPO_PACKETS
