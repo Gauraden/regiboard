@@ -540,7 +540,6 @@ GetFtpDirList() {
   cd $TMP_DIR
   wget --spider --no-remove-listing --password=$REPO_PSW_FTP \
     ftp://${REPO_URL_FTP}/${1}/
-  echo "${TMP_DIR}/.listing"
 }
 
 UploadDataToRemoteRepo() {
