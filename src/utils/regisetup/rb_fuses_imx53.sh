@@ -1,12 +1,11 @@
 #!/bin/sh
 
-. "$(pwd)/rb_functions.sh"
+. /usr/lib/regisetup/hw.sh
 
-FUSE_DEV='/dev/mxc_iim'
 DEV_PARSER='ParseUnknownCfg'
 
-if ! IsFileExists $FUSE_DEV; then
-    PrintAndDie "FUSE device \"$FUSE_DEV\" was not found!"
+if ! IsFileExists $DEV_FUSE; then
+    PrintAndDie "FUSE device \"$DEV_FUSE\" was not found!"
 fi
 # Parsers for configuration of unknown device
 ParseUnknownCfg() {

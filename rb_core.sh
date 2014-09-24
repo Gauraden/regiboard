@@ -56,7 +56,7 @@ CheckSourcesOfPackets() {
   local dl_empty=true
   if [ -f $REMOTE_REPO_LIST ]; then
     local list_dt=$(date -d @$(stat -c%Z $REMOTE_REPO_LIST) +%D)
-    Warn "$REMOTE_REPO_LIST: \"${list_dt}\" == \"$(date +%D)\""
+    PrintWarn "$REMOTE_REPO_LIST: \"${list_dt}\" == \"$(date +%D)\""
     test "$list_dt" == "$(date +%D)" && return
   fi
   Print "Detecting sources..."

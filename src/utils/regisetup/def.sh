@@ -87,6 +87,7 @@ GetBit() {
 	if [ "$mask" = "" ]; then
 		mask='1'
 	fi
+	Warn "\"BIT_VALUE=($2 >> $offs) & $mask\" && echo $BIT_VALUE || echo '0'"
 	let "BIT_VALUE=($2 >> $offs) & $mask" && echo $BIT_VALUE || echo '0'
 }
 

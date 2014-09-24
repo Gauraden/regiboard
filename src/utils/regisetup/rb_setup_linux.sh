@@ -1,16 +1,28 @@
 #!/bin/sh
 
-. "$(pwd)/rb_functions.sh"
+. /usr/lib/regisetup/hw.sh
 
-UBI_VOL0_SIZE='120MiB'
-UBI_VOL1_SIZE='350MiB'
 PATH2IMAGE=''
 
-FTP_REPO_URL='regiboard@jenny'
-FTP_REPO_PSW='12345'
 # You can use this commands to detect id of UBI device
 #cat /sys/class/misc/ubi_ctrl/dev
 #cat /sys/class/ubi/ubi0/dev
+
+FindImage() {
+	DieIfNotDefined "$1" 'Name of image'
+	# First of all let's check the boot partition of MMC
+	if IsFileExists "/boot/$1"; then
+		PATH2IMAGE="/boot/$1"
+		return
+	fi
+	# At last checking local directory
+	if IsFileExists "./$1"; then
+		PATH2IMAGE="./$1"
+		return
+	fi
+	GetFileFromFTP "$1" "./" && export PATH2IMAGE="./$1" || \
+	  PrintAndDie "Image '$1' was not found, installation could not continue"
+}
 
 PreparingUBIFS() {
 	Print 'Preparing UBI file system...'
@@ -52,36 +64,22 @@ SetupRootFS() {
 }
 
 InstallRootFS() {
-  local vol_size=${UBI_VOL0_SIZE}
+  local vol_size=${UBI_ROOTFS_SIZE}
   if [ "$1" != "" ]; then
     vol_size=$1
   fi
+  FindImage 'rootfs.tar'
 	PreparingUBIFS 0 "$vol_size" "rootfs"
-	SetupRootFS    0 "$(pwd)/rootfs.tar" '/mnt'
+	SetupRootFS    0 "$PATH2IMAGE" '/mnt'
+	unset PATH2IMAGE
 }
 
 InstallStorageFS() {
-  local vol_size=${UBI_VOL1_SIZE}
+  local vol_size=${UBI_STORAGE_SIZE}
   if [ "$1" != "" ]; then
     vol_size=$1
   fi
 	PreparingUBIFS 1 "$vol_size" "storage"
-}
-
-FindImage() {
-	DieIfNotDefined "$1" 'Name of image'
-	# First of all let's check the boot partition of MMC
-	if IsFileExists "/boot/$1"; then
-		PATH2IMAGE="/boot/$1"
-		return
-	fi
-	# At last checking local directory
-	if IsFileExists "./$1"; then
-		PATH2IMAGE="./$1"
-		return
-	fi
-	GetFileFromFTP "$1" "./" && export PATH2IMAGE="./$1" || \
-	  PrintAndDie "Image '$1' was not found, installation could not continue"
 }
 
 InstallBootLoader() {
@@ -98,6 +96,7 @@ InstallBootLoader() {
 		PrintNotice "Writing u-boot config to: $mtd..."
 		flashcp -v "$uboot_conf" /dev/$mtd
 	fi
+	unset PATH2IMAGE
 }
 
 InstallOS() {
@@ -109,6 +108,7 @@ InstallOS() {
 	Print "Writing kernel image '$PATH2IMAGE' to: $mtd ..."
 	mtd_debug erase /dev/$mtd 0 0x300000
 	nandwrite -p /dev/$mtd "$PATH2IMAGE"
+	unset PATH2IMAGE
 }
 
 DoAllOperations() {

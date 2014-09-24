@@ -7,7 +7,7 @@ SYS_GRAPHIC='/sys/class/graphics'
 BOARD_NAME=$(cat /proc/cpuinfo | grep -E 'Hardware(.*):(.*)' | sed -r 's/(.+): (.+)/\2/g') #'
 HW_ADDR=$(cat /etc/hwaddr)
 
-IsItMX53
+#IsItMX53
 
 ReadFuse() {
 	ThrowUndefined $FUSE_DEV 'Name of FUSE device!'

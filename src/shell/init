@@ -40,7 +40,7 @@ fi
 echo "ROOT: $ROOT"
 echo "ROOT_FS: $ROOT_FS_TYPE"
 
-#sleep 1
+test "$ROOT" == "/dev/mmcblk0p2" && echo "waiting for SD/MMC..." && sleep 1
 #e2fsck -fy /dev/mmcblk0p2
 
 mount -t $ROOT_FS_TYPE $ROOT $NEW_ROOT || PrintAndDie "Failed to mount: $ROOT"
