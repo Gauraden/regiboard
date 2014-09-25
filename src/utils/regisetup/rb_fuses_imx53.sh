@@ -5,7 +5,7 @@
 DEV_PARSER='ParseUnknownCfg'
 
 if ! IsFileExists $DEV_FUSE; then
-    PrintAndDie "FUSE device \"$DEV_FUSE\" was not found!"
+  PrintAndDie "FUSE device \"$DEV_FUSE\" was not found!"
 fi
 # Parsers for configuration of unknown device
 ParseUnknownCfg() {
@@ -38,7 +38,7 @@ ParseNandCfg() {
 		'3' ) interleave='Reserved';;
 		*   ) interleave='unknown';;
 	esac
-	let "addr_cycle=$addr_cycle + 3"
+  addr_cycle=$(($addr_cycle + 3))
 	if [ "$bt_freq" = '0' ]; then
 		bt_freq='800'
 	else
@@ -53,7 +53,7 @@ ParseNandCfg() {
 	Print " * MMU enable: $mmu_enable"
 }
 ParseNandCfg2() {
-	local fuse_val="0x$1"
+	local fuse_val=$1
 	local page_size=$(GetBit 6 $fuse_val 0x3)
 	local nand_if=$(GetBit 5 $fuse_val 0x1)
 	local ddr_freq=$(GetBit 4 $fuse_val 0x1)
@@ -101,7 +101,7 @@ ParseNandCfg2() {
 	Print " * Security..: $sec_conf"
 }
 ParseNandCfg3() {
-	local fuse_val="0x$1"
+	local fuse_val=$1
 	local stride_size=$(GetBit 7 $fuse_val 0x1)
 	local lba_nand=$(GetBit 6 $fuse_val 0x1)
 	local nand_rb=$(GetBit 5 $fuse_val 0x1)
@@ -150,9 +150,49 @@ ParseNandCfg3() {
 	Print " * Pages.....: $pages"
 	Print " * Boot......: direct boot from external memory is $dir_bt"
 }
+ParseSerialROMCfg() {
+	local fuse_val=$1
+	local dev_name=$2
+	local rom_select=$(GetBit 3 $fuse_val 0x1)
+	if [ "$rom_select" = '0' ]; then
+	  rom_select='I2C'
+	else
+	  rom_select='SPI'
+	fi
+	# Printing config
+	Print " * Device....: $dev_name"
+	Print " * Serial ROM: $rom_select"
+}
+ParseSerialROMCfg2() {
+	local fuse_val=$1
+	local addressing=$(GetBit 5 $fuse_val 0x1)
+	if [ "$addressing" = '0' ]; then
+  	addressing='16'
+	else
+	  addressing='24'
+	fi
+	# Printing config
+	Print " * Addressing: $addressing bit"
+}
+ParseSerialROMCfg3() {
+	local fuse_val=$1
+	local port_select=$(GetBit 4 $fuse_val 0x3)
+	local cs_select=$(GetBit 2 $fuse_val 0x3)
+	case "$port_select" in
+		'0' ) port_select='I2C-1/ECSPI-1';;
+		'1' ) port_select='I2C-2/ECSPI-2';;
+		'2' ) port_select='I2C-3/CSPI';;
+		'3' ) port_select='Reserved';;
+		*   ) port_select='unknown';;
+	esac
+	# Printing config
+	Print " * Port......: $port_select"
+	Print " * CS(SPI)...: $cs_select"
+  return 0
+}
 # Parser of BOOT_CFG1 register
 ParseBootCFG1() {
-	local fuse_val="0x$1"
+	local fuse_val=$1
 	local dev_type=$(GetBit 4 $fuse_val 0xf)
 	local dev_name='unknown'
 	# checking devices of the first group
@@ -166,7 +206,7 @@ ParseBootCFG1() {
 		*   );;
 	esac
 	# checking devices of the second group
-	let "dev_type=$dev_type >> 1"
+	dev_type=$(($dev_type >> 1))
 	case "$dev_type" in
 		# SD/eSD
 		'2' ) dev_name='SD/eSD';;
@@ -176,7 +216,7 @@ ParseBootCFG1() {
 		*   );;
 	esac
 	# maybe it's NAND
-	let "dev_type=$dev_type >> 2"
+	dev_type=$(($dev_type >> 2))
 	if [ "$dev_type" = '1' ]; then
 		dev_name='NAND Flash'
 	fi
@@ -185,7 +225,7 @@ ParseBootCFG1() {
 	case "$dev_name" in
 		'WEIM'           ) ;;
 		'HD (SATA/PATA)' ) ;;
-		'Serial ROM'     ) ;;
+		'Serial ROM'     ) DEV_PARSER='ParseSerialROMCfg';;
 		'SD/eSD'         ) ;;
 		'MMC/eMMC'       ) ;;
 		'NAND Flash'     ) DEV_PARSER='ParseNandCfg';;
@@ -195,7 +235,7 @@ ParseBootCFG1() {
 }
 # parser of BOOT_LOCK register
 ParseBootLock() {
-	local fuse_val="0x$1"
+	local fuse_val=$1
 	local jtag_smode=$(GetBit 5 $fuse_val 0x3)
 	local bt_fuse=$(GetBit 4 $fuse_val 0x1)
 	local jtag_heo=$(GetBit 3 $fuse_val 0x1)
@@ -217,7 +257,7 @@ ParseBootLock() {
 	Print " * JTAG mode.: $jtag_smode"
 	Print " * Boot mode.: $bt_fuse"
 }
-
+# Look at iMX53RM.pdf (page 5092). There will be addresses of FUSE registers.
 DisableKernelMessages
 ReadFuse 'BOOT_CFG1' 0x080C 'ParseBootCFG1'
 ReadFuse 'BOOT_CFG2' 0x0810 "${DEV_PARSER}2"

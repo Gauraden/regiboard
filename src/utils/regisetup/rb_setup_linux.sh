@@ -9,7 +9,7 @@ PATH2IMAGE=''
 #cat /sys/class/ubi/ubi0/dev
 
 FindImage() {
-	DieIfNotDefined "$1" 'Name of image'
+	ThrowUndefined "$1" 'Name of image'
 	# First of all let's check the boot partition of MMC
 	if IsFileExists "/boot/$1"; then
 		PATH2IMAGE="/boot/$1"
@@ -21,44 +21,45 @@ FindImage() {
 		return
 	fi
 	GetFileFromFTP "$1" "./" && export PATH2IMAGE="./$1" || \
-	  PrintAndDie "Image '$1' was not found, installation could not continue"
+	  Throw "Image '$1' was not found, installation could not continue"
 }
 
 PreparingUBIFS() {
 	Print 'Preparing UBI file system...'
-	DieIfNotDefined "$2" 'UBI volume size'
-	DieIfNotDefined "$3" 'MTD name: cat /proc/mtd'
-	local mtd_dev=$(GetMTDFor "$3") #"mtd$1"
+	ThrowUndefined "$2" 'UBI volume size'
+	ThrowUndefined "$3" 'MTD name: cat /proc/mtd'
+	local vol_name="$3"
+	local mtd_dev=$(GetMTDFor "$vol_name") #"mtd$1"
 	local mtd_num=$(echo "$mtd_dev" | grep -E -o '([0-9]+)') #'
 	local ubi_dev="ubi$1"
 	local vol_size="$2"
 	if ! IsFileExists '/dev/ubi_ctrl'; then
-		PrintNotice 'Creating "ubi_ctrl" device'
+		Notice 'Creating "ubi_ctrl" device'
 		mknod /dev/ubi_ctrl c 10 63
 	else
 		ubidetach /dev/ubi_ctrl -m $mtd_num
 	fi
-	PrintNotice "Formating \"${mtd_dev}\" to UBI format"
+	Notice "Formating \"${mtd_dev}\" to UBI format"
 	ubiformat /dev/${mtd_dev}
-	PrintNotice "Creating UBI volume (${vol_size}): "
+	Notice "Creating UBI volume (${vol_size}): "
 	ubiattach /dev/ubi_ctrl -m $mtd_num
-	ubimkvol  /dev/${ubi_dev} -N $mtd_dev -s ${vol_size} || PrintAndDie "Check size: ${vol_size}!"
+	ubimkvol  /dev/${ubi_dev} -N ${vol_name} -s ${vol_size} || Throw "Check size: ${vol_size}!"
 }
 
 SetupRootFS() {
 	Print 'Setup root file system...'
-	DieIfNotDefined "$1" 'UBI device number'
+	ThrowUndefined "$1" 'UBI device number'
 	if ! IsFileExists "$2"; then
-		GetFileFromFTP 'rootfs.tar' "$2" || PrintAndDie "Root FS image \"$2\" was not found!"
+		GetFileFromFTP 'rootfs.tar' "$2" || Throw "Root FS image \"$2\" was not found!"
 	fi
 	if ! IsFileExists "$3"; then
-		PrintAndDie "Mount point \"$3\" was not found!"
+		Throw "Mount point \"$3\" was not found!"
 	fi
-	PrintNotice "Mounting of UBI$1 partition to: $3"
-	mount -t ubifs ubi$1:rootfs "$3" || PrintAndDie "Check UBI device: ubi$1"
-	PrintNotice "Unpacking root FS image: $2"
+	Notice "Mounting of UBI$1 partition to: $3"
+	mount -t ubifs ubi$1:rootfs "$3" || Throw "Check UBI device: ubi$1"
+	Notice "Unpacking root FS image: $2"
 	tar xvf "$2" -C "$3/" > ${_DEV_NULL}
-	PrintNotice 'Preparing home directory for "Regigraf" software'
+	Notice 'Preparing home directory for "Regigraf" software'
 	mkdir "$3/home/regigraf"
 	echo 'ubi1:storage     /home/regigraf ubifs    defaults          0      0' >> "$3/etc/fstab"
 }
@@ -93,7 +94,7 @@ InstallBootLoader() {
 	local uboot_conf='/boot/u-boot_nand_config.bin'
 	if IsFileExists "$uboot_conf"; then
 		mtd=$(GetMTDFor 'config')
-		PrintNotice "Writing u-boot config to: $mtd..."
+		Notice "Writing u-boot config to: $mtd..."
 		flashcp -v "$uboot_conf" /dev/$mtd
 	fi
 	unset PATH2IMAGE
@@ -120,7 +121,7 @@ DoAllOperations() {
 
 Update() {
 	local imgs_dir="$(pwd)"
-	PrintNotice 'Updating images...'
+	Notice 'Updating images...'
 	rm "$imgs_dir/uImage"
 	rm "$imgs_dir/rootfs.tar"
 	GetFileFromFTP 'uImage'     "$imgs_dir/"
@@ -142,7 +143,7 @@ case "$1" in
 	# Update all images and scripts
 	'update' ) Update;;
 	# default
-	*        ) PrintWarn "Unknown subprogram: $1";;
+	*        ) Warn "Unknown subprogram: $1";;
 esac
 
 sync

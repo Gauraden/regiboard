@@ -40,7 +40,7 @@ Error() {
 }
 
 Throw() {
-	PrintErr "$1"
+	Error "$1"
 	exit 1
 }
 
@@ -81,14 +81,11 @@ EnableKernelMessages() {
 }
 
 GetBit() {
-	local offs=$1
-	local src=$2
-	local mask=$3
-	if [ "$mask" = "" ]; then
-		mask='1'
-	fi
-	Warn "\"BIT_VALUE=($2 >> $offs) & $mask\" && echo $BIT_VALUE || echo '0'"
-	let "BIT_VALUE=($2 >> $offs) & $mask" && echo $BIT_VALUE || echo '0'
+	local offs=${1:-'0'}
+	local src=${2:-'0'}
+	local mask=${3:-'1'}
+  local bit=$((($src >> $offs) & $mask))
+  test $bit && echo $bit || echo 0
 }
 
 GetFileFromFTP() {

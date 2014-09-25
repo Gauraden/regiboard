@@ -1,0 +1,571 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2014-08-14 09:55:03.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2014-09-24 16:17:41.966249936 +0400
+@@ -17,39 +17,66 @@
+ #include <mach/common.h>
+ #include <mach/gpio.h>
+ #include <mach/iomux-mx53.h>
++#include <mach/mmc.h>
+ #include <asm/io.h>
+ #include <asm/irq.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/flash.h>
+ #include "devices.h"
+ 
++//#define MX53_REGIBOARD_V1
++
++#define GPIO_ID(port, pin) ((port - 1)*32 + pin)
++
++// CSPI pins
++#define MX53_CSPI_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_HYS | PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST) 
++
++#define MX53_PAD_EIM_D20__CSPI_SS0  (_MX53_PAD_EIM_D20__CSPI_SS0 | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
++#define MX53_PAD_EIM_D21__CSPI_SCLK (_MX53_PAD_EIM_D21__CSPI_SCLK | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
++#define MX53_PAD_EIM_D22__CSPI_MISO (_MX53_PAD_EIM_D22__CSPI_MISO | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
++#define MX53_PAD_EIM_D28__CSPI_MOSI (_MX53_PAD_EIM_D28__CSPI_MOSI | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
++// I2C pins
++#define _MX53_PAD_GPIO_5__I2C3_SCL		IOMUX_PAD(0x6C0, 0x330, 6 | IOMUX_CONFIG_SION, 0x824, 2, 0)
++#define MX53_PAD_GPIO_5__I2C3_SCL		(_MX53_PAD_GPIO_5__I2C3_SCL | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
++#define _MX53_PAD_GPIO_6__I2C3_SDA		IOMUX_PAD(0x6B4, 0x324, 2 | IOMUX_CONFIG_SION, 0x828, 1, 0)
++#define MX53_PAD_GPIO_6__I2C3_SDA		(_MX53_PAD_GPIO_6__I2C3_SDA | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
+ /* Global configuration of PADs ***********************************************/
++/* 
++ * Format for pin descriptions:
++ * i.MX53 unit pin -> output pin -> external device pin
++ */
+ static iomux_v3_cfg_t iomux_pads[] = {
+-	// RTC (DS3231MZ+)
+-	MX53_PAD_CSI0_DAT8__I2C1_SDA, // CSI0_DAT8  -> I2C1_SDA -> SDA     (7)
+-	MX53_PAD_CSI0_DAT9__I2C1_SCL, // CSI0_DAT9  -> I2C1_SCL -> SCL     (8)
+-	MX53_PAD_GPIO_5__I2C3_SCL,    // GPIO_5     -> I2C3_SCL -> SCL     (8) // work
+-	MX53_PAD_GPIO_6__I2C3_SDA,    // GPIO_6     -> I2C3_SDA -> SDA     (7) // does not work!
+-	MX53_PAD_GPIO_16__GPIO7_11,   // GPIO_16    -> _INT_RTC -> INT/SQW (3)
+-	MX53_PAD_GPIO_17__GPIO7_12,   // GPIO_17    -> _RST_RTC -> RST     (4)
++	// PSU (Power Supply Unit) signals
++	MX53_PAD_PATA_DATA8__GPIO2_8, // GPIO2_8 -> PATA_DATA8 -> Reset (X2)
++	MX53_PAD_PATA_DATA9__GPIO2_9, // GPIO2_9 -> PATA_DATA9 -> Save  (X2)
++	// PSU (thermo sensor) (lm92)
++	MX53_PAD_CSI0_DAT8__I2C1_SDA, // I2C1_SDA -> CSI0_DAT8 -> SDA (7)
++	MX53_PAD_CSI0_DAT9__I2C1_SCL, // I2C1_SCL -> CSI0_DAT9 -> SCL (8)
++  // RTC (DS3231MZ+)
++	MX53_PAD_GPIO_5__I2C3_SCL,    // I2C3_SCL -> GPIO_5  -> SCL     (8)
++	MX53_PAD_GPIO_6__I2C3_SDA,    // I2C3_SDA -> GPIO_6  -> SDA     (7)
++	MX53_PAD_GPIO_16__GPIO7_11,   // GPIO7_11 -> GPIO_16 -> INT/SQW (3)
++	MX53_PAD_GPIO_17__GPIO7_12,   // GPIO7_12 -> GPIO_17 -> RST     (4)
+ 	// BackplaneSec (X2)
+-	MX53_PAD_CSI0_DAT12__GPIO5_30, // CSI0_DAT12 -> UART4_TX_GPIO5_30 -> 32
+-	MX53_PAD_CSI0_DAT13__GPIO5_31, // CSI0_DAT13 -> UART4_RX_GPIO5_31 -> 34
+-	MX53_PAD_CSI0_DAT14__GPIO6_0,  // CSI0_DAT14 -> UART5_TX_GPIO6_0  -> 36
+-	MX53_PAD_CSI0_DAT15__GPIO6_1,  // CSI0_DAT15 -> UART5_RX_GPIO6_1  -> 38
+-	MX53_PAD_CSI0_DAT16__GPIO6_2,  // CSI0_DAT16 -> GPIO6_2           -> 42
+-	MX53_PAD_CSI0_DAT17__GPIO6_3,  // CSI0_DAT17 -> GPIO6_3           -> 44
+-	MX53_PAD_CSI0_DAT18__GPIO6_4,  // CSI0_DAT18 -> GPIO6_4           -> 46
+-	MX53_PAD_CSI0_DAT19__GPIO6_5,  // CSI0_DAT19 -> GPIO6_5           -> 48
++	MX53_PAD_CSI0_DAT12__GPIO5_30, // UART4_TX_GPIO5_30 -> CSI0_DAT12 -> 32
++	MX53_PAD_CSI0_DAT13__GPIO5_31, // UART4_RX_GPIO5_31 -> CSI0_DAT13 -> 34
++	MX53_PAD_CSI0_DAT14__GPIO6_0,  // UART5_TX_GPIO6_0  -> CSI0_DAT14 -> 36
++	MX53_PAD_CSI0_DAT15__GPIO6_1,  // UART5_RX_GPIO6_1  -> CSI0_DAT15 -> 38
++	MX53_PAD_CSI0_DAT16__GPIO6_2,  // GPIO6_2           -> CSI0_DAT16 -> 42
++	MX53_PAD_CSI0_DAT17__GPIO6_3,  // GPIO6_3           -> CSI0_DAT17 -> 44
++	MX53_PAD_CSI0_DAT18__GPIO6_4,  // GPIO6_4           -> CSI0_DAT18 -> 46
++	MX53_PAD_CSI0_DAT19__GPIO6_5,  // GPIO6_5           -> CSI0_DAT19 -> 48
+ 	// DISP 0 (X25)
+-	MX53_PAD_GPIO_1__GPIO1_1,             // GPIO_1  -> DISP0_CONTRAST -> 112
+-	MX53_PAD_EIM_D21__IPU_DISPB0_SER_CLK, // EIM_D21 -> DISP0_SER_SCLK -> 89
+-	MX53_PAD_EIM_D28__IPU_DISPB0_SER_DIO, // EIM_D28 -> DISP0_SER_MOSI -> 87
++	MX53_PAD_GPIO_1__GPIO1_1,             // DISP0_CONTRAST -> GPIO_1  -> 112
++#ifdef MX53_REGIBOARD_V1
++	MX53_PAD_EIM_D21__IPU_DISPB0_SER_CLK, // DISP0_SER_SCLK -> EIM_D21 -> 89
++	MX53_PAD_EIM_D28__IPU_DISPB0_SER_DIO, // DISP0_SER_MOSI -> EIM_D28 -> 87
++#endif
+ 	// ParalDisp (X26)
+-	MX53_PAD_DI0_DISP_CLK__IPU_DI0_DISP_CLK, // DI0_DISP_CLK -> DISP0_DCLK  -> 2
+-	MX53_PAD_DI0_PIN2__IPU_DI0_PIN2,         // DI0_PIN2     -> DISP0_HSYNC -> 3
+-	MX53_PAD_DI0_PIN3__IPU_DI0_PIN3,         // DI0_PIN3     -> DISP0_VSYNC -> 4
+-	MX53_PAD_DI0_PIN15__IPU_DI0_PIN15,       // DI0_PIN15    -> DISP0_DRDY  -> 27
++	MX53_PAD_DI0_DISP_CLK__IPU_DI0_DISP_CLK, // DISP0_DCLK  -> DI0_DISP_CLK -> 2
++	MX53_PAD_DI0_PIN2__IPU_DI0_PIN2,         // DISP0_HSYNC -> DI0_PIN2     -> 3
++	MX53_PAD_DI0_PIN3__IPU_DI0_PIN3,         // DISP0_VSYNC -> DI0_PIN3     -> 4
++	MX53_PAD_DI0_PIN15__IPU_DI0_PIN15,       // DISP0_DRDY  -> DI0_PIN15    -> 27
+ 	MX53_PAD_DISP0_DAT0__IPU_DISP0_DAT_0,
+ 	MX53_PAD_DISP0_DAT1__IPU_DISP0_DAT_1,
+ 	MX53_PAD_DISP0_DAT2__IPU_DISP0_DAT_2,
+@@ -80,21 +107,21 @@
+ 	MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2,
+ 	MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3,
+ 	MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK,
+-	MX53_PAD_GPIO_10__GPIO4_0,           // GPIO_10 -> LVDS0_DPS   -> 4
+-	MX53_PAD_GPIO_11__GPIO4_1,           // GPIO_11 -> LVDS0_SEL68 -> 20
++	MX53_PAD_GPIO_10__GPIO4_0,           // GPIO4_0 -> GPIO_10 -> LVDS0_DPS   -> 4
++	MX53_PAD_GPIO_11__GPIO4_1,           // GPIO4_1 -> GPIO_11 -> LVDS0_SEL68 -> 20
+ 	// Front USB/LED
+-	MX53_PAD_KEY_ROW3__GPIO4_13, // KEY_ROW3 -> VD3_4(GPIO4_13)   -> 7 (GREEN)
+-	MX53_PAD_KEY_COL4__GPIO4_14, // KEY_ROW3 -> VD1_2(GPIO4_14)   -> 8 (RED)
+-	MX53_PAD_KEY_ROW4__GPIO4_15, // KEY_ROW3 -> Dinamic(GPIO4_15) -> 9
++	MX53_PAD_KEY_ROW3__GPIO4_13, // GPIO4_13 -> KEY_ROW3 -> VD3_4   -> 7 (GREEN)
++	MX53_PAD_KEY_COL4__GPIO4_14, // GPIO4_14 -> KEY_ROW3 -> VD1_2   -> 8 (RED)
++	MX53_PAD_KEY_ROW4__GPIO4_15, // GPIO4_15 -> KEY_ROW3 -> Dinamic -> 9
+ 	// SD 1
+-	MX53_PAD_PATA_DIOW__GPIO6_17,  // PATA_DIOW  -> SD1_CD_GPIO6_17
+-	MX53_PAD_PATA_DMACK__GPIO6_18, // PATA_DMACK -> SD1_WP_GPIO6_18
+-	MX53_PAD_SD1_CMD__ESDHC1_CMD,
+-	MX53_PAD_SD1_CLK__ESDHC1_CLK,
+-	MX53_PAD_SD1_DATA0__ESDHC1_DAT0,
+-	MX53_PAD_SD1_DATA1__ESDHC1_DAT1,
+-	MX53_PAD_SD1_DATA2__ESDHC1_DAT2,
+-	MX53_PAD_SD1_DATA3__ESDHC1_DAT3,
++	MX53_PAD_PATA_DIOW__GPIO6_17,    // GPIO6_17 -> PATA_DIOW  -> +3.3U (Card detect)
++	MX53_PAD_PATA_DMACK__GPIO6_18,   // GPIO6_18 -> PATA_DMACK -> +3.3U (Write protect)
++	MX53_PAD_SD1_CMD__ESDHC1_CMD,    // ESDHC1_CMD  -> SD1_CMD   -> CMD     (3)
++	MX53_PAD_SD1_CLK__ESDHC1_CLK,    // ESDHC1_CLK  -> SD1_CLK   -> CLK     (5)
++	MX53_PAD_SD1_DATA0__ESDHC1_DAT0, // ESDHC1_DAT0 -> SD1_DATA0 -> DAT0    (7)
++	MX53_PAD_SD1_DATA1__ESDHC1_DAT1, // ESDHC1_DAT1 -> SD1_DATA1 -> DAT1    (8)
++	MX53_PAD_SD1_DATA2__ESDHC1_DAT2, // ESDHC1_DAT2 -> SD1_DATA2 -> DAT2    (1)
++	MX53_PAD_SD1_DATA3__ESDHC1_DAT3, // ESDHC1_DAT3 -> SD1_DATA3 -> CD/DAT3 (2)
+ 	// SD 2
+ 	MX53_PAD_SD2_CMD__ESDHC2_CMD,
+ 	MX53_PAD_SD2_CLK__ESDHC2_CLK,
+@@ -117,19 +144,19 @@
+ 	MX53_PAD_FEC_TXD1__FEC_TDATA_1,
+ 	MX53_PAD_FEC_TXD0__FEC_TDATA_0,
+ 	// SPI->GPIO touch screen
+-	MX53_PAD_PATA_DATA6__GPIO2_6, // PENIRQ
+-	MX53_PAD_CSI0_DAT4__GPIO5_22, // SCK
+-	MX53_PAD_CSI0_DAT5__GPIO5_23, // MOSI
+-	MX53_PAD_CSI0_DAT6__GPIO5_24, // MISO
+-	MX53_PAD_CSI0_DAT7__GPIO5_25, // CS
++	MX53_PAD_PATA_DATA6__GPIO2_6, // GPIO2_6  -> PATA_DATA6 -> PENIRQ (11)
++	MX53_PAD_CSI0_DAT4__GPIO5_22, // GPIO5_22 -> CSI0_DAT4  -> SCK    (16)
++	MX53_PAD_CSI0_DAT5__GPIO5_23, // GPIO5_23 -> CSI0_DAT5  -> MOSI   (14)
++	MX53_PAD_CSI0_DAT6__GPIO5_24, // GPIO5_24 -> CSI0_DAT6  -> MISO   (12)
++	MX53_PAD_CSI0_DAT7__GPIO5_25, // GPIO5_25 -> CSI0_DAT7  -> CS     (15)
+ 	// PWM Backlight
+-	MX53_PAD_PATA_INTRQ__GPIO7_2, // Backlight enable/disable
+-	MX53_PAD_GPIO_9__PWM1_PWMO,   // PWM output
++	MX53_PAD_PATA_INTRQ__GPIO7_2, // GPIO7_2   -> PATA_INTRQ (Backlight enable/disable)
++	MX53_PAD_GPIO_9__PWM1_PWMO,   // PWM1_PWMO -> GPIO_9 (PWM output)
+ 	// EIM
+-	MX53_PAD_EIM_RW__ECSPI2_SS0,   // EIM_RW  -> SPI2_nCS  -> 3
+-	MX53_PAD_EIM_CS0__ECSPI2_SCLK, // EIM_CS0 -> SPI2_CLK  -> 4
+-	MX53_PAD_EIM_CS1__ECSPI2_MOSI, // EIM_CS1 -> SPI2_MOSI -> 5
+-	MX53_PAD_EIM_OE__ECSPI2_MISO,  // EIM_OE  -> SPI2_MISO -> 6
++	MX53_PAD_EIM_RW__ECSPI2_SS0,   // SPI2_nCS  -> EIM_RW  -> 3
++	MX53_PAD_EIM_CS0__ECSPI2_SCLK, // SPI2_CLK  -> EIM_CS0 -> 4
++	MX53_PAD_EIM_CS1__ECSPI2_MOSI, // SPI2_MOSI -> EIM_CS1 -> 5
++	MX53_PAD_EIM_OE__ECSPI2_MISO,  // SPI2_MISO -> EIM_OE  -> 6
+ 	// NAND
+ 	MX53_PAD_EIM_DA0__EMI_NAND_WEIM_DA_0, // IO_0
+ 	MX53_PAD_EIM_DA1__EMI_NAND_WEIM_DA_1, // IO_1
+@@ -146,12 +173,14 @@
+ 	MX53_PAD_NANDF_WP_B__EMI_NANDF_WP_B,  // WP
+ 	MX53_PAD_NANDF_RB0__EMI_NANDF_RB_0,   // R/B
+ 	MX53_PAD_NANDF_CS0__EMI_NANDF_CS_0,   // CE
+-	// PSU (Power Supply Unit)
+-	MX53_PAD_PATA_DATA8__GPIO2_8, // PATA_DATA8 -> GPIO2_8(X2) -> Reset
+-	MX53_PAD_PATA_DATA9__GPIO2_9, // PATA_DATA9 -> GPIO2_9(X2) -> Save
++	// NOR
++  MX53_PAD_EIM_D20__CSPI_SS0,  // CSPI_SS0  -> EIM_D20 -> CS_B (4)
++  MX53_PAD_EIM_D21__CSPI_SCLK, // CSPI_SCLK -> EIM_D21 -> SCK  (2)
++  MX53_PAD_EIM_D22__CSPI_MISO, // CSPI_MISO -> EIM_D22 -> SO   (8)
++  MX53_PAD_EIM_D28__CSPI_MOSI, // CSPI_MOSI -> EIM_D28 -> SI   (1)
+ };
+ /* PWM backlight **************************************************************/
+-#define BACKLIGHT_ENABLE (6*32 + 2) // GPIO-7.2
++#define BACKLIGHT_ENABLE GPIO_ID(7,2) // GPIO-7.2
+ 
+ static int mxc_pwm_backlight_init(struct device *dev) {
+ 	printk("Regiboard PWM backlight init\n");
+@@ -178,12 +207,14 @@
+ 	.exit           = mxc_pwm_backlight_exit
+ };
+ /* SPI->GPIO touch screen *****************************************************/
+-#define TS_PENIRQ         (1*32 + 6 )  // GPIO-2.6
+-#define TS_BUSY           (1*32 + 7 )  // GPIO-2.7
+-#define TS_SCK            (4*32 + 22)  // GPIO-5.22      
+-#define TS_MOSI           (4*32 + 23)  // GPIO-5.23 
+-#define TS_MISO           (4*32 + 24)  // GPIO-5.24
+-#define TS_CS             (4*32 + 25)  // GPIO-5.25
++#define TS_PENIRQ  GPIO_ID(2,6)  // GPIO-2.6
++#define TS_BUSY    GPIO_ID(2,7)  // GPIO-2.7
++#define TS_SCK     GPIO_ID(5,22) // GPIO-5.22      
++#define TS_MOSI    GPIO_ID(5,23) // GPIO-5.23 
++#define TS_MISO    GPIO_ID(5,24) // GPIO-5.24
++#define TS_CS      GPIO_ID(5,25) // GPIO-5.25
++#define TS_SCK_HZ  (125000 * 26) // max spi clock (SCK) speed in HZ
++#define TS_MODEL   "ads7846"
+ 
+ struct spi_gpio_platform_data spi_gpio_data = {
+ 	.sck            = TS_SCK,
+@@ -216,18 +247,6 @@
+ 	.debounce_tol     = 10,
+ 	.gpio_pendown     = TS_PENIRQ,
+ };
+-
+-static struct spi_board_info mxc_ts_device[] __initdata = {
+-	{
+-		.modalias        = "ads7846",
+-		.max_speed_hz    = 125000 * 26,//1000 * 1000,  /* max spi clock (SCK) speed in HZ */
+-		.bus_num         = 0,
+-		.chip_select     = 0,
+-		.controller_data = (void *)TS_CS,
+-		.platform_data   = &ads_info,
+-		.irq             = gpio_to_irq(TS_PENIRQ),
+-	},
+-};
+ /* Displays *******************************************************************/
+ // G150XGE-L04
+ // - Resolution.: 1024x768
+@@ -243,8 +262,8 @@
+ // -- SEL68 (20) <- LVDS0_SEL68 <- GPIO_11 (GPIO4_1); Selection for 6 bits/8bits LVDS data input.
+ // --- ”High” or “NC” for 6 bits LVDS Input
+ // --- “Low” for 8 bits LVDS Input
+-#define LVDS0_DPS   (3*32 + 0)  // GPIO-4.0
+-#define LVDS0_SEL68 (3*32 + 1)  // GPIO-4.1
++#define LVDS0_DPS   GPIO_ID(4,0) // GPIO-4.0
++#define LVDS0_SEL68 GPIO_ID(4,1) // GPIO-4.1
+ 
+ static struct fb_videomode video_modes[] = {
+ 	{ // Regigraf 15" display
+@@ -409,10 +428,11 @@
+ 	UP_REG(addr, NFC_CONFIG3_GET, NFC_CONFIG3_SET, 0x3, 0, val)
+ 
+ static struct mtd_partition nand_flash_partitions[] = {
+-/* MX53 ROM require the boot FCB/DBBT support which need
+- * more space to store such info on NAND boot partition.
+- * 16M should cover all kind of NAND boot support on MX53.
+- */
++#ifdef MX53_REGIBOARD_V1
++  /* MX53 ROM require the boot FCB/DBBT support which need
++   * more space to store such info on NAND boot partition.
++   * 16M should cover all kind of NAND boot support on MX53.
++   */
+ 	{
+ 		.name   = "bootloader",
+ 		.offset = 0,
+@@ -427,6 +447,13 @@
+ 		.offset = 0x000600000,
+ 		.size   = 10 * 1024 * 1024
+ 	}, {
++#else
++  {
++		.name   = "kernel",
++		.offset = 0,
++		.size   = 10 * 1024 * 1024
++	}, {
++#endif
+ 		.name   = "rootfs",
+ 		.offset = MTDPART_OFS_APPEND,
+ 		.size   = 128 * 1024 * 1024
+@@ -467,8 +494,8 @@
+ 	// EIM Registers
+ 	eim_base = ioremap(MX53_BASE_ADDR(WEIM_BASE_ADDR), SZ_4K);
+ 	// CS0GCR1
+-	EIM_CS0GCR1_DSZ( eim_base, 0x4); // 100 - 8 bit port resides on DATA[7:0]
+-	EIM_CS0GCR1_MUM( eim_base, 0x1); // Multiplexed Mode enable
++	EIM_CS0GCR1_DSZ (eim_base, 0x4); // 100 - 8 bit port resides on DATA[7:0]
++	EIM_CS0GCR1_MUM (eim_base, 0x1); // Multiplexed Mode enable
+ 	EIM_CS0GCR1_CSEN(eim_base, 0x0); // Chip select function is disabled
+ 	// CS0GCR2
+ 	// Muxed 16 bypass grant. This bit when asserted causes EIM to bypass the
+@@ -501,20 +528,44 @@
+ 	.width    = 1,
+ 	.init     = mxc_mt29f_nand_init,
+ };
+-/* RTC ************************************************************************/
+-// Model: DS3231MZ+
+-// Bus  : I2C
+-// Addr : 0x68
+-#define RTC_INT (6*32 + 11) // GPIO-7.11 -> _INT_RTC
+-#define RTC_RST (6*32 + 12) // GPIO-7.12 -> _RST_RTC
++/* NOR ************************************************************************/
++// [Adesto Tech] AT45DB321D-SU: 32Mb, 2.7V to 3.6V, (66 MHz)
++// Bus        : CSPI
++// Page size  : 512 - 528 bytes
++// Pages      : 8,192
++// Page erase : 512 bytes
++// Block erase: 4KB
++#define NOR_ALIAS  "mxc_dataflash"
++#define NOR_CLK_HZ (25 * 1000 * 1000) // max spi clock (SCK) speed in HZ
+ 
+-static struct i2c_board_info mxc_i2c_board_info[] = {
++static struct mtd_partition mxc_dataflash_partitions[] = {
+ 	{
+-		.type = "ds3231",
+-		.addr = 0x68,
+-		.irq  = gpio_to_irq(RTC_INT)
++	 .name   = "bootloader",
++	 .offset = 0,
++// 	 .size   = (1986 * 528), // ~ 1 MByte (page 528 bytes)
++	 .size   = (2048 * 512), // 1 MByte (page 512 bytes)
+ 	},
+ 	{
++	 .name   = "config",
++	 .offset = MTDPART_OFS_APPEND,
++	 .size   = MTDPART_SIZ_FULL,
++	},
++};
++
++static struct flash_platform_data mxc_spi_flash_data[] = {
++	{
++   .type     = "at45db321d",
++	 .name     = NOR_ALIAS,
++	 .parts    = mxc_dataflash_partitions,
++	 .nr_parts = ARRAY_SIZE(mxc_dataflash_partitions),
++	},
++};
++/* PSU (Power Supply Unit) termo-sensor ***************************************/
++// Model: lm92
++// Bus  : I2C-1
++// Addr : 0x4b or 0x48
++static struct i2c_board_info mxc_i2c1_board_info[] = {
++	{
+ 		.type = "lm92",
+ 		.addr = 0x4b,
+ 	},
+@@ -523,6 +574,59 @@
+ 		.addr = 0x48,
+ 	},
+ };
++/* RTC ************************************************************************/
++// Model: DS3231MZ+
++// Bus  : I2C-3
++// Addr : 0x68
++#define RTC_INT GPIO_ID(7,11) // GPIO-7.11 -> _INT_RTC
++#define RTC_RST GPIO_ID(7,12) // GPIO-7.12 -> _RST_RTC
++
++static struct i2c_board_info mxc_i2c3_board_info[] = {
++	{
++		.type = "ds3231",
++		.addr = 0x68,
++		.irq  = gpio_to_irq(RTC_INT)
++	},
++};
++/* SD *************************************************************************/
++#define SD1_CD GPIO_ID(6,17) // GPIO-6.17 -> SD1_CD (MX53_PAD_PATA_DIOW__GPIO6_17)
++#define SD1_WP GPIO_ID(6,18) // GPIO-6.18 -> SD1_WP
++
++static unsigned int sdhc_get_card_det_status(struct device *dev) {
++  unsigned int sd_cd;
++  sd_cd = gpio_get_value(SD1_CD);
++  // i.MX53 board v.2
++  // Card detection pin is not connected to card slot, so we must always return
++  // state of inserted card (0)
++	return 0;
++}
++
++static unsigned int sdhc_get_card_wp_status(struct device *dev) {
++  unsigned int sd_wp;
++  sd_wp = gpio_get_value(SD1_WP);
++  // i.MX53 board v.2
++  // Similar to SD1_CD
++	return 0;
++}
++
++static struct mxc_mmc_platform_data mmc1_data = {
++	.ocr_mask            = MMC_VDD_27_28 | MMC_VDD_28_29 | 
++	                       MMC_VDD_29_30 | MMC_VDD_31_32,
++	.caps                = MMC_CAP_4_BIT_DATA,
++	.min_clk             = 400000,
++	.max_clk             = 50000000,
++	.card_fixed          = 0,
++	.card_inserted_state = 0,
++	.status              = sdhc_get_card_det_status,
++	.wp_status           = sdhc_get_card_wp_status,
++	.clock_mmc           = "esdhc_clk",
++	.power_mmc           = NULL,
++};
++
++static void mx53_regiboard_init_sd(void) {
++	mxcsdhc1_device.resource[2].start = gpio_to_irq(SD1_CD);
++	mxcsdhc1_device.resource[2].end   = gpio_to_irq(SD1_CD);
++}
+ /* Setup of clocks ************************************************************/
+ void mx53_regigraf_clock_init(void) {
+ //	printk("Regiboard clocks init...\n");
+@@ -535,56 +639,53 @@
+ 	// Descriptions:
+ 	// * [X] - Alt mode number
+ 	// * mxc_iomux_set_input(<Register address>, <Daisy chain value>)
+-	/* Debug UART */
+-	// ### CSI0_DAT10: [2]TXD
+-	// Daisy chain controls:
+-	// 0 - IOMUXC_ECSPI2_IPP_IND_MISO_SELECT_INPUT    [3]
+-	// 1 - IOMUXC_UART1_IPP_UART_RXD_MUX_SELECT_INPUT [2]
+-	// ### CSI0_DAT11: [2]RXD
+-	// Daisy chain controls:
+-	// 0 - IOMUXC_ECSPI2_IPP_IND_SS_B_0_SELECT_INPUT  [3]
+-	// 1 - IOMUXC_UART1_IPP_UART_RXD_MUX_SELECT_INPUT [2]
+-	/* PWM backlight */
+-	// ### PATA_INTRQ -> LCD_Backlight_EN_GPIO7_2 -> Baclight Disp pin №3
+-	// ### GPIO_9     -> PWM_to_LCD               -> Baclight Disp pin №4
+-	/* SPI touch screen */
+-	// ------------------------------------------------------
+-	//    iMX53   ||    PIN       ||   Touch screen: ADS784??
+-	// ------------------------------------------------------
+-	// CSI0_DAT4  -> SPI1_CLK     -> DCLK
+-	// CSI0_DAT5  -> SPI1_MOSI    -> DIN
+-	// CSI0_DAT6  -> SPI1_MISO    -> DOUT
+-	// CSI0_DAT7  -> SPI1_nCS     -> CS
+-	// PATA_DATA6 -> Touch_PENIRQ -> PENIRQ
+-	// PATA_DATA7 -> Touch_BUSY   -> BUSY 
+-	// ------------------------------------------------------
+-	// ### CSI0_DAT4 : [1]GPIO-5.22 [3]ECSPI-1.SCLK
+-	// Daisy chain controls:
+-	// 0 - IOMUXC_ECSPI1_IPP_CSPI_CLK_IN_SELECT_INPUT [3]
+-	// 1 - IOMUXC_KPP_IPP_IND_COL_5_SELECT_INPUT      [2]
+-	// ### CSI0_DAT5 : [1]GPIO-5.23 [3]ECSPI-1.MOSI
+-	// Daisy chain controls:
+-	// 0 - IOMUXC_ECSPI1_IPP_IND_MOSI_SELECT_INPUT [3]
+-	// 1 - IOMUXC_KPP_IPP_IND_ROW_5_SELECT_INPUT   [2]
+-	// ### CSI0_DAT6 : [1]GPIO-5.24 [3]ECSPI-1.MISO
+-	// Daisy chain controls:
+-	// 0 - IOMUXC_ECSPI1_IPP_IND_MISO_SELECT_INPUT [3]
+-	// 1 - IOMUXC_KPP_IPP_IND_COL_6_SELECT_INPUT   [2]
+-	// ### CSI0_DAT7 : [1]GPIO-5.25 [3]ECSPI-1.SS0
+-	// Daisy chain controls:
+-	// 0 - IOMUXC_ECSPI1_IPP_IND_SS_B_0_SELECT_INPUT [3]
+-	// 1 - IOMUXC_KPP_IPP_IND_ROW_6_SELECT_INPUT     [2]
+-	// ### PATA_DATA6: [1]GPIO-2.6
+-	// No daisy chain controls
+-	// ### PATA_DATA7: [1]GPIO-2.7
+-	// No daisy chain controls
+ 	mxc_iomux_v3_setup_multiple_pads(iomux_pads, ARRAY_SIZE(iomux_pads));
+ 	// RTC gpio
+ 	if (gpio_request(RTC_RST, "rtc_reset") == 0)
+ 		gpio_direction_input(RTC_RST);
+ 	if (gpio_request(RTC_INT, "rtc_irq") == 0)
+ 		gpio_direction_input(RTC_INT);
++  // SD gpio
++  if (gpio_request(SD1_CD, "sd1-cd") == 0)
++  	gpio_direction_input(SD1_CD);
++  if (gpio_request(SD1_WP, "sd1-wp") == 0)
++  	gpio_direction_input(SD1_WP);
+ }
++/* Setup SPI devices **********************************************************/
++static struct mxc_spi_master mxc_ecspi_data = {
++  .maxchipselect = 4,
++  .spi_version   = 23,
++};
++
++static struct mxc_spi_master mxc_cspi_data = {
++  .maxchipselect = 4,
++  .spi_version   = 7,
++};
++// ECSPI-1
++static struct spi_board_info mxc_ecspi_device[] __initdata = {
++	{ // Touchscreen
++		.modalias        = TS_MODEL,
++		.max_speed_hz    = TS_SCK_HZ, // max: 52 Mbps
++		.bus_num         = 0, // ECSPI-1
++		.chip_select     = 0, // ECSPI-1.SS0
++		.controller_data = (void *)TS_CS,
++		.platform_data   = &ads_info,
++		.irq             = gpio_to_irq(TS_PENIRQ),
++	},
++};
++// CSPI
++static struct spi_board_info mxc_cspi_device[] __initdata = {
++#ifndef MX53_REGIBOARD_V1
++	{ // NOR
++    .modalias      = NOR_ALIAS,
++    .max_speed_hz  = NOR_CLK_HZ, // max: 26 Mbps
++    .bus_num       = 3, // CSPI
++    .chip_select   = 0, // CSPI.SS0
++    .platform_data = &mxc_spi_flash_data[0],
++	},
++#endif
++};
++
+ /* Setup of specific devices **************************************************/
+ void mx53_regiboard_fixup(int fb_mem, int mem_start) {
+ 	if (!fb_mem)
+@@ -596,14 +697,28 @@
+ 
+ void mx53_regigraf_devices(void) {
+ 	printk("Regiboard devices init...\n");
+-	/* I2C-1: RTC, PSU (thermo sensor) */
+-	i2c_register_board_info(0, mxc_i2c_board_info, ARRAY_SIZE(mxc_i2c_board_info));
++	/* I2C devices */
++	i2c_register_board_info(0, mxc_i2c1_board_info, ARRAY_SIZE(mxc_i2c1_board_info));
++  i2c_register_board_info(2, mxc_i2c3_board_info, ARRAY_SIZE(mxc_i2c3_board_info));
++	/* SPI devices */
++	// The i.MX53 chip has three CSPI interfaces: one CSPI and two ECSPI
++	// The sequence of functions calls is very important!
++	// 1. mxc_register_device     - initialisation of SPI bus
++	// 2. spi_register_board_info - registration of devices on this bus
++  mxc_register_device(&mxcspi1_device, &mxc_ecspi_data); // ECSPI-1
++  mxc_register_device(&mxcspi2_device, &mxc_ecspi_data); // ECSPI-2
++  mxc_register_device(&mxcspi3_device, &mxc_cspi_data);  // CSPI
++  // Register CSPI devices
++  spi_register_board_info(mxc_cspi_device, ARRAY_SIZE(mxc_cspi_device));
++  // Register ECSPI devices
++  spi_register_board_info(mxc_ecspi_device, ARRAY_SIZE(mxc_ecspi_device));
++  platform_device_register(&spi_gpio_device);
+ 	/* PWM backlight */
+ 	mxc_register_device(&mxc_pwm1_device, NULL);
+ 	mxc_register_device(&mxc_pwm1_backlight_device, &mxc_pwm_backlight_data);
+-	/* SPI touch screen */
+-  spi_register_board_info(mxc_ts_device, ARRAY_SIZE(mxc_ts_device));
+-  platform_device_register(&spi_gpio_device);
++  /* SD */
++ 	mx53_regiboard_init_sd();
++	mxc_register_device(&mxcsdhc1_device, &mmc1_data);
+   /* NAND */
+ 	mxc_register_device(&mxc_nandv2_mtd_device, &mxc_nand_data);
+ 	/* LCD */
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_loco.c.orig	2014-07-29 15:42:23.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_loco.c	2014-09-18 11:55:40.802726960 +0400
+@@ -805,7 +805,7 @@
+ 	.addr = 0x68,
+ 	 },	 
+ };
+-#endif // MX53_REGIBOARD
++
+ static unsigned int sdhc_get_card_det_status(struct device *dev)
+ {
+ 	return gpio_get_value(SD1_CD);
+@@ -822,7 +822,7 @@
+ 	.clock_mmc = "esdhc_clk",
+ 	.power_mmc = NULL,
+ };
+-
++#endif // MX53_REGIBOARD
+ static int mxc_sgtl5000_init(void);
+ 
+ static struct mxc_audio_platform_data sgtl5000_data = {
+@@ -1142,11 +1142,10 @@
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_nand_pads,
+ 					ARRAY_SIZE(mx53_nand_pads));
+-#endif
+ 	/* SD1 */
+ 	gpio_request(SD1_CD, "sd1-cd");
+ 	gpio_direction_input(SD1_CD);
+-
++#endif
+ #if defined(CONFIG_TOUCHSCREEN_ADS7846) && !defined(MX53_REGIBOARD)
+ 	gpio_request(TS0_PENIRQ, "ts0-penirq");
+ 	gpio_direction_input(TS0_PENIRQ);
+@@ -1194,10 +1193,10 @@
+ 	mxc_ipu_data.csi_clk[0] = clk_get(NULL, "ssi_ext1_clk");
+ 	mxc_spdif_data.spdif_core_clk = clk_get(NULL, "spdif_xtal_clk");
+ 	clk_put(mxc_spdif_data.spdif_core_clk);
+-
++#ifndef MX53_REGIBOARD
+ 	mxcsdhc1_device.resource[2].start = gpio_to_irq(SD1_CD);
+ 	mxcsdhc1_device.resource[2].end = gpio_to_irq(SD1_CD);
+-
++#endif
+ 	mxc_cpu_common_init();
+ 	mx53_loco_io_init();
+ #ifdef MX53_REGIBOARD
+@@ -1261,8 +1260,9 @@
+ 
+ //	mxc_register_device(&mxc_pwm2_device, NULL);
+ //	mxc_register_device(&mxc_pwm1_backlight_device, &mxc_pwm_backlight_data);
++#ifndef MX53_REGIBOARD
+ 	mxc_register_device(&mxcsdhc1_device, &mmc1_data);
+-
++#endif
+ 	mxc_register_device(&mxc_ssi1_device, NULL);
+ 	mxc_register_device(&mxc_ssi2_device, NULL);
+ 	mxc_register_device(&mxc_alsa_spdif_device, &mxc_spdif_data);
