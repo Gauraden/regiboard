@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Service variables
 _RUN_ID=$(date +%Y%j%H%M%S)

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 _EXPORT_ONLY_FUNCS='y'
 
@@ -27,6 +27,11 @@ cp "${SRC_ETC_DIR}/interfaces"         "${TARGET_DIR}/etc/network/"
 cp "${SRC_ETC_DIR}/sshd_config"        "${TARGET_DIR}/etc/"
 cp "${SRC_ETC_DIR}/directfbrc"         "${TARGET_DIR}/etc/"
 cp "${SRC_ETC_DIR}/ipkg.conf"          "${TARGET_DIR}/etc/"
+
+PrintNotice 'Generating of MAC...'
+HW_ADDR=$(printf '00:60:2F:%02X:%02X:%02X' $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
+Print "Addr: ${HW_ADDR}"
+echo "$HW_ADDR" > ${TARGET_DIR}/etc/hwaddr
 
 PrintNotice 'Applying of hacks...'
 cd "${TARGET_DIR}/usr/share/directfb-1.4.16/" && mv ./cursor.dat ./cursor.dat.bak || echo
