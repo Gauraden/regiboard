@@ -24,6 +24,13 @@ FindImage() {
 	  Throw "Image '$1' was not found, installation could not continue"
 }
 
+SetupMAC() {
+  Notice 'Generating of MAC...'
+  local HW_ADDR=$(printf '00:60:2F:%02X:%02X:%02X' $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
+  Print "Addr: ${HW_ADDR}"
+  echo "$HW_ADDR" > ${1}/etc/hwaddr
+}
+
 PreparingUBIFS() {
 	Print 'Preparing UBI file system...'
 	ThrowUndefined "$2" 'UBI volume size'
@@ -62,6 +69,7 @@ SetupRootFS() {
 	Notice 'Preparing home directory for "Regigraf" software'
 	mkdir "$3/home/regigraf"
 	echo 'ubi1:storage     /home/regigraf ubifs    defaults          0      0' >> "$3/etc/fstab"
+	SetupMAC "$3"
 }
 
 InstallRootFS() {

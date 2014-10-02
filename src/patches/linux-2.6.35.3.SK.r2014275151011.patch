@@ -1,0 +1,163 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2014-09-24 16:17:41.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2014-10-02 12:53:50.416814858 +0400
+@@ -25,9 +25,17 @@
+ #include "devices.h"
+ 
+ //#define MX53_REGIBOARD_V1
++#define MX53_SPI2GPIO_TOUCH
+ 
+ #define GPIO_ID(port, pin) ((port - 1)*32 + pin)
+ 
++// ECSPI-1 pins
++#define MX53_ESCPI1_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_DSE_HIGH)
++					
++#define MX53_PAD_CSI0_DAT4__ECSPI1_SCLK (_MX53_PAD_CSI0_DAT4__ECSPI1_SCLK | MUX_PAD_CTRL(MX53_ESCPI1_PAD_CTRL))
++#define MX53_PAD_CSI0_DAT5__ECSPI1_MOSI (_MX53_PAD_CSI0_DAT5__ECSPI1_MOSI | MUX_PAD_CTRL(MX53_ESCPI1_PAD_CTRL))
++#define MX53_PAD_CSI0_DAT6__ECSPI1_MISO (_MX53_PAD_CSI0_DAT6__ECSPI1_MISO | MUX_PAD_CTRL(MX53_ESCPI1_PAD_CTRL))
++#define MX53_PAD_CSI0_DAT7__ECSPI1_SS0  (_MX53_PAD_CSI0_DAT7__ECSPI1_SS0 | MUX_PAD_CTRL(MX53_ESCPI1_PAD_CTRL))
+ // CSPI pins
+ #define MX53_CSPI_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_HYS | PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST) 
+ 
+@@ -36,10 +44,10 @@
+ #define MX53_PAD_EIM_D22__CSPI_MISO (_MX53_PAD_EIM_D22__CSPI_MISO | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
+ #define MX53_PAD_EIM_D28__CSPI_MOSI (_MX53_PAD_EIM_D28__CSPI_MOSI | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
+ // I2C pins
+-#define _MX53_PAD_GPIO_5__I2C3_SCL		IOMUX_PAD(0x6C0, 0x330, 6 | IOMUX_CONFIG_SION, 0x824, 2, 0)
+-#define MX53_PAD_GPIO_5__I2C3_SCL		(_MX53_PAD_GPIO_5__I2C3_SCL | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
+-#define _MX53_PAD_GPIO_6__I2C3_SDA		IOMUX_PAD(0x6B4, 0x324, 2 | IOMUX_CONFIG_SION, 0x828, 1, 0)
+-#define MX53_PAD_GPIO_6__I2C3_SDA		(_MX53_PAD_GPIO_6__I2C3_SDA | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
++#define _MX53_PAD_GPIO_5__I2C3_SCL IOMUX_PAD(0x6C0, 0x330, 6 | IOMUX_CONFIG_SION, 0x824, 2, 0)
++#define _MX53_PAD_GPIO_6__I2C3_SDA IOMUX_PAD(0x6B4, 0x324, 2 | IOMUX_CONFIG_SION, 0x828, 1, 0)
++#define MX53_PAD_GPIO_5__I2C3_SCL (_MX53_PAD_GPIO_5__I2C3_SCL | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
++#define MX53_PAD_GPIO_6__I2C3_SDA (_MX53_PAD_GPIO_6__I2C3_SDA | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
+ /* Global configuration of PADs ***********************************************/
+ /* 
+  * Format for pin descriptions:
+@@ -143,12 +151,21 @@
+ 	MX53_PAD_FEC_TX_EN__FEC_TX_EN,
+ 	MX53_PAD_FEC_TXD1__FEC_TDATA_1,
+ 	MX53_PAD_FEC_TXD0__FEC_TDATA_0,
++#ifdef MX53_SPI2GPIO_TOUCH
+ 	// SPI->GPIO touch screen
+ 	MX53_PAD_PATA_DATA6__GPIO2_6, // GPIO2_6  -> PATA_DATA6 -> PENIRQ (11)
+ 	MX53_PAD_CSI0_DAT4__GPIO5_22, // GPIO5_22 -> CSI0_DAT4  -> SCK    (16)
+ 	MX53_PAD_CSI0_DAT5__GPIO5_23, // GPIO5_23 -> CSI0_DAT5  -> MOSI   (14)
+ 	MX53_PAD_CSI0_DAT6__GPIO5_24, // GPIO5_24 -> CSI0_DAT6  -> MISO   (12)
+ 	MX53_PAD_CSI0_DAT7__GPIO5_25, // GPIO5_25 -> CSI0_DAT7  -> CS     (15)
++#else
++	// ECSPI-1 Touch screen
++	MX53_PAD_PATA_DATA6__GPIO2_6,
++	MX53_PAD_CSI0_DAT4__ECSPI1_SCLK,
++	MX53_PAD_CSI0_DAT5__ECSPI1_MOSI,
++	MX53_PAD_CSI0_DAT6__ECSPI1_MISO,
++	MX53_PAD_CSI0_DAT7__ECSPI1_SS0,
++#endif
+ 	// PWM Backlight
+ 	MX53_PAD_PATA_INTRQ__GPIO7_2, // GPIO7_2   -> PATA_INTRQ (Backlight enable/disable)
+ 	MX53_PAD_GPIO_9__PWM1_PWMO,   // PWM1_PWMO -> GPIO_9 (PWM output)
+@@ -213,9 +230,10 @@
+ #define TS_MOSI    GPIO_ID(5,23) // GPIO-5.23 
+ #define TS_MISO    GPIO_ID(5,24) // GPIO-5.24
+ #define TS_CS      GPIO_ID(5,25) // GPIO-5.25
+-#define TS_SCK_HZ  (125000 * 26) // max spi clock (SCK) speed in HZ
++#define TS_SCK_HZ  (125000 * 16) // max spi clock (SCK) speed in HZ
+ #define TS_MODEL   "ads7846"
+ 
++#ifdef MX53_SPI2GPIO_TOUCH
+ struct spi_gpio_platform_data spi_gpio_data = {
+ 	.sck            = TS_SCK,
+ 	.mosi           = TS_MOSI,
+@@ -230,15 +248,16 @@
+ 		.platform_data = &spi_gpio_data,
+ 	},
+ };
+-
++#endif
+ static struct ads7846_platform_data ads_info = {
+ 	.model            = 7843, // ADS7843E
++	.vref_mv          = 2500, // 2.5V external VREF
+ 	.swap_xy          = false,
+ 	.x_min            = 1155,//550,//150,
+ 	.x_max            = 3079,//3030, //3830,
+ 	.y_min            = 1089,//550,//190,
+ 	.y_max            = 2886,//2900,//3830,
+-	.vref_delay_usecs = 100,
++	.vref_delay_usecs = 10,
+ 	.x_plate_ohms     = 450,
+ 	.y_plate_ohms     = 250,
+ 	.pressure_max     = 15000,
+@@ -654,23 +673,29 @@
+ /* Setup SPI devices **********************************************************/
+ static struct mxc_spi_master mxc_ecspi_data = {
+   .maxchipselect = 4,
+-  .spi_version   = 23,
++  .spi_version   = 23, // version 23 - means ECSPI (high frequency <= 52 Mbps)
+ };
+ 
+ static struct mxc_spi_master mxc_cspi_data = {
+   .maxchipselect = 4,
+-  .spi_version   = 7,
++  .spi_version   = 7, // version 7 - means CSPI (<= 26 Mbps)
+ };
+ // ECSPI-1
+ static struct spi_board_info mxc_ecspi_device[] __initdata = {
+ 	{ // Touchscreen
+-		.modalias        = TS_MODEL,
++    // for debug we can use modalias = "spidev" -> /dev/(spidev1.0 | spidev0.0)
++		.modalias        = TS_MODEL, 
++		.platform_data   = &ads_info,
++		.mode            = SPI_MODE_0,
++		.irq             = gpio_to_irq(TS_PENIRQ),
+ 		.max_speed_hz    = TS_SCK_HZ, // max: 52 Mbps
+-		.bus_num         = 0, // ECSPI-1
++#ifdef MX53_SPI2GPIO_TOUCH
++		.bus_num         = 0, // SPI over GPIO
++#else
++		.bus_num         = 1, // ECSPI-1
++#endif
+ 		.chip_select     = 0, // ECSPI-1.SS0
+ 		.controller_data = (void *)TS_CS,
+-		.platform_data   = &ads_info,
+-		.irq             = gpio_to_irq(TS_PENIRQ),
+ 	},
+ };
+ // CSPI
+@@ -712,7 +737,9 @@
+   spi_register_board_info(mxc_cspi_device, ARRAY_SIZE(mxc_cspi_device));
+   // Register ECSPI devices
+   spi_register_board_info(mxc_ecspi_device, ARRAY_SIZE(mxc_ecspi_device));
++#ifdef MX53_SPI2GPIO_TOUCH
+   platform_device_register(&spi_gpio_device);
++#endif
+ 	/* PWM backlight */
+ 	mxc_register_device(&mxc_pwm1_device, NULL);
+ 	mxc_register_device(&mxc_pwm1_backlight_device, &mxc_pwm_backlight_data);
+--- ./build/linux-2.6.35.3.SK/drivers/spi/mxc_spi.c.orig	2011-11-10 01:54:50.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/spi/mxc_spi.c	2014-10-02 12:47:56.161268454 +0400
+@@ -470,17 +470,21 @@
+ void mxc_spi_buf_rx_##type(struct mxc_spi *master_drv_data, u32 val)\
+ {\
+ 	type *rx = master_drv_data->transfer.rx_buf;\
+-	*rx++ = (type)val;\
+-	master_drv_data->transfer.rx_buf = rx;\
++	if (rx) {\
++  	*rx++ = (type)val;\
++  	master_drv_data->transfer.rx_buf = rx;\
++	}\
+ }
+ 
+ #define MXC_SPI_BUF_TX(type)    \
+ u32 mxc_spi_buf_tx_##type(struct mxc_spi *master_drv_data)\
+ {\
+-	u32 val;\
++	u32 val = 0;\
+ 	const type *tx = master_drv_data->transfer.tx_buf;\
+-	val = *tx++;\
+-	master_drv_data->transfer.tx_buf = tx;\
++	if (tx) {\
++	  val = *tx++;\
++  	master_drv_data->transfer.tx_buf = tx;\
++	}\
+ 	return val;\
+ }
+ 

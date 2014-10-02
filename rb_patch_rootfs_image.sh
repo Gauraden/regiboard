@@ -37,6 +37,6 @@ PrintNotice 'Applying of hacks...'
 cd "${TARGET_DIR}/usr/share/directfb-1.4.16/" && mv ./cursor.dat ./cursor.dat.bak || echo
 # Hacks ------------------------------------------------------------------------
 # Samba is not working correct! Removing it from autorun.
-#rm "${TARGET_DIR}/etc/init.d/S91smb"
+rm -f "${TARGET_DIR}/etc/init.d/S91smb"
 # Was usefull with gcc 4.7
 #cd "${TARGETDIR}/lib/" && ln -sf ld-2.9.so ld-linux-armhf.so.3
