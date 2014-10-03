@@ -65,9 +65,13 @@ PacketMake() {
 
 SetPacketControl() {
 	DieIfNotDefined "$1" 'Path to "control" file of packet'
+	local version=${PACKET_VERSION}
+	if [ "$PACKET_EXTERN" != 'true' ]; then
+    version="${version}-${RB_BUILD_ID}"
+  fi
 	echo -e \
 "Package: ${PACKET_NAME}\n"\
-"Version: ${PACKET_VERSION}\n"\
+"Version: ${version}\n"\
 "Filename: ${PACKET_NAME}.ipk\n"\
 "Description: ${PACKET_DESCRIPTION}\n"\
 "Section: regiboard/apps\n"\

@@ -32,7 +32,7 @@ if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	ROOTFS_IMG_DIR="${OUTPUT_DIR}/rootfs"
 	PACKETS_DIR="${OUTPUT_DIR}/packets"
 	INCLUDE_DIR="${OUTPUT_DIR}/include"
-  FIRMWARE_DIR="${OUTPUT_DIR}/firmware"
+	FIRMWARE_DIR="${OUTPUT_DIR}/firmware"
 	SRC_ETC_DIR="${WORK_DIR}/src/etc"
 	SRC_SHELL_DIR="${WORK_DIR}/src/shell"
 	SRC_PATCHES_DIR="${WORK_DIR}/src/patches"
@@ -41,6 +41,7 @@ if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 
 	GCC_VER=$(echo ${_PROC_VERSION} | awk -F '(' '{print $3}' | grep -P -o '([0-9\.]+)')
 	LINUX_DIST=$(echo ${_PROC_VERSION} | awk -F '(' '{print $4}' | grep -P -o '^([a-zA-Z]+)')
+	RB_BUILD_ID=$(git tag -l 'v*' | sort -V | tail -n 1 | sed -r 's/(.+)([\.\-]+)([0-9]+)/\3/')
 fi
 
 CYAN='\033[1;36m'
