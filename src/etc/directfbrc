@@ -1,6 +1,6 @@
 system=fbdev
 fbdev=/dev/fb0
-mode=1024x768
+#mode=1024x768
 #mode=1280x720
 depth=24
 pixelformat=RGB24
@@ -8,8 +8,10 @@ tslib-devices=/dev/input/event0
 memcpy=armasm
 dma
 disable-module=linux_input
+graphics-vt
+bg-none
+#bg-color=FF000000
+#bg-image=/home/regigraf/themes/vbr_logo_0%.png
 no-vt-switch
 no-vt-switching
-bg-color=FF000000
-#bg-image=/home/regigraf/themes/vbr_logo_0%.png
-
+no-sighandler
