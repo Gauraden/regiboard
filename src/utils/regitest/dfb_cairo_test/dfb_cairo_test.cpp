@@ -206,14 +206,79 @@ bool check_cairo(IDirectFB *dfb, IDirectFBSurface *primary) {
     return true;
 }
 
+static
+void CairoMainSurf(IDirectFB *dfb) {
+  DFBSurfaceDescription dsc;
+	int scr_w,
+	    scr_h;
+  IDirectFBScreen screen = dfb->GetScreen(0);
+  screen.GetSize(&scr_w, &scr_h);
+  
+  std::cout << "screen: " << scr_w << "x" << scr_h << std::endl;
+  boost::scoped_array<unsigned char> v_buf(new unsigned char[scr_w * scr_h * kScrDepth]);
+    
+  dsc.flags = (DFBSurfaceDescriptionFlags)(DSDESC_CAPS
+//                                        | DSDESC_WIDTH
+//                                        | DSDESC_HEIGHT
+//                                        | DSDESC_PIXELFORMAT
+//                                          | DSDESC_PREALLOCATED 
+                                          | DBDESC_MEMORY);
+//	dsc.caps        = DSCAPS_NONE;
+	dsc.caps        = DSCAPS_PRIMARY;
+//	dsc.width       = scr_w;
+//	dsc.height      = scr_h;
+//	dsc.pixelformat = DSPF_RGB32;
+	dsc.preallocated[0].data  = v_buf.get();
+	dsc.preallocated[0].pitch = dsc.width * kScrDepth;
+	dsc.preallocated[1].data  = NULL;
+	dsc.preallocated[1].pitch = 0;
+  IDirectFBSurface dfb_buf = dfb->CreateSurface(dsc);
+  
+  cairo_surface_t *cairo_surface = cairo_image_surface_create_for_data(v_buf.get(),
+    CAIRO_FORMAT_ARGB32,
+    scr_w,
+    scr_h,
+    cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, scr_w));
+  if (not cairo_surface) {
+    std::cout << "cairo_surface is NULL" << std::endl;
+    return;
+  }
+  std::cout << "Creation of cairo context..." << std::endl;
+  cairo_t *cairo_context = cairo_create(cairo_surface);
+  if (not cairo_context) {
+    std::cout << "cairo_context is NULL" << std::endl;
+    return;
+  }
+  
+ 	cairo_save(cairo_context);
+	cairo_set_source_rgb(cairo_context, 1, 1, 1);
+  cairo_move_to (cairo_context, 10, 15);
+  cairo_line_to (cairo_context, 700, 16);
+  cairo_set_line_width (cairo_context, 1.0);
+  cairo_set_line_cap (cairo_context, CAIRO_LINE_CAP_ROUND);
+  cairo_stroke (cairo_context);
+  cairo_restore(cairo_context);
+  
+  dfb_buf.Flip();
+  const int kSleep = 5;  
+  std::cout << "Waiting for " << kSleep << " seconds..." << std::endl;
+  sleep(kSleep);
+  
+  cairo_destroy(cairo_context);
+  cairo_surface_destroy(cairo_surface);
+}
+
 int main (int argc, char **argv) {
-	IDirectFB             m_dfb;
+/*
 	IDirectFBSurface      m_primary;
 	DFBSurfaceDescription dsc;
 	int w, h;
-	
+*/
   DirectFB::Init(/*&argc, &argv*/);
-  m_dfb     = DirectFB::Create();
+  IDirectFB m_dfb = DirectFB::Create();
+  CairoMainSurf(&m_dfb);
+  return 0;
+/*  
   dsc.flags = (DFBSurfaceDescriptionFlags)(DSDESC_CAPS |
 //                                           DSDESC_WIDTH |
 //                                           DSDESC_HEIGHT |
@@ -226,4 +291,5 @@ int main (int argc, char **argv) {
   m_primary.GetSize(&w, &h);
     
   check_cairo(&m_dfb, &m_primary);
+  */
 }
