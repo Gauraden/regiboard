@@ -1,0 +1,374 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_diagnostic_drv.c.orig	2014-12-09 11:28:33.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_diagnostic_drv.c	2014-12-12 12:05:58.185042159 +0300
+@@ -0,0 +1,348 @@
++#include <asm/io.h>
++#include <linux/platform_device.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/ioctl.h>
++#include <linux/fs.h>
++#include <linux/hrtimer.h>
++#include <linux/delay.h>
++#include <linux/clk.h>
++#include <mach/gpio.h>
++#include "mx53_diagnostic_drv.h"
++/*
++// Pins
++DISP0_DAT20 -> SATA_PHY::TDI (ALT7)
++DISP0_DAT21 -> SATA_PHY::TDO (ALT7)
++DISP0_DAT22 -> SATA_PHY::TCK (ALT7)
++DISP0_DAT23 -> SATA_PHY::TMS (ALT7)
++
++SD1_CLK   -> SATA_PHY::DTB[0] (ALT7)
++SD1_DATA3 -> SATA_PHY::DTB[1] (ALT7)
++
++// Registers
++SJC_GPUCR2::sata_phyjtagalt7_hard_en[31] = 1(I/O pads); 0(DAP)
++
++// SATA
++1000_0000h base - MX53_SATA_BASE_ADDR
++
++1000_0178 Port0 PHY Control Register (SATA_P0PHYCR)
++ - 19 [CR_READ ] CR Read. Reads from the referenced Address register.
++ - 18 [CR_WRITE ] CR Write. Writes the Write Data register to the referenced 
++                  Address register.
++ - 17 [CR_CAP_DATA] CR Capture Data. Captures phy_cr_data_in[15:0] into the 
++                    Write Data register.
++ - 16 [CR_CAP_ADDR] CR Capture Address. Captures phy_cr_data_in[15:0] into the 
++                    Address register. 
++ - 15–0 [CR_DATA_IN] CR Address and Write Data Input Bus. Supplies and captures
++                     address and write data.
++
++1000_017C Port0 PHY Status  Register (SATA_P0PHYSR) 
++ - 18 [CR_ACK] CR Acknowledgement. Acknowledgement for the phy_cr_cap_addr,
++               phy_cr_cap_data, phy_cr_write, and phy_cr_read control signals.
++ - 15–0 [CR_DATA_OUT] CR Data Output Bus. Always presents last read data.
++*/
++
++#define DIAGNOSTIC_POLL_DELAY ktime_set(5, 0) // (sec, nsec) => 1 sec
++// Macroses for 
++#define CLEAR_REG(reg, mask, offs) (reg & ~(mask << offs))
++#define SET_REG(reg, mask, offs, val) (CLEAR_REG(reg, mask, offs) | \
++                                            ((val & mask) << offs))
++#define GET_REG(reg, mask, offs) reg & (mask << offs)
++// MX53 SATA registers
++#define SATA_BASE diagnostic_data.sata_base
++
++#define MX53_SATA_GPARAM1R 0x0E8 // Global Parameter 1 Register
++#define MX53_SATA_VERSIONR 0x0F8 // Version Register 
++#define MX53_SATA_P0IS     0x110 // Port0 Interrupt Status Register 
++#define MX53_SATA_P0SIG    0x124 // Port0 Signature Register
++#define MX53_SATA_P0SERR   0x130 // Port0 Serial ATA Error Register
++#define MX53_SATA_P0DMACR  0x170 // Port0 DMA Control Register
++#define MX53_SATA_P0PHYCR  0x178 // Port0 PHY Control Register 
++#define MX53_SATA_P0PHYSR  0x17C // Port0 PHY Status Register
++
++#define W_P0PHYCR(val) __raw_writel((u32)val, (u32)SATA_BASE + MX53_SATA_P0PHYCR)
++#define R_P0PHYSR      __raw_readl((u32)SATA_BASE + MX53_SATA_P0PHYSR)
++
++#define CR_DATA(val) ((u32)val & 0xFFFF)
++#define CR_ACK(val)  (((u32)val >> 18) & 0x1)
++#define CAP_ADDR     ((u32)1 << 16)
++#define CAP_DATA     ((u32)1 << 17)
++#define CR_WRITE     ((u32)1 << 18)
++#define CR_READ      ((u32)1 << 19)
++// MX53 registers in the Clock module
++#define LT_LIMIT  0x0001
++#define DAC_CTL   0x0008
++#define RTUNE_CTL 0x0009
++#define ADC_OUT   0x000A
++#define JTAG_ID_H 0x000C
++#define JTAG_ID_L 0x000D
++#define MPLL_CTL  0x0016
++#define MPLL_TST  0x0017
++
++#define SATA_PHY_IS_READY(val)       (CR_ACK(val) == 1)
++#define MPLL_TST_MEAS_IV(reg, val)   SET_REG(reg, 0x3FF, 2,  val) // <- 512
++#define MPLL_TST_MEAS_GD(reg, val)   SET_REG(reg, 0x1,   1,  val) 
++#define RTUNE_CTL_MODE(reg, val)     SET_REG(reg, 0x3,   0,  val) // <- 1
++#define DAC_CTL_DAC_MODE(reg, val)   SET_REG(reg, 0x7,   12, val) // <- 4
++#define RTUNE_CTL_SEL_ATBP(reg, val) SET_REG(reg, 0x1,   4,  val) // <- 0 / 1
++#define ADC_OUT_VALUE(reg)           GET_REG(reg, 0x3FF, 0)       // -> m1
++
++static struct mx53_diagnostic_device_data {
++	struct class   *dev_class;
++	struct device  *dev;
++	struct hrtimer  timer;
++  struct clk     *osc_clk;
++  struct clk     *pll3_clk;
++  struct clk     *sata_clk;
++  struct clk     *sata_ref_clk;
++	void __iomem   *sata_base;
++	int             opened;
++	unsigned        delay_nsec;
++	unsigned        poll_tries;
++	int             cpu_temp;
++} diagnostic_data = {
++	.opened   = 0,
++	.cpu_temp = 0,	
++};
++
++static u32 mx53_sata_phy_poll_ack()
++{
++  u32 val;
++  u32 tries;
++  tries = 0;
++  do {
++    val = R_P0PHYSR;
++    if (SATA_PHY_IS_READY(val))
++      break;
++//    ndelay(diagnostic_data.delay_nsec);
++    tries++;
++  } while (tries < diagnostic_data.poll_tries);
++  return val;   
++}
++
++u16 mx53_sata_phy_read(u16 reg_add)
++{
++  u32 val = 0x00000000;
++  u32 cmd = 0x00000000;
++  cmd |= reg_add;
++  W_P0PHYCR(cmd);
++  W_P0PHYCR(cmd | CAP_ADDR);
++  val = mx53_sata_phy_poll_ack();
++  if (! SATA_PHY_IS_READY(val))
++    goto poll_ack_fail;
++  W_P0PHYCR(cmd);
++  val = mx53_sata_phy_poll_ack();
++  if (! SATA_PHY_IS_READY(val))
++    goto poll_ack_fail;
++  W_P0PHYCR(CR_READ);
++  val = mx53_sata_phy_poll_ack();
++  if (! SATA_PHY_IS_READY(val))
++    goto poll_ack_fail;
++  W_P0PHYCR(0x00000000);
++  mx53_sata_phy_poll_ack();
++
++  printk("DEBUG: %s: addr: 0x%4X; val: 0x%8X\n", __func__,
++         (unsigned)reg_add, (unsigned)CR_DATA(val), (unsigned)CR_ACK(val));
++  return CR_DATA(val);
++poll_ack_fail:
++  printk("DEBUG: %s: addr: 0x%4X; poll ack: 0x%8X; FAIL\n", __func__,
++         (unsigned)reg_add, (unsigned)val);
++  return 0x0;
++}
++
++void mx53_sata_phy_write(u16 reg_add, u16 reg_val)
++{
++/*
++  W_P0PHYCR(CR_DATA(reg_add) | CAP_ADDR);
++  mx53_sata_phy_poll_ack();
++  W_P0PHYCR(CR_DATA(reg_val) | CAP_DATA);
++  mx53_sata_phy_poll_ack();
++  W_P0PHYCR(CR_DATA(reg_val) | CR_WRITE);
++  printk("DEBUG: %s: addr: 0x%X; val: 0x%X\n", __func__,
++         (unsigned)reg_add, (unsigned)reg_val);
++*/
++}
++
++static enum hrtimer_restart mx53_diagnostic_timer(struct hrtimer *timer)
++{
++  u16 mpll_tst_bak;
++  u16 rtune_ctl_bak;
++  u16 dac_ctl_bak;
++  u32 jtag_id;
++  printk("DEBUG: %s: ver: 0x%X; P0IS: 0x%X; P0SIG: 0x%X; sata: %u; sataref: %u... \n", __func__,
++         (unsigned)__raw_readl((u32)SATA_BASE + MX53_SATA_VERSIONR),
++         (unsigned)__raw_readl((u32)SATA_BASE + MX53_SATA_P0IS),
++         (unsigned)__raw_readl((u32)SATA_BASE + MX53_SATA_P0SIG),
++         clk_get_rate(diagnostic_data.sata_clk),
++         clk_get_rate(diagnostic_data.sata_ref_clk));
++  jtag_id = mx53_sata_phy_read(JTAG_ID_L);
++  mpll_tst_bak = mx53_sata_phy_read(MPLL_TST);
++  hrtimer_forward(timer, hrtimer_cb_get_time(timer), DIAGNOSTIC_POLL_DELAY);
++  return HRTIMER_RESTART;
++}
++
++static int mx53_diagnostic_device_open(struct inode *inode, struct file *file)
++{
++	if (diagnostic_data.opened)
++		return -EBUSY;
++	diagnostic_data.opened++;
++	return 0;
++}
++
++static int mx53_diagnostic_device_release(struct inode *inode, struct file *file)
++{
++	diagnostic_data.opened--;
++	return 0;
++}
++
++static int mx53_diagnostic_ioctl(
++	struct inode  *inode,
++	struct file   *file,
++	unsigned int   ioctl_num,
++	unsigned long  ioctl_param)
++{
++	switch (ioctl_num) {
++	  case IOCTL_MX53_GET_CPU_TEMP: {
++	    printk("DEBUG: cpu_temp: %d\n", diagnostic_data.cpu_temp);
++		  return diagnostic_data.cpu_temp;
++	  }
++	  default:
++		  break;
++	};
++	return 0;
++}
++
++struct file_operations mx53_diagnostic_fops = {
++	.owner   = THIS_MODULE,
++	.ioctl   = mx53_diagnostic_ioctl,
++	.open    = mx53_diagnostic_device_open,
++	.release = mx53_diagnostic_device_release,
++};
++
++static int mx53_diagnostic_init_module()
++{
++  int            rate;
++	dev_t          devt    = MKDEV(MX53_DIAGNOSTIC_MAJOR_NUM, 0);
++	struct class  *t_class = class_create(THIS_MODULE, MX53_DIAGNOSTIC_DEV_NAME);
++	struct device *t_dev   = device_create(
++		t_class,
++		0,
++		devt,
++		0,
++		MX53_DIAGNOSTIC_DEV_NAME
++	);
++
++	int err = register_chrdev(
++		MX53_DIAGNOSTIC_MAJOR_NUM,
++		MX53_DIAGNOSTIC_DEV_NAME,
++		&mx53_diagnostic_fops
++	);
++
++	if (err < 0) {
++		printk("%s: driver initialization was failed! Error: %d\n",
++		        MX53_DIAGNOSTIC_DRV_NAME, err);
++		goto err_free_sysfs_dev;
++	}
++  /*
++   CCM_CCGR4 : [13 – 12] (CG6              ): usb ph2 clock (usb_phy2_clk_enable)
++             : [11 – 10] (CG5              ): usb phy1 clock (usb_phy1_clk_enable)
++             : [ 3 – 2 ] (CG1              ): sata (sata_clk_enable)
++   CCM_CSCMR1: [   26  ] (USB_PHY_CLK_SEL  ): Selector for USB PHY clock multiplexer
++               - 0 derive clock from oscillator
++               - 1 derive clock from divided output of PLL3 (Default)
++   CCM_CDCDR : [ 5 – 3 ] (USB_PHY_PRED{2:0}): Selector for usb_phy clock pre-divider.
++               - Values: 1 ... 8 (def = 3)
++             : [ 2 – 0 ] (USB_PHY_PODF{2:0}): Selector for usb_phy clock post-divider.
++               - Values: 1 ... 8 (def = 3)
++   * KERNEL --------------------------------------------------------------------
++   * move usb_phy_clk to 24MHz
++   clk_set_parent(&usb_phy_clk[0], &osc_clk);
++   clk_set_parent(&usb_phy_clk[1], &osc_clk);
++   */
++  // JEDEC ID: 0x1f:0x27:0x01
++  // USB_PHY clock
++	diagnostic_data.sata_ref_clk = clk_get(NULL, "usb_phy1_clk");
++	if (IS_ERR(diagnostic_data.sata_ref_clk)) {
++	  printk("DEBUG: %s: sata_ref_clk fail!\n", __func__);
++    goto err_free_sysfs_dev;
++	}
++//	clk_set_parent(diagnostic_data.sata_ref_clk, diagnostic_data.pll3_clk);
++	clk_set_rate(diagnostic_data.sata_ref_clk, clk_round_rate(diagnostic_data.sata_ref_clk, 50000000));
++	clk_enable(diagnostic_data.sata_ref_clk);
++  printk("DEBUG: %s: sata_ref_clk = %lu\n", __func__, clk_get_rate(diagnostic_data.sata_ref_clk));
++  // SATA clock
++  diagnostic_data.sata_clk = clk_get(NULL, "imx_sata_clk");
++	if (IS_ERR(diagnostic_data.sata_clk)) {
++	  printk("DEBUG: %s: sata_clk fail!\n", __func__);
++    goto err_free_sysfs_dev;
++	}
++	rate = clk_round_rate(diagnostic_data.sata_clk, clk_get_rate(diagnostic_data.sata_ref_clk));
++	clk_set_rate(diagnostic_data.sata_clk, rate);
++	clk_enable(diagnostic_data.sata_clk);
++  printk("DEBUG: %s: sata_clk = %lu\n", __func__, clk_get_rate(diagnostic_data.sata_clk));
++
++  diagnostic_data.poll_tries = 1000000;
++  diagnostic_data.delay_nsec = 1000000000 / (clk_get_rate(diagnostic_data.sata_ref_clk) / 16);
++  diagnostic_data.sata_base  = ioremap(MX53_SATA_BASE_ADDR, SZ_2K);
++	diagnostic_data.dev_class  = t_class;
++	diagnostic_data.dev        = t_dev;
++
++  __raw_writel((u32)0x00000000, (u32)SATA_BASE + MX53_SATA_P0DMACR);
++
++  hrtimer_init(&diagnostic_data.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
++  diagnostic_data.timer.function = mx53_diagnostic_timer;
++	hrtimer_start(&diagnostic_data.timer, DIAGNOSTIC_POLL_DELAY, HRTIMER_MODE_REL);
++	return 0;
++
++err_free_sysfs_dev:
++	device_destroy(t_class, t_dev);
++	class_destroy(t_class);
++	return err;
++}
++
++static void mx53_diagnostic_cleanup_module()
++{
++  iounmap(diagnostic_data.sata_base);
++  
++ 	clk_disable(diagnostic_data.sata_ref_clk);
++	clk_put(diagnostic_data.sata_ref_clk);
++	clk_disable(diagnostic_data.sata_clk);
++	clk_put(diagnostic_data.sata_clk);
++  
++	unregister_chrdev(MX53_DIAGNOSTIC_MAJOR_NUM, MX53_DIAGNOSTIC_DEV_NAME);
++	device_destroy(diagnostic_data.dev_class, diagnostic_data.dev);
++	class_destroy(diagnostic_data.dev_class);
++}
++
++static int __devinit mx53_diagnostic_probe(struct platform_device *pdev)
++{
++	printk("%s interface initialization\n", MX53_DIAGNOSTIC_DRV_NAME);
++	mx53_diagnostic_init_module();
++	return 0;
++}
++
++static int __devexit mx53_diagnostic_remove(struct platform_device *pdev)
++{
++	mx53_diagnostic_cleanup_module();
++	return 0;
++}
++
++static struct platform_driver mx53_diagnostic_driver = {
++	.driver		= {
++		.name	= MX53_DIAGNOSTIC_DRV_NAME,
++	},
++	.probe  = mx53_diagnostic_probe,
++	.remove = __devexit_p(mx53_diagnostic_remove),
++};
++
++static int __init mx53_diagnostic_init(void)
++{
++	return platform_driver_register(&mx53_diagnostic_driver);
++}
++arch_initcall(mx53_diagnostic_init);
++
++static void __exit mx53_diagnostic_exit(void)
++{
++	platform_driver_unregister(&mx53_diagnostic_driver);
++}
++module_exit(mx53_diagnostic_exit);
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/Makefile.orig	2014-07-29 15:42:22.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/Makefile	2014-12-12 12:46:04.602789390 +0300
+@@ -8,7 +8,7 @@
+ check_fuse.o
+ 
+ obj-$(CONFIG_ARCH_MX51) += clock.o suspend.o
+-obj-$(CONFIG_ARCH_MX53) += clock.o suspend.o mx53_wp.o
++obj-$(CONFIG_ARCH_MX53) += clock.o suspend.o mx53_wp.o mx53_diagnostic_drv.o
+ obj-$(CONFIG_ARCH_MX50) += clock_mx50.o dmaengine.o dma-apbh.o mx50_suspend.o mx50_freq.o mx50_ddr_freq.o mx50_wfi.o
+ 
+ obj-$(CONFIG_MACH_MX51_3DS) += mx51_3stack.o mx51_3stack_gpio.o mx51_3stack_pmic_mc13892.o
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_loco.c.orig	2014-12-10 16:18:40.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_loco.c	2014-12-10 16:19:26.637406150 +0300
+@@ -1267,7 +1267,9 @@
+ 	mxc_register_device(&mxc_ssi2_device, NULL);
+ 	mxc_register_device(&mxc_alsa_spdif_device, &mxc_spdif_data);
+ 	mxc_register_device(&ahci_fsl_device, &sata_data);
++#ifndef MX53_REGIBOARD
+ 	mxc_register_device(&imx_ahci_device_hwmon, NULL);
++#endif
+ 	mxc_register_device(&mxc_fec_device, &fec_data);
+ 	mxc_register_device(&mxc_ptp_device, NULL);
+ 	/* ASRC is only available for MX53 TO2.0 */

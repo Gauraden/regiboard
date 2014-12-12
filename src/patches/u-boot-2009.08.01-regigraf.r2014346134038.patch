@@ -1,0 +1,56 @@
+--- ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/lowlevel_init.S.orig	2014-05-07 16:30:15.000000000 +0400
++++ ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/lowlevel_init.S	2014-12-12 13:36:59.144388602 +0300
+@@ -119,7 +119,8 @@
+ 	mov r1, #0x4
+ 	str r1, [r0, #CLKCTL_CCSR]
+ 
+-	setup_pll PLL1_BASE_ADDR, 800
++//	setup_pll PLL1_BASE_ADDR, 800
++	setup_pll PLL1_BASE_ADDR, 1100 // FIXIT: was 800
+ 
+         setup_pll PLL3_BASE_ADDR, 400
+ 
+@@ -240,6 +241,9 @@
+ CCM_VAL_0x00808145:     .word 0x00808145
+ CCM_VAL_0x00015154:     .word 0x00015154
+ CCM_VAL_0x02888945:     .word 0x02888945
++W_DP_OP_1100:           .word DP_OP_1100
++W_DP_MFD_1100:          .word DP_MFD_1100
++W_DP_MFN_1100:          .word DP_MFN_1100
+ W_DP_OP_1000:           .word DP_OP_1000
+ W_DP_MFD_1000:          .word DP_MFD_1000
+ W_DP_MFN_1000:          .word DP_MFN_1000
+@@ -252,6 +256,9 @@
+ W_DP_OP_400:            .word DP_OP_400
+ W_DP_MFD_400:           .word DP_MFD_400
+ W_DP_MFN_400:           .word DP_MFN_400
++W_DP_OP_304:            .word DP_OP_304
++W_DP_MFD_304:           .word DP_MFD_304
++W_DP_MFN_304:           .word DP_MFN_304
+ W_DP_OP_216:            .word DP_OP_216
+ W_DP_MFD_216:           .word DP_MFD_216
+ W_DP_MFN_216:           .word DP_MFN_216
+--- ./build/u-boot-2009.08.01-regigraf/include/asm-arm/arch-mx53/mx53.h.orig	2012-09-07 13:00:15.000000000 +0400
++++ ./build/u-boot-2009.08.01-regigraf/include/asm-arm/arch-mx53/mx53.h	2014-12-12 13:36:22.192853147 +0300
+@@ -360,6 +360,10 @@
+ 
+ /* Assuming 24MHz input clock with doubler ON */
+ /*                            MFI         PDF */
++#define DP_OP_1100	((11 << 4) + ((1 - 1) << 0))
++#define DP_MFD_1100	(12 - 1)
++#define DP_MFN_1100	5
++
+ #define DP_OP_1000	((10 << 4) + ((1 - 1) << 0))
+ #define DP_MFD_1000	(12 - 1)
+ #define DP_MFN_1000	5
+@@ -396,6 +400,10 @@
+ #define DP_MFD_400      (3 - 1)
+ #define DP_MFN_400      1
+ 
++#define DP_OP_304       ((6 << 4) + ((2 - 1)  << 0))
++#define DP_MFD_304      (3 - 1)
++#define DP_MFN_304      1
++
+ /* For freq lower than 300MHz, dpgdck0_2_en is 0.
+  * Thus the parameters is for 432MHz.
+  */
