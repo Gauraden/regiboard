@@ -1,0 +1,285 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2014-12-12 12:48:39.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2015-01-26 15:03:31.803598769 +0300
+@@ -31,13 +31,23 @@
+ #define GPIO_ID(port, pin) ((port - 1)*32 + pin)
+ 
+ // ECSPI-1 pins
++#undef MX53_PAD_CSI0_DAT4__ECSPI1_SCLK
++#undef MX53_PAD_CSI0_DAT5__ECSPI1_MOSI
++#undef MX53_PAD_CSI0_DAT6__ECSPI1_MISO
++#undef MX53_PAD_CSI0_DAT7__ECSPI1_SS0
++
+ #define MX53_ESCPI1_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_DSE_HIGH)
+-					
++				
+ #define MX53_PAD_CSI0_DAT4__ECSPI1_SCLK (_MX53_PAD_CSI0_DAT4__ECSPI1_SCLK | MUX_PAD_CTRL(MX53_ESCPI1_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT5__ECSPI1_MOSI (_MX53_PAD_CSI0_DAT5__ECSPI1_MOSI | MUX_PAD_CTRL(MX53_ESCPI1_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT6__ECSPI1_MISO (_MX53_PAD_CSI0_DAT6__ECSPI1_MISO | MUX_PAD_CTRL(MX53_ESCPI1_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT7__ECSPI1_SS0  (_MX53_PAD_CSI0_DAT7__ECSPI1_SS0 | MUX_PAD_CTRL(MX53_ESCPI1_PAD_CTRL))
+ // CSPI pins
++#undef MX53_PAD_EIM_D20__CSPI_SS0
++#undef MX53_PAD_EIM_D21__CSPI_SCLK
++#undef MX53_PAD_EIM_D22__CSPI_MISO
++#undef MX53_PAD_EIM_D28__CSPI_MOSI
++
+ #define MX53_CSPI_PAD_CTRL (PAD_CTL_PKE | PAD_CTL_HYS | PAD_CTL_DSE_HIGH | PAD_CTL_SRE_FAST) 
+ 
+ #define MX53_PAD_EIM_D20__CSPI_SS0  (_MX53_PAD_EIM_D20__CSPI_SS0 | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
+@@ -45,6 +55,11 @@
+ #define MX53_PAD_EIM_D22__CSPI_MISO (_MX53_PAD_EIM_D22__CSPI_MISO | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
+ #define MX53_PAD_EIM_D28__CSPI_MOSI (_MX53_PAD_EIM_D28__CSPI_MOSI | MUX_PAD_CTRL(MX53_CSPI_PAD_CTRL))
+ // I2C pins
++#undef _MX53_PAD_GPIO_5__I2C3_SCL
++#undef _MX53_PAD_GPIO_6__I2C3_SDA
++#undef MX53_PAD_GPIO_5__I2C3_SCL
++#undef MX53_PAD_GPIO_6__I2C3_SDA
++
+ #define _MX53_PAD_GPIO_5__I2C3_SCL IOMUX_PAD(0x6C0, 0x330, 6 | IOMUX_CONFIG_SION, 0x824, 2, 0)
+ #define _MX53_PAD_GPIO_6__I2C3_SDA IOMUX_PAD(0x6B4, 0x324, 2 | IOMUX_CONFIG_SION, 0x828, 1, 0)
+ #define MX53_PAD_GPIO_5__I2C3_SCL (_MX53_PAD_GPIO_5__I2C3_SCL | MUX_PAD_CTRL(MX53_I2C_PAD_CTRL_2))
+@@ -268,9 +283,33 @@
+ 	.gpio_pendown     = TS_PENIRQ,
+ };
+ /* Displays *******************************************************************/
+-// G150XGE-L04
++/*
++ pixclock    : Pixel clock, dot clock or just clock, usually in MHz. It needs to
++               be entered in picoseconds.
++                 pixclock in ps= 10 ^(-12) / dotclock in MHz
++ left_margin : Number of pixclk pulses between HSYNC signal and the first valid 
++               pixel data. (Horizontal Back Porch)
++ right_margin: Number of pixclk between the last valid pixel data in the line 
++               and the nect hsync pulse. (Horizontal Front Porch)
++ upper_margin: Number of lines (HSYNC pulses) from a VSYNC signal to the first 
++               valid line. (Vertical Back Porch)
++ lower_margin: Number of lines (HSYNC pulses) between the last valid line of the 
++               frame and the next VSYNC pulse. (Vertical Front Porch)
++ hsync_len   : Number of pixclk pulses when a HSYNC signal is active.
++ vsync_len   : Number of HSYNC pulses when a VSYNC signal is active.
++ sync        : Polarity on the Data Enable
++ */
++// G150XGE-L04 
++// - Datasheets.: G150XGE-L04.pdf, G150XGE-L04_RevC4_Datasheet.pdf
+ // - Resolution.: 1024x768
+ // - Pixel clock: 65MHz
++// - PINs:
++// -- REV   (4 ) <- LVDS0_DPS   <- GPIO_10 (GPIO4_0); Reverse Scan selection.
++// --- Normal scan (Pin4, REV = High or NC)
++// --- Reverse scan (Pin4, REV = Low)
++// -- SEL68 (20) <- LVDS0_SEL68 <- GPIO_11 (GPIO4_1); Selection for 6 bits/8bits LVDS data input.
++// --- ”High” for 6 bits LVDS Input
++// --- “Low” or “NC” for 8 bits LVDS Input
+ // G150XG01
+ // - Resolution.: 1024x2, 768 X2 (RGBW)
+ // - Pixel clock: 65MHz
+@@ -282,39 +321,60 @@
+ // -- SEL68 (20) <- LVDS0_SEL68 <- GPIO_11 (GPIO4_1); Selection for 6 bits/8bits LVDS data input.
+ // --- ”High” or “NC” for 6 bits LVDS Input
+ // --- “Low” for 8 bits LVDS Input
++// NLB150XG01L-01
++// - Resolution.: 1024x768
++// - Pixel clock: ...MHz
+ #define LVDS0_DPS   GPIO_ID(4,0) // GPIO-4.0
+ #define LVDS0_SEL68 GPIO_ID(4,1) // GPIO-4.1
+ 
++#define FB_SYNC (FB_SYNC_CLK_LAT_FALL)
++#define FB_MODE (FB_VMODE_NONINTERLACED) //FB_VMODE_INTERLACED
++
+ static struct fb_videomode video_modes[] = {
+ 	{ // Regigraf 15" display
+ 		"G150XGE-L04", // name
+ 		60,            // refresh
+ 		1024, 768,     // x,y res
+-		15385,         // pixclock (10^12 / Pixel clock)
++		15385,         // pixclock (10^12 / Pixel clock) picoseconds
+ 		220,           // left_margin
+ 		40,            // right_margin
+ 		21,            // upper_margin
+ 		7,             // lower_margin
+ 		60,            // hsync_len
+ 		10,            // vsync_len
+-		FB_SYNC_CLK_LAT_FALL,   // sync
+-		FB_VMODE_NONINTERLACED, // vmode
++		FB_SYNC,       // sync
++		FB_MODE,       // vmode
+ 		0,             // flag
+ 	},
+ 	{ // Regigraf 15" display (RGBW)
+-		"G150XG01", // name
++		"G150XG01",    // name
+ 		60,            // refresh
+ 		1024, 768,     // x,y res
+-		15385,         // pixclock (10^12 / Pixel clock)
++		15385,         // pixclock (10^12 / Pixel clock) picoseconds
+ 		220,           // left_margin
+ 		40,            // right_margin
+ 		21,            // upper_margin
+ 		7,             // lower_margin
+ 		60,            // hsync_len
+ 		10,            // vsync_len
+-		FB_SYNC_CLK_LAT_FALL,   // sync
+-		FB_VMODE_NONINTERLACED, // vmode
+-		0,             // flag	
++		FB_SYNC,       // sync
++		FB_MODE,       // vmode
++    0,             // flag	
++	},
++	{ // Regigraf 15" display
++		"NLB150XG01L-01", // name
++		60,            // refresh
++		1024, 768,     // x,y res
++		15385,         // pixclock (10^12 / Pixel clock) picoseconds
++		320,           // left_margin
++		0,             // right_margin
++		38,            // upper_margin
++		0,             // lower_margin
++		0,             // hsync_len
++		0,             // vsync_len
++		FB_SYNC,       // sync
++		FB_MODE,       // vmode
++		0,             // flag
+ 	},
+ 	{ // iMX51 babbage display
+ 		"CLAA-WVGA", 30, 800, 480, 37037, 40, 60, 10, 10, 20, 10,
+@@ -324,25 +384,54 @@
+ 	},
+ };
+ 
++struct LCDControl {
++  int rsc;   // Reverse Scan Control
++  int sel68; // LVDS 6/8 bit select
++} static const kLCDConfiguration[] = {
++  { // kG150XGE_L04
++    .rsc   = 1, // normal scan
++    .sel68 = 0  // 8 bit
++  },
++  { // kG150XG01
++    .rsc   = 0, // normal scan
++    .sel68 = 0  // 8 bit
++  },
++  { // kNLB150XG01L_01
++    .rsc   = 0, // normal scan
++    .sel68 = 0  // 8 bit
++  },
++  { // kCLAA_WVGA
++    .rsc   = 0,
++    .sel68 = 0
++  },
++};
++
+ enum LCDModel {
+-	kG150XGE_L04 = 0,
+-	kG150XG01    = 1,
+-	kCLAA_WVGA   = 2
++	kG150XGE_L04    = 0,
++	kG150XG01       = 1,
++	kNLB150XG01L_01 = 2,
++	kCLAA_WVGA      = 3,
++	kLcdAmount      = 4, // must be the last
+ };
+ 
+ static struct mxc_fb_platform_data fb_data[] = {
+ 	{
+-		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
++		.interface_pix_fmt = IPU_PIX_FMT_RGB24, // IPU_PIX_FMT_RGBA32
+ 		.mode_str          = "G150XGE-L04",
+ 		.mode              = video_modes,
+ 		.num_modes         = ARRAY_SIZE(video_modes),
+ 	}, {
+-		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
++		.interface_pix_fmt = IPU_PIX_FMT_RGB24, // IPU_PIX_FMT_RGBA32
+ 		.mode_str          = "G150XG01",
+ 		.mode              = video_modes,
+ 		.num_modes         = ARRAY_SIZE(video_modes),
++  }, {
++		.interface_pix_fmt = IPU_PIX_FMT_RGB24, // IPU_PIX_FMT_RGBA32
++		.mode_str          = "NLB150XG01L-01",
++		.mode              = video_modes,
++		.num_modes         = ARRAY_SIZE(video_modes),
+ 	}, {
+-		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
++		.interface_pix_fmt = IPU_PIX_FMT_RGB24, // IPU_PIX_FMT_RGBA32
+ 		.mode_str          = "CLAA-WVGA",
+ 		.mode              = video_modes,
+ 		.num_modes         = ARRAY_SIZE(video_modes),
+@@ -359,8 +448,9 @@
+ 
+ static void mx53_regiboard_init_fb(int lcd_id, int fb_dev_id)
+ {
+-	const int kDevNum = 3; // ARRAY_SIZE(mxc_fb_devices);
++	const int kDevNum = kLcdAmount; // ARRAY_SIZE(mxc_fb_devices);
+ 	const int kLCDNum = ARRAY_SIZE(fb_data);
++  const struct LCDControl *lcd_ctl;
+ 	if (fb_dev_id >= kDevNum)
+ 		fb_dev_id = kDevNum - 1;
+ 	if (lcd_id >= kLCDNum) {
+@@ -369,14 +459,14 @@
+ 	}
+ 	printk("Regiboard LCD setup: %s\n", fb_data[lcd_id].mode_str);
+ 	// LVDS disp  (X27): fb_dev_id = 0
+-	if (lcd_id == kG150XG01) {
+-		int gpio_err;
+-		if (gpio_request(LVDS0_DPS, "lvds_dps") == 0)
+-			gpio_err = gpio_direction_output(LVDS0_DPS, 0);   // Normal scan
+-		printk("* REV pin error: %d\n", gpio_err);
+-		if (gpio_request(LVDS0_SEL68, "lvds_sel68") == 0)
+-			gpio_err = gpio_direction_output(LVDS0_SEL68, 0); // 8 bit input
+-		printk("* SEL68 pin error: %d\n", gpio_err);
++	lcd_ctl = &kLCDConfiguration[lcd_id];
++	if (gpio_request(LVDS0_DPS, "lvds_dps") == 0 &&
++	    gpio_direction_output(LVDS0_DPS, lcd_ctl->rsc) == 0) {
++  	printk("* REV pin: %d\n", lcd_ctl->rsc);
++	}
++	if (gpio_request(LVDS0_SEL68, "lvds_sel68") == 0 &&
++	    gpio_direction_output(LVDS0_SEL68, lcd_ctl->sel68) == 0) {
++  	printk("* SEL68 pin: %d\n", lcd_ctl->sel68);
+ 	}
+ 	// Paral disp (X26): ...
+ 	// ...        (X25): ...
+@@ -384,6 +474,19 @@
+ 	mxc_fb_devices[fb_dev_id].resource      = mxcfb_resources;
+ 	mxc_register_device(&mxc_fb_devices[fb_dev_id], &fb_data[lcd_id]);
+ }
++
++static int mx53_detect_lcd_model()
++{
++  int id;
++  printk("Regiboard trying to detect LCD:\n");
++  for (id = 0; id < kLcdAmount; id++) {
++    printk("* %d - %s\n", id, fb_data[id].mode_str);
++    if (strstr(saved_command_line, fb_data[id].mode_str) != 0)
++      return id;
++  }
++  printk("Regiboard LCD was not detected!\n");
++  return kCLAA_WVGA;
++}
+ /* NAND ***********************************************************************/
+ // Micron MT29F4G08ABAEA: 512Mb, 8-bit, 3.3V
+ // * Type.: SLC
+@@ -486,7 +589,7 @@
+ 
+ static int mxc_mt29f_nand_init(void)
+ {
+-	u32 i, reg;
++//	u32 i, reg;
+ 	void __iomem *m4if_base;
+ 	void __iomem *eim_base;
+ 	void __iomem *nfc_base;
+@@ -732,7 +835,7 @@
+ 	printk("Regiboard devices init...\n");
+ 	/* iMX53 diagnostic interface */
+ // 	platform_device_register(&mx53_diagnostic_device);
+-//	mxc_register_device(&imx_ahci_device_hwmon, NULL);
++	mxc_register_device(&imx_ahci_device_hwmon, NULL);
+ 	/* I2C devices */
+ 	i2c_register_board_info(0, mxc_i2c1_board_info, ARRAY_SIZE(mxc_i2c1_board_info));
+   i2c_register_board_info(2, mxc_i2c3_board_info, ARRAY_SIZE(mxc_i2c3_board_info));
+@@ -761,5 +864,7 @@
+ 	mxc_register_device(&mxc_nandv2_mtd_device, &mxc_nand_data);
+ 	/* LCD */
+ //	mx53_regiboard_init_fb(kG150XGE_L04, 0); // 0 - LVDS; Main 15" display
+-	mx53_regiboard_init_fb(kG150XG01, 0); // 0 - LVDS; Alt0 15" display
++//	mx53_regiboard_init_fb(kG150XG01, 0); // 0 - LVDS; Alt_0 15" display
++//	mx53_regiboard_init_fb(kNLB150XG01L_01, 0); // 0 - LVDS; Alt_1 15" display
++  mx53_regiboard_init_fb(mx53_detect_lcd_model(), 0);
+ }
