@@ -4,31 +4,40 @@
 #
 
 BOARD_NAME=$(cat /proc/cpuinfo | grep -E 'Hardware(.*):(.*)' | sed -r 's/(.+): (.+)/\2/g') #'
+BOARD_ID=$(cat /proc/cmdline | grep -Eo 'board=([0-9\.]+)' | sed -r 's/board=//g')
 HW_ADDR=$(cat /etc/hwaddr)
+REGIGRAF_PKG=$(ipkg-cl list_installed | grep regigraf)
+
+BOARD_ID=${BOARD_ID:='unknown'}
 
 case "$1" in
   start)
- 	echo "Starting network..."
-	#/sbin/ifup -a
-	/sbin/ifconfig lo up 127.0.0.1
-	/sbin/ifconfig eth0 up hw ether $HW_ADDR
-	# Hack
-#	if [ "$BOARD_NAME" != 'MX53 Regiboard' ]; then
-#		ethtool -s eth0 speed 10 duplex half
-#	fi
-	udhcpc -b -A 2147483647
-	;;
+    echo "Starting network..."
+    #/sbin/ifup -a
+    /sbin/ifconfig lo up 127.0.0.1
+    /sbin/ifconfig eth0 up hw ether $HW_ADDR
+    # Hack
+    #	if [ "$BOARD_NAME" != 'MX53 Regiboard' ]; then
+    #		ethtool -s eth0 speed 10 duplex half
+    #	fi
+    udhcpc -b -A 2147483647
+    if [ "$REGIGRAF_PKG" == '' ]; then
+      echo "Regigraf 1772 ($BOARD_NAME): ID: ${BOARD_ID}" > /dev/tty0
+      echo "--------------------------------------------"
+      ifconfig > /dev/tty0
+    fi
+    ;;
   stop)
-	echo -n "Stopping network..."
-	/sbin/ifdown -a
-	;;
+    echo -n "Stopping network..."
+    /sbin/ifdown -a
+    ;;
   restart|reload)
-	"$0" stop
-	"$0" start
-	;;
+    "$0" stop
+    "$0" start
+    ;;
   *)
-	echo "Usage: $0 {start|stop|restart}"
-	exit 1
+    echo "Usage: $0 {start|stop|restart}"
+    exit 1
 esac
 
 exit $?

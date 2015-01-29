@@ -12,6 +12,58 @@
 
 //#define MODBUS_TCP
 
+void PrintRegs(uint16_t *regs, size_t amount) {
+  for (size_t i = 0; i < amount; i++) {
+    printf("reg[%d]=%d (0x%X)\n", i, regs[i], regs[i]);
+  }
+}
+
+int SendRequest_0x3(modbus_t *ctx, unsigned cmd_id, size_t amount, uint16_t *out) {
+  const int kRes = modbus_read_registers(ctx, cmd_id, amount, out);
+  if (kRes == -1) {
+      fprintf(stderr, "READ ERROR: [%u]: %s\n", cmd_id, modbus_strerror(errno));
+      return kRes;
+  }
+  return kRes;
+}
+
+int SendRequest_0x4(modbus_t *ctx, unsigned cmd_id, size_t amount, uint16_t *out) {
+  const int kRes = modbus_read_input_registers(ctx, cmd_id, amount, out);
+  if (kRes == -1) {
+      fprintf(stderr, "READ ERROR: [%u]: %s\n", cmd_id, modbus_strerror(errno));
+      return kRes;
+  }
+  return kRes;
+}
+
+bool ReadID(modbus_t *ctx) {
+  uint16_t tab_reg[64];
+  const int kRes = SendRequest_0x3(ctx, GET_FEID, 0x1, tab_reg);
+  if (kRes < 1)
+    return false;
+  PrintRegs(tab_reg, kRes);
+  return true;
+}
+
+bool ReadColdJunction(modbus_t *ctx) {
+  uint16_t tab_reg[64];
+  const int kRes = SendRequest_0x4(ctx, GET_COLDJUNCTION_TEMP(1), 0x2, tab_reg);
+  if (kRes < 1)
+    return false;
+  PrintRegs(tab_reg, kRes);
+  union U16toFloat {
+    uint16_t u16[2];
+    float    real;
+  };
+  U16toFloat temp;
+  temp.u16[0] = tab_reg[1];
+  temp.u16[1] = tab_reg[0];
+  //float *temp = reinterpret_cast<float*>(tab_reg);
+  std::cout << "temp: " << std::fixed << temp.real
+            << std::endl;
+  return true;
+}
+
 int main(int argc, char *argv[]) {
   uint16_t           tab_reg[64];
   std::stringstream  buf;
@@ -46,14 +98,8 @@ int main(int argc, char *argv[]) {
       return -1;
   }
   modbus_set_response_timeout(ctx, 1, 0);
-  rc = modbus_read_registers(ctx, GET_FEID, 0x1, tab_reg);
-  if (rc == -1) {
-      fprintf(stderr, "READ ERROR: %s\n", modbus_strerror(errno));
-      return -1;
-  }
-  for (i=0; i < rc; i++) {
-      printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
-  }
+  ReadID(ctx);
+  ReadColdJunction(ctx);
   modbus_close(ctx);
   modbus_free(ctx);
 }
