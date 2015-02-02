@@ -1,6 +1,7 @@
 #include "sdp.hpp"
 #include "ymodem.hpp"
 #include "tftp.hpp"
+#include <iostream>
 #include <list>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
