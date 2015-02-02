@@ -56,7 +56,7 @@ FONT_BOLD='\033[1m'
 FONT_UNDER='\033[4m'
 ESC_RESET='\033[0m'
 
-# Function for cheking variable definition.
+# Function for checking variable definition.
 #   < value of variable
 IsDefined() {
 	if [ "$1" = "" ]; then

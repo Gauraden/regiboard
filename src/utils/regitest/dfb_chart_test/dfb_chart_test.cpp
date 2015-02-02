@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include "dfb_cairo.hpp"
-#include <time.h>
 #include <string>
 #include <list>
 #include <cmath>
 #include <boost/shared_ptr.hpp>
+#include "../regitest_time.hpp"
 
 static int screen_w = 1;
 static int screen_h = 1;
@@ -12,38 +12,6 @@ static int screen_h = 1;
 static const Color kBgColorCairo(180, 180, 180, 255);
 static const Color kBgColorDfb(100, 100, 100, 255);
 static const Color kTrendColor(255, 255, 255, 255);
-
-class Clock {
-  public:
-    typedef long long int USec;
-    Clock() {
-      clock_gettime(CLOCK_MONOTONIC, &ts);
-    }
-    USec GetInUSec() const {
-      return ((ts.tv_sec * 1000000) + (ts.tv_nsec / 1000));
-    }
-    USec GetDiff(const Clock &with) const {
-      return (GetInUSec() - with.GetInUSec());
-    }
-    USec MeasureAndPrint(const std::string &test,
-                         const std::string &stage,
-                         unsigned           amount) const {
-      if (amount < 1)
-        amount = 1;
-      const USec kResTm = Clock().GetDiff(*this) / amount;
-      std::cout << "\t * " << test << ": " << stage << ": "
-                << "[" << amount << "] "
-                << kResTm << " usec"
-                << std::endl;
-      return kResTm;
-    }
-    USec MeasureAndPrint(const std::string &test,
-                         const std::string &stage) const {
-      return MeasureAndPrint(test, stage, 1);
-    }
-  private:
-    struct timespec ts;
-};
 
 class Trend {
   public:

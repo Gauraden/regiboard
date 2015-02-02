@@ -7,6 +7,7 @@ add_executable(modbus_test
 
 target_link_libraries(modbus_test
 	modbus
+	rt
 )
 
 INSTALL(TARGETS modbus_test
