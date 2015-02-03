@@ -70,8 +70,7 @@ struct SysInfo {
 };
 
 static void PrintSysInfo(const SysInfo &inf) {
-  std::cout << "--- Описание --------------------------" << std::endl
-            << "Описание:\n"
+  std::cout << "Описание:\n"
             << "\t* Плата....: " << inf.board << "\n"
             << "\t* Загрузчик: " << inf.u_boot_build << " (U-Boot)\n"
             << "\t* Процессор: " << inf.cpu << "\n"
@@ -171,8 +170,6 @@ static bool UploadKernel(boost::asio::serial_port &port, const std::string &file
   SendCmd(port, "print");
   ParseUntil(port, "Regiboard U-Boot >", &inf);
   PrintSysInfo(inf);
-  
-  
   std::cout << "Загрузка ядра Linux..." << std::endl;
   SendCmd(port, "loady " + inf.uboot.loadaddr + " 115200; bootm " + inf.uboot.loadaddr);
   SkipLines(port, 2);
@@ -196,8 +193,8 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
              "путь к устройству COM")
 		("img",  po::value<std::string>()->default_value("u-boot.imx"),
              "путь к образу загрузчика u-boot")
-		("kernel", po::value<std::string>()->default_value("uImage.bin"),
-             "путь к образу ядра Linux");
+		("kernel", po::value<std::string>()->default_value(""),
+             "путь к образу ядра Linux. Ядро не будет загружено если не указать файл");
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
 	po::notify(vm);
@@ -217,7 +214,7 @@ int main(int argc, char **argv) {
     return 0;
   boost::asio::io_service io_service;
   boost::asio::serial_port port(io_service, set.tty_dev);
-  std::cout << "Порт \"" << kTtyDev << "\": "
+  std::cout << "Порт \"" << set.tty_dev << "\": "
             << (port.is_open() ? "открыт" : "закрыт") << std::endl;
   port.set_option( boost::asio::serial_port_base::baud_rate(115200) );
   port.set_option( boost::asio::serial_port_base::character_size(8) );
@@ -225,7 +222,8 @@ int main(int argc, char **argv) {
   port.set_option( boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none) );
   port.set_option( boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none) );
   if (PktStatus().Send(port) && 
-      UploadUBoot(port, set.imx_img)) {
+      UploadUBoot(port, set.imx_img) &&
+      set.kernel_img.size() > 0) {
     UploadKernel(port, set.kernel_img);
   }
   port.close();
