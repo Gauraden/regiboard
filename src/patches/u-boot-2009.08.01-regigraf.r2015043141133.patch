@@ -1,0 +1,297 @@
+--- ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/flash_header.S.orig	2014-05-07 16:30:15.000000000 +0400
++++ ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/flash_header.S	2015-02-11 12:48:06.440874315 +0300
+@@ -17,8 +17,9 @@
+  * MA 02111-1307 USA
+  */
+ 
+-#include <config.h>
++//#include <config.h>
+ #include <asm/arch/mx53.h>
++#include "esdctl_regs.h"
+ 
+ #define REG_LD_AND_STR_INIT(base)	\
+ 	ldr r0, =base;
+@@ -105,37 +106,79 @@
+ 
+ 	/* ESDCTL */
+ 	REG_LD_AND_STR_INIT(ESDCTL_BASE_ADDR)
+-	REG_LD_AND_STR_OP(25, 0x088, 0x35343535)
+-	REG_LD_AND_STR_OP(26, 0x090, 0x4d444c44)
+-	REG_LD_AND_STR_OP(27, 0x07c, 0x01370138)
+-	REG_LD_AND_STR_OP(28, 0x080, 0x013b013c)
+-	REG_LD_AND_STR_OP(29, 0x018, 0x00001740)
+-	REG_LD_AND_STR_OP(30, 0x000, 0xc3190000)
+-/*	REG_LD_AND_STR_OP(31, 0x00c, 0x9f5152e3) */
+-	REG_LD_AND_STR_OP(31, 0x00c, 0x404452e3)
+-	
+-/*	REG_LD_AND_STR_OP(32, 0x010, 0xb68e8a63) */
+-	REG_LD_AND_STR_OP(32, 0x010, 0xb68e8a63)
+-
+-	REG_LD_AND_STR_OP(33, 0x014, 0x01ff00db)
+-	REG_LD_AND_STR_OP(34, 0x02c, 0x000026d2)
+-	REG_LD_AND_STR_OP(35, 0x030, 0x009f0e21)
+-	REG_LD_AND_STR_OP(36, 0x008, 0x12273030)
+-	REG_LD_AND_STR_OP(37, 0x004, 0x0002002d)
+-	REG_LD_AND_STR_OP(38, 0x01c, 0x00008032)
+-	REG_LD_AND_STR_OP(39, 0x01c, 0x00008033)
+-	REG_LD_AND_STR_OP(40, 0x01c, 0x00028031)
+-	REG_LD_AND_STR_OP(41, 0x01c, 0x052080b0)
+-	REG_LD_AND_STR_OP(42, 0x01c, 0x04008040)
+-	REG_LD_AND_STR_OP(43, 0x01c, 0x0000803a)
+-	REG_LD_AND_STR_OP(44, 0x01c, 0x0000803b)
+-	REG_LD_AND_STR_OP(45, 0x01c, 0x00028039)
+-	REG_LD_AND_STR_OP(46, 0x01c, 0x05208138)
+-	REG_LD_AND_STR_OP(47, 0x01c, 0x04008048)
+-	REG_LD_AND_STR_OP(48, 0x020, 0x00005800)
+-	REG_LD_AND_STR_OP(49, 0x040, 0x04b80003)
+-	REG_LD_AND_STR_OP(50, 0x058, 0x00022227)
+-	REG_LD_AND_STR_OP(51, 0x01C, 0x00000000)
++	REG_LD_AND_STR_OP(25, RDDLCTL, 0x35343535)
++	REG_LD_AND_STR_OP(26, WRDLCTL, 0x4d444c44)
++	REG_LD_AND_STR_OP(27, DGCTRL0, 0x01370138)
++	REG_LD_AND_STR_OP(28, DGCTRL1, 0x013b013c)
++	// --- iMX53 QSB -------------------------------------------------------------
++  REG_LD_AND_STR_OP(29, ESDMISC, 0x00001740)
++  REG_LD_AND_STR_OP(30,  ESDCTL, 0xc3190000)
++  REG_LD_AND_STR_OP(31, ESDCFG0, 0x404452e3)
++  REG_LD_AND_STR_OP(32, ESDCFG1, 0xb68e8a63)
++  REG_LD_AND_STR_OP(33, ESDCFG2, 0x01ff00db)
++	REG_LD_AND_STR_OP(34, ESDRWD, 0x000026d2)
++  REG_LD_AND_STR_OP(35,  ESDOR, 0x009f0e21)
++  REG_LD_AND_STR_OP(36, ESDOTC, 0x12273030)
++	REG_LD_AND_STR_OP(37, ESDPDC, 0x0002002d)
++  // --- iMX53 regiboard -------------------------------------------------------
++  /*
++  REG_LD_AND_STR_OP(29, ESDMISC, DDR_TYPE_DDR3 
++                               | DDR_RALAT(5)
++                               | DDR_MIF3_MODE(3) 
++                               | DDR_BI_ON)
++  REG_LD_AND_STR_OP(30,  ESDCTL, DDR_DSIZ_32
++                               | DDR_BL_8
++                               | DDR_COL_10bit 
++                               | DDR_ROW_14bit
++                               | DDR_SDE_1
++                               | DDR_SDE_0)
++  REG_LD_AND_STR_OP(31, ESDCFG0, DDR_CL(tCL)
++                               | DDR_FAW(tFAW)
++                               | DDR_XPDLL(tXPDLL)
++                               | DDR_XP(tXP)
++                               | DDR_XS(tXS)
++                               | DDR_RFC(tRFC))
++  REG_LD_AND_STR_OP(32, ESDCFG1, DDR_CWL_DDR3(tCWL)
++                               | DDR_MRD(tMRD)
++                               | DDR_WR(tWR)
++                               | DDR_RPA_RP
++                               | DDR_RAS(tRAS)
++                               | DDR_RC(tRC)
++                               | DDR_RP(tRP)
++                               | DDR_RCD(tRCD))
++  REG_LD_AND_STR_OP(33, ESDCFG2, DDR_RRD(tRRD)
++                               | DDR_WTR(tWTR)
++                               | DDR_RTP(tRTP) 
++                               | DDR_DLLK(tDLLK))
++	REG_LD_AND_STR_OP(34, ESDRWD, 0x000026d2)
++  REG_LD_AND_STR_OP(35,  ESDOR, DDR_RST_CKE_DDR3
++                              | DDR_SDE_RST_DDR3
++                              | DDR_XPR(tXPR))
++  REG_LD_AND_STR_OP(36, ESDOTC, DDR_AOFPD(tAOFPD)
++                              | DDR_AONPD(tAONPD)
++                              | DDR_ANPD(tANPD)
++                              | DDR_AXPD(tAXPD)
++                              | DDR_ODTLon(tODTLon)
++                              | DDR_ODT_idle(tODT_idle_off))
++	REG_LD_AND_STR_OP(37, ESDPDC, DDR_CKE(tCKE)
++	                            | DDR_CKSRX(tCKSRX)
++	                            | DDR_CKSRE(tCKSRE))
++	                            */
++  // ---------------------------------------------------------------------------
++	REG_LD_AND_STR_OP(38, ESDSCR, 0x00008032)
++	REG_LD_AND_STR_OP(39, ESDSCR, 0x00008033)
++	REG_LD_AND_STR_OP(40, ESDSCR, 0x00028031)
++	REG_LD_AND_STR_OP(41, ESDSCR, 0x052080b0)
++	REG_LD_AND_STR_OP(42, ESDSCR, 0x04008040)
++	REG_LD_AND_STR_OP(43, ESDSCR, 0x0000803a)
++	REG_LD_AND_STR_OP(44, ESDSCR, 0x0000803b)
++	REG_LD_AND_STR_OP(45, ESDSCR, 0x00028039)
++	REG_LD_AND_STR_OP(46, ESDSCR, 0x05208138)
++	REG_LD_AND_STR_OP(47, ESDSCR, 0x04008048)
++	REG_LD_AND_STR_OP(48, ESDREF, 0x00005800)
++	REG_LD_AND_STR_OP(49, ZQHWCTRL, 0x04b80003)
++	REG_LD_AND_STR_OP(50, ODTCTRL, 0x00022227)
++	REG_LD_AND_STR_OP(51, ESDSCR, 0x00000000)
+ 	REG_LD_AND_STR_END(ESDCTL_BASE_ADDR)
+ 
+ /*
+--- ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/esdctl_regs.h.orig	2014-12-19 09:15:19.621767350 +0300
++++ ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/esdctl_regs.h	2015-02-11 12:47:53.753033823 +0300
+@@ -0,0 +1,145 @@
++// ESDCTL registers
++// CONFIG_SYS_PLL2_FREQ
++#include <config.h>
++// Functions
++#define SET_BIT(val, mask, offs) ((val & mask) << offs)
++#define nCK(ns)        (((ns % tCK) > 0) + (ns / tCK))
++#define MAX(ck0, ck1)  (((ck0 > ck1) * ck0) + ((ck0 < ck1) * ck1) + ((ck0 == ck1) * ck0))
++#define MAXnCK(ck, ns) MAX(ck, nCK(ns))
++#define AVG(min, max) ((min + max) / 2)
++// Timings: all "ns" was multiplied by 100
++#define tCK     250 // (2.5 * 100 ns) <- 400MHz; (3 * 100 ns) <- 333MHz
++#define tCL     6
++#define tCWL    5
++#define tMRD    4
++#define tDLLK   512
++#define tCAS    tCL
++
++#define tRFCns  16000       // 160 * 100 ns
++#define tREFI   (7800 * 100) // 7.8 usec * 100 nsec
++#define tRCD    nCK(1375)   // 13.75 * 100 ns
++#define tRP     nCK(1375)   // 13.75 * 100 ns
++#define tRAS    nCK(3500)   // (35, 9*tREFI) * 100 ns
++#define tRC     nCK(4875)   // 48.75 * 100 ns
++#define tFAW_1K nCK(3000)   // 30 * 100 ns
++#define tFAW_2K nCK(4000)   // 40 * 100 ns
++#define tFAW    tFAW_2K
++#define tRFC    nCK(tRFCns) // tRFCns / tCK
++#define tWR     nCK(1500) //-> nCK(1200)   // 12 * 100 ns
++#define tXPDLL  MAXnCK(10, 2400) // 24 * 100 ns
++#define tXP     MAXnCK( 3,  600) // 6 * 100 ns
++#define tXPR    MAXnCK( 5, (tRFCns + 1000)) // 10 * 100 ns
++#define tXS     MAXnCK( 5, (tRFCns + 1000)) // 10 * 100 ns
++#define tRRD_1K MAXnCK( 4,  600) // 6 * 100 ns
++#define tRRD_2K MAXnCK( 4,  750) // 7.5 * 100 ns
++#define tRRD    tRRD_2K
++#define tWTR    MAXnCK( 4,  750) // 7.5 * 100 ns
++#define tRTP    MAXnCK( 4,  750) // 7.5 * 100 ns
++#define tCKE    MAXnCK( 3,  500) // 5 * 100 ns
++#define tCKSRX  MAXnCK( 5, 1000) // 10 * 100 ns
++#define tCKSRE  MAXnCK( 5, 1000) // 10 * 100 ns
++
++#define tAOFPD        nCK(200) // (2 ... 8.5) * 100 ns
++#define tAONPD        nCK(200) // (2 ... 8.5) * 100 ns
++#define tANPD         (tCWL - 1)
++#define tAXPD         tANPD
++#define tODTLon       tANPD
++#define tODT_idle_off tANPD
++// Adresses
++#define ESDCTL   0x000
++#define ESDPDC   0x004
++#define ESDOTC   0x008
++#define ESDCFG0  0x00C
++#define ESDCFG1  0x010
++#define ESDCFG2  0x014
++#define ESDMISC  0x018
++#define ESDSCR   0x01C
++#define ESDREF   0x020
++#define ESDRWD   0x02C
++#define ESDOR    0x030
++#define ZQHWCTRL 0x040
++#define ODTCTRL  0x058
++#define DGCTRL0  0x07C
++#define DGCTRL1  0x080
++#define RDDLCTL  0x088
++#define WRDLCTL  0x090
++// ESDCTL
++#define DDR_SDE_0          SET_BIT(  1, 0x1, 31)
++#define DDR_SDE_1          SET_BIT(  1, 0x1, 30)
++#define DDR_ROW(val)       SET_BIT(val, 0x7, 24)
++#define DDR_ROW_11bit      DDR_ROW(0x0)
++#define DDR_ROW_12bit      DDR_ROW(0x1)
++#define DDR_ROW_13bit      DDR_ROW(0x2)
++#define DDR_ROW_14bit      DDR_ROW(0x3) // +
++#define DDR_ROW_15bit      DDR_ROW(0x4)
++#define DDR_ROW_16bit      DDR_ROW(0x5)
++#define DDR_COL(val)       SET_BIT(val, 0x7, 20)
++#define DDR_COL_8bit       DDR_COL(0x3)
++#define DDR_COL_9bit       DDR_COL(0x0)
++#define DDR_COL_10bit      DDR_COL(0x1) // +
++#define DDR_COL_11bit      DDR_COL(0x2)
++#define DDR_COL_12bit      DDR_COL(0x4)
++#define DDR_BL_8           SET_BIT(  1, 0x1, 19)
++#define DDR_DSIZ_16        SET_BIT(  0, 0x1, 16)
++#define DDR_DSIZ_32        SET_BIT(  1, 0x1, 16) // +
++// ESDPDC :
++#define DDR_PRCT_1(val)    SET_BIT(      val, 0x7, 28)
++#define DDR_PRCT_0(val)    SET_BIT(      val, 0x7, 24)
++#define DDR_CKE(val)       SET_BIT((val - 1), 0x7, 16)
++#define DDR_PWDT_1(val)    SET_BIT(      val, 0xF, 12)
++#define DDR_PWDT_0(val)    SET_BIT(      val, 0xF,  8)
++#define DDR_SLOW_PD        SET_BIT(        1, 0x1,  7)
++#define DDR_BOTH_CS_PD     SET_BIT(        1, 0x1,  6)
++#define DDR_CKSRX(val)     SET_BIT(      val, 0x7,  3)
++#define DDR_CKSRE(val)     SET_BIT(      val, 0x7,  0)
++// ESDOTC :
++#define DDR_AOFPD(val)     SET_BIT((val - 1), 0x7,  27)
++#define DDR_AONPD(val)     SET_BIT((val - 1), 0x7,  24)
++#define DDR_ANPD(val)      SET_BIT((val - 1), 0xF,  20)
++#define DDR_AXPD(val)      SET_BIT((val - 1), 0xF,  16)
++#define DDR_ODTLon(val)    SET_BIT(      val, 0x7,  12)
++#define DDR_ODT_idle(val)  SET_BIT(      val, 0x1F,  4)
++// ESDCFG0: 0x404452e3
++#define DDR_RFC(val)       SET_BIT((val - 1), 0xFF, 24)
++#define DDR_XS(val)        SET_BIT((val - 1), 0xFF, 16)
++#define DDR_XP(val)        SET_BIT((val - 1), 0x7,  13)
++#define DDR_XPDLL(val)     SET_BIT((val - 1), 0xF,   9)
++#define DDR_FAW(val)       SET_BIT((val - 1), 0x1F,  4)
++#define DDR_CL(val)        SET_BIT((val - 3), 0xF,   0)
++// ESDCFG1: 0xb68e8a63
++#define DDR_RCD(val)       SET_BIT((val - 1), 0x7,  29)
++#define DDR_RP(val)        SET_BIT((val - 1), 0x7,  26)
++#define DDR_RC(val)        SET_BIT((val - 1), 0x1F, 21)
++#define DDR_RAS(val)       SET_BIT((val - 1), 0x1F, 16)
++#define DDR_RPA_RP         SET_BIT(        0, 0x1,  15)
++#define DDR_RPA_RP_1       SET_BIT(        1, 0x1,  15)
++#define DDR_WR(val)        SET_BIT((val - 1), 0x7,   9)
++#define DDR_MRD(val)       SET_BIT((val - 1), 0xF,   5)
++#define DDR_CWL_DDR3(val)  SET_BIT((val - 2), 0x7,   0) // +
++#define DDR_CWL_DDR2(val)  DDR_CWL_DDR3(val)
++#define DDR_CWL_LPDDR2(val) DDR_CWL_DDR3(val + 1)
++// ESDCFG2: 0x01ff00db
++#define DDR_DLLK(val)      SET_BIT((val - 1), 0x1FF, 16)
++#define DDR_RTP(val)       SET_BIT((val - 1), 0x7,    6)
++#define DDR_WTR(val)       SET_BIT((val - 1), 0x7,    3)
++#define DDR_RRD(val)       SET_BIT((val - 1), 0x7,    0)
++// ESDMISC
++#define DDR_BI_ON          SET_BIT(  1, 0x1, 12)
++#define DDR_MIF3_MODE(val) SET_BIT(val, 0x3,  9)  // 3 - 11
++#define DDR_RALAT(val)     SET_BIT(val, 0x7,  6)  // 5
++#define DDR_4_BANK         SET_BIT(  1, 0x1,  5)
++#define DDR_TYPE(val)      SET_BIT(val, 0x3,  3)
++#define DDR_TYPE_DDR3      DDR_TYPE(0x0) // +
++#define DDR_TYPE_LPDDR2    DDR_TYPE(0x1)
++#define DDR_TYPE_DDR2      DDR_TYPE(0x2)
++// ESDOR  :
++#define DDR_XPR(val)       SET_BIT((val - 1), 0xFF, 16)
++#define DDR_SDE_RST(val)   SET_BIT((val + 1), 0x3F,  8)
++#define DDR_SDE_RST_DDR3   DDR_SDE_RST(13)
++#define DDR_RST_CKE(val)   SET_BIT((val + 1), 0x3F,  0)
++#define DDR_RST_CKE_DDR3   DDR_RST_CKE(32)
++// ESDSCR :
++#define CMD_ADDR_MSB(val)  SET_BIT(val, 0xFF, 24)
++#define CMD_ADDR_LSB(val)  SET_BIT(val, 0xFF, 16)
++
++
+--- ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/lowlevel_init.S.orig	2014-12-12 16:33:04.000000000 +0300
++++ ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/lowlevel_init.S	2015-02-11 11:54:58.724949330 +0300
+@@ -256,6 +256,9 @@
+ W_DP_OP_400:            .word DP_OP_400
+ W_DP_MFD_400:           .word DP_MFD_400
+ W_DP_MFN_400:           .word DP_MFN_400
++W_DP_OP_333:            .word DP_OP_333
++W_DP_MFD_333:           .word DP_MFD_333
++W_DP_MFN_333:           .word DP_MFN_333
+ W_DP_OP_304:            .word DP_OP_304
+ W_DP_MFD_304:           .word DP_MFD_304
+ W_DP_MFN_304:           .word DP_MFN_304
+--- ./build/u-boot-2009.08.01-regigraf/include/asm-arm/arch-mx53/mx53.h.orig	2014-12-12 13:36:22.000000000 +0300
++++ ./build/u-boot-2009.08.01-regigraf/include/asm-arm/arch-mx53/mx53.h	2015-02-11 10:26:51.955413024 +0300
+@@ -400,6 +400,10 @@
+ #define DP_MFD_400      (3 - 1)
+ #define DP_MFN_400      1
+ 
++#define DP_OP_333       ((10 << 4) + ((3 - 1) << 0))
++#define DP_MFD_333      (5 - 1) 
++#define DP_MFN_333      2
++
+ #define DP_OP_304       ((6 << 4) + ((2 - 1)  << 0))
+ #define DP_MFD_304      (3 - 1)
+ #define DP_MFN_304      1

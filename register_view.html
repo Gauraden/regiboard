@@ -1,0 +1,343 @@
+<html>
+  <head>
+    <style type="text/css">
+      body  {
+        font-family: "Courier New", Courier, monospace;
+      }
+      
+      label {
+        width  : 200px;
+        display: inline-block;
+      }
+    </style>
+    <script type="text/javascript">
+    devices = {
+      "iMX53": {
+        "ESDCTL": {
+          "ESDCTL": {
+            "offs" : 0x0,
+            "field": {
+              31: {"name": "SDE_0", "bits": 1, "info": ""},
+              30: {"name": "SDE_1", "bits": 1, "info": ""},
+              24: {"name": "ROW",   "bits": 3, "info": ""},
+              20: {"name": "COL",   "bits": 3, "info": ""},
+              19: {"name": "BL",    "bits": 1, "info": ""},
+              16: {"name": "DSIZ",  "bits": 1, "info": ""}
+          }}, // ESDCTL - register
+          "ESDPDC": {
+            "offs" : 0x4,
+            "field": {
+              28: {"name": "PRCT_1",     "bits": 3, "info": ""},
+              24: {"name": "PRCT_0",     "bits": 3, "info": ""},
+              16: {"name": "tCKE",       "bits": 3, "info": ""},
+              12: {"name": "PWDT_1",     "bits": 4, "info": ""},
+               8: {"name": "PWDT_0",     "bits": 4, "info": ""},
+               7: {"name": "SLOW_PD",    "bits": 1, "info": ""},
+               6: {"name": "BOTH_CS_PD", "bits": 1, "info": ""},
+               3: {"name": "tCKSRX",     "bits": 3, "info": ""},
+               0: {"name": "tCKSRE",     "bits": 3, "info": ""}
+          }}, // ESDPDC - register
+          "ESDOTC": {
+            "offs" : 0x8,
+            "field": {
+              27: {"name": "tAOFPD",        "bits": 3, "info": ""},
+              24: {"name": "tAONPD",        "bits": 3, "info": ""},
+              20: {"name": "tANPD",         "bits": 4, "info": ""},
+              16: {"name": "tAXPD",         "bits": 4, "info": ""},
+              12: {"name": "tODTLon",       "bits": 3, "info": ""},
+               4: {"name": "tODT_idle_off", "bits": 5, "info": ""}
+          }}, // ESDOTC - register
+          "ESDCFG0": {
+            "offs" : 0xC,
+            "field": {
+              24: {"name": "tRFC",        "bits": 8, "info": ""},
+              16: {"name": "tXS",         "bits": 8, "info": ""},
+              13: {"name": "tXP",         "bits": 3, "info": ""},
+               9: {"name": "tXPDLL",      "bits": 4, "info": ""},
+               4: {"name": "tFAW",        "bits": 5, "info": ""},
+               0: {"name": "tCL",         "bits": 4, "info": ""}
+          }}, // ESDCFG0 - register
+          "ESDCFG1": {
+            "offs" : 0x10,
+            "field": {
+              29: {"name": "tRCD",        "bits": 4, "info": ""},
+              26: {"name": "tRP",         "bits": 3, "info": ""},
+              21: {"name": "tRC",         "bits": 5, "info": ""},
+              16: {"name": "tRAS",        "bits": 5, "info": ""},
+              15: {"name": "tRPA",        "bits": 1, "info": ""},
+               9: {"name": "tWR",         "bits": 3, "info": ""},
+               5: {"name": "tMRD",        "bits": 4, "info": ""},
+               0: {"name": "tCWL",        "bits": 3, "info": ""}
+          }}, // ESDCFG1 - register
+          "ESDCFG2": {
+            "offs" : 0x14,
+            "field": {
+              16: {"name": "tDLLK",       "bits": 9, "info": ""},
+               6: {"name": "tRTP",        "bits": 3, "info": ""},
+               3: {"name": "tWTR",        "bits": 3, "info": ""},
+               0: {"name": "tRRD",        "bits": 3, "info": ""}
+          }}, // ESDCFG2 - register
+          "ESDMISC": {
+            "offs" : 0x18,
+            "field": {
+              31: {"name": "CS0_RDY",       "bits": 1, "info": ""},
+              30: {"name": "CS1_RDY",       "bits": 1, "info": ""},
+              20: {"name": "ONE_CS",        "bits": 1, "info": ""},
+              19: {"name": "ADDR_MIRROR",   "bits": 1, "info": ""},
+              18: {"name": "LHD",           "bits": 1, "info": ""},
+              16: {"name": "WALAT",         "bits": 2, "info": ""},
+              12: {"name": "BI_ON",         "bits": 1, "info": ""},
+              11: {"name": "LPDDR2_S2",     "bits": 1, "info": ""},
+               9: {"name": "MIF3_MODE",     "bits": 2, "info": ""},
+               6: {"name": "RALAT",         "bits": 3, "info": ""},
+               5: {"name": "DDR_4_BANK",    "bits": 1, "info": ""},
+               3: {"name": "DDR_TYPE",      "bits": 2, "info": ""},
+               1: {"name": "RST",           "bits": 1, "info": ""}
+          }}, // ESDMISC - registers
+          "ESDSCR": {
+            "offs" : 0x1C,
+            "field": {
+              24: {"name": "CMD_ADDR_MSB",        "bits": 8, "info": ""},
+              16: {"name": "CMD_ADDR_LSB",        "bits": 8, "info": ""},
+              15: {"name": "CON_REQ",             "bits": 1, "info": ""},
+              14: {"name": "CON_ACK",             "bits": 1, "info": ""},
+              10: {"name": "MRR_READ_DATA_VALID", "bits": 1, "info": ""},
+               9: {"name": "WL_EN",               "bits": 1, "info": ""},
+               4: {"name": "CMD",                 "bits": 3, "info": ""},
+               3: {"name": "CMD_CS",              "bits": 1, "info": ""},
+               0: {"name": "CMD_BA",              "bits": 3, "info": ""}
+          }}, // ESDSCR - register
+          "ESDREF": {
+            "offs" : 0x20,
+            "field": {
+              16: {"name": "REF_CNT",        "bits": 16,  "info": ""},
+              14: {"name": "REF_SEL",        "bits": 2, "info": ""},
+              11: {"name": "REFR",           "bits": 3, "info": ""},
+               0: {"name": "START_REF",      "bits": 1, "info": ""}
+          }}, // ESDREF - register
+          "ESDWCC": {
+            "offs" : 0x24,
+            "field": {
+              31: {"name": "WCC_EN",        "bits": 1,  "info": ""},
+              30: {"name": "WCC_RST",       "bits": 1,  "info": ""},
+               0: {"name": "WR_CMD_CNT",    "bits": 30, "info": ""}
+          }}, // ESDWCC - register
+          "ESDRCC": {
+            "offs" : 0x28,
+            "field": {
+              31: {"name": "RCC_EN",        "bits": 1,  "info": ""},
+              30: {"name": "RCC_RST",       "bits": 1,  "info": ""},
+               0: {"name": "RD_CMD_CNT",    "bits": 30, "info": ""}            
+          }}, // ESDRCC - register
+          "ESDRWD": {
+            "offs" : 0x2C,
+            "field": {
+              16: {"name": "tDAI",        "bits": 13,  "info": ""},
+              12: {"name": "RTW_SAME",    "bits": 3,  "info": ""},
+               9: {"name": "WTR_DIFF",    "bits": 3,  "info": ""},
+               6: {"name": "WTW_DIFF",    "bits": 3,  "info": ""},
+               3: {"name": "RTW_DIFF",    "bits": 3,  "info": ""},
+               0: {"name": "RTR_DIFF",    "bits": 3,  "info": ""}
+          }}, // ESDRWD - register
+          "ESDOR": {
+            "offs" : 0x30,
+            "field": {
+              16: {"name": "tXPR",        "bits": 8,  "info": ""},
+               8: {"name": "SDE_to_RST",  "bits": 6,  "info": ""},
+               0: {"name": "RST_to_CKE",  "bits": 6,  "info": ""}
+          }}, // ESDOR - register
+          "ESDMRR": {
+            "offs" : 0x34,
+            "field": {
+              24: {"name": "MRR_READ_DATA3",       "bits": 8,  "info": ""},
+              16: {"name": "MRR_READ_DATA2",       "bits": 8,  "info": ""},
+               8: {"name": "MRR_READ_DATA1",       "bits": 8,  "info": ""},
+               0: {"name": "MRR_READ_DATA0",       "bits": 8,  "info": ""}
+          }}, // ESDMRR - register
+          "ESDCFG3_LP": {
+            "offs" : 0x38,
+            "field": {
+              16: {"name": "RC_LP",       "bits": 6,  "info": ""},
+               8: {"name": "tRCD_LP",     "bits": 4,  "info": ""},
+               4: {"name": "tRPpb_LP",    "bits": 4,  "info": ""},
+               0: {"name": "tRPab_LP",    "bits": 4,  "info": ""}
+          }}, // ESDCFG3_LP - register
+          "ZQHWCTRL": {
+            "offs" : 0x40,
+            "field": {
+              26: {"name": "ZQ_PARA_EN",       "bits": 1,  "info": ""},
+              23: {"name": "TZQ_CS",           "bits": 3,  "info": ""},
+              20: {"name": "TZQ_OPER",         "bits": 3,  "info": ""},
+              17: {"name": "TZQ_INIT",         "bits": 3,  "info": ""},
+              16: {"name": "ZQ_HW_FOR",        "bits": 1,  "info": ""},
+              11: {"name": "ZQ_HW_PD_RES",     "bits": 5,  "info": ""},
+               6: {"name": "ZQ_HW_PU_RES",     "bits": 5,  "info": ""},
+               2: {"name": "ZQ_HW_PER",        "bits": 4,  "info": ""},
+               0: {"name": "ZQ_MODE",          "bits": 2,  "info": ""}
+          }}, // ZQHWCTRL - register
+          "ODTCTRL": {
+            "offs" : 0x58,
+            "field": {
+              16: {"name": "ODT3_INT_RES",       "bits": 3,  "info": ""},
+              12: {"name": "ODT2_INT_RES",       "bits": 3,  "info": ""},
+               8: {"name": "ODT1_INT_RES",       "bits": 3,  "info": ""},
+               4: {"name": "ODT0_INT_RES",       "bits": 3,  "info": ""},
+               3: {"name": "ODT_RD_ACT_EN",      "bits": 1,  "info": ""},
+               2: {"name": "ODT_RD_PAS_EN",      "bits": 1,  "info": ""},
+               1: {"name": "ODT_WR_ACT_EN",      "bits": 1,  "info": ""},
+               0: {"name": "ODT_WR_PAS_EN",      "bits": 1,  "info": ""}
+          }}, // ODTCTRL - register
+          "DGCTRL0": {
+            "offs" : 0x7C,
+            "field": {
+              31: {"name": "RST_RD_FIFO",       "bits": 1,  "info": ""},
+              30: {"name": "DG_CMP_CYC",        "bits": 1,  "info": ""},
+              29: {"name": "DG_DIS",            "bits": 1,  "info": ""},
+              28: {"name": "HW_DG_EN",          "bits": 1,  "info": ""},
+              24: {"name": "DG_HC_DEL1",        "bits": 4,  "info": ""},
+              23: {"name": "DG_EXT_UP",         "bits": 1,  "info": ""},
+              16: {"name": "DG_DL_ABS_OFFSET1", "bits": 7,  "info": ""},
+              12: {"name": "HW_DG_ERR",         "bits": 1,  "info": ""},
+               8: {"name": "DG_HC_DEL0",        "bits": 4,  "info": ""},
+               0: {"name": "DG_DL_ABS_OFFSET0", "bits": 7,  "info": ""}
+          }}, // DGCTRL0 - register
+          "DGCTRL1": {
+            "offs" : 0x80,
+            "field": {
+              24: {"name": "DG_HC_DEL3",        "bits": 4,  "info": ""},
+              16: {"name": "DG_DL_ABS_OFFSET3", "bits": 7,  "info": ""},
+               8: {"name": "DG_HC_DEL2",        "bits": 4,  "info": ""},
+               0: {"name": "DG_DL_ABS_OFFSET2", "bits": 7,  "info": ""}
+          }}, // DGCTRL1 - register
+          "RDDLCTL": {
+            "offs" : 0x88,
+            "field": {
+              24: {"name": "RD_DL_ABS_OFFSET3",       "bits": 7,  "info": ""},
+              16: {"name": "RD_DL_ABS_OFFSET2",       "bits": 7,  "info": ""},
+               8: {"name": "RD_DL_ABS_OFFSET1",       "bits": 7,  "info": ""},
+               0: {"name": "RD_DL_ABS_OFFSET0",       "bits": 7,  "info": ""}
+          }}, // RDDLCTL - register
+          "WRDLCTL": {
+            "offs" : 0x90,
+            "field": {
+              24: {"name": "WR_DL_ABS_OFFSET3",       "bits": 7,  "info": ""},
+              16: {"name": "WR_DL_ABS_OFFSET2",       "bits": 7,  "info": ""},
+               8: {"name": "WR_DL_ABS_OFFSET1",       "bits": 7,  "info": ""},
+               0: {"name": "WR_DL_ABS_OFFSET0",       "bits": 7,  "info": ""}
+          }} // WRDLCTL - register
+        } // ESDCTL - controller
+      } // iMX53 - device
+    };
+
+    function FillInSelect(select, obj) {
+      // чистим список
+      while (select.options.length > 0) {
+        select.remove(0);
+      }
+      // заполняем
+      var keys = Object.keys(obj);
+      for (key_id in keys) {
+        var key  = keys[key_id];
+        var offs = obj[key].offs;
+        var opt  = document.createElement("option");        
+        // Assign text and value to Option object
+        opt.text  = (offs ? "[0x" + offs.toString(16) + "] " : "") + key;
+        opt.value = key;
+        select.add(opt);
+      }      
+    }
+
+    function SetUpRegisters() {
+      var ctl  = document.getElementById("controller");
+      var unit = document.getElementById("unit");
+      var reg  = document.getElementById("register");
+      FillInSelect(reg, devices[ctl.value][unit.value]);
+    }
+    
+    function SetUpUnits() {
+      var ctl = document.getElementById("controller");
+      var unit = document.getElementById("unit");
+      FillInSelect(unit, devices[ctl.value]);
+      SetUpRegisters();
+      unit.onchange = SetUpRegisters;
+    }
+    
+    function OnLoad() {
+      var ctl = document.getElementById("controller");
+      FillInSelect(ctl, devices);
+      SetUpUnits();
+      SetUpRegisters();
+      ctl.onchange = SetUpUnits;
+    }
+    
+    function GetRegister() {
+      var ctl  = document.getElementById("controller");
+      var unit = document.getElementById("unit");
+      var reg  = document.getElementById("register");
+      return devices[ctl.value][unit.value][reg.value];
+    }
+    
+    function GetMask(bits) {
+      var mask = 0;
+      for (var i = 0; i < bits; i++) {
+        mask |= (1 << i);
+      }
+      return mask;
+    }
+    
+    function AddLabel(text, target) {
+      var x = document.createElement("LABEL");
+      var t = document.createTextNode(text);
+      x.setAttribute("for", target);
+      x.appendChild(t);
+      return x;
+    }
+    
+    function AddInputNum(id, def_val) {
+      var x = document.createElement("INPUT");
+      x.setAttribute("id",   id);
+      x.setAttribute("type", "number");
+      x.setAttribute("value", def_val);
+      return x;
+    }
+    
+    function AddField(node, field, off, val, addr) {
+      var mask = GetMask(field.bits);
+      var wdg  = AddInputNum(field['name'], (val >> off) & mask);
+      var lbl  = AddLabel(field['name'], field['name']);
+      wdg.onchange = function() {
+        var out = document.getElementById("value");
+        if (this.value > mask)
+          this.value = mask;
+        if (this.value < 0)
+          this.value = 0;
+        out.value = "0x" + ((val & ~(mask << off)) | ((this.value & mask) << off)).toString(16);
+      }
+      node.appendChild(lbl);
+      node.appendChild(wdg);
+      node.appendChild(document.createElement('br'));
+    }
+    
+    function Decode() {
+      var reg    = GetRegister();
+      var val    = document.getElementById("value");
+      var fields = document.getElementById("fields");
+      fields.innerHTML = "";
+      for (f in reg.field) {
+        AddField(fields, reg.field[f], f, val.value, reg.offs);
+      }
+    }
+    </script>
+  </head>
+  <body onload="OnLoad()">
+    <select id="controller"></select>
+    <select id="unit"></select>
+    <select id="register"></select>
+    <hr>
+    <label for="value">Значение</label>
+    <input id="value"/>
+    <button type="button" onclick="Decode()">Декодировать</button>
+    <hr>
+    <div id="fields"></div>
+  </body>
+</html>

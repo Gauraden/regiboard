@@ -1,0 +1,39 @@
+<html>
+  <head>
+    <style type="text/css">
+      body  {
+        font-family: "Courier New", Courier, monospace;
+      }
+      
+      label {
+        width  : 50px;
+        display: inline-block;
+      }
+    </style>
+    <script type="text/javascript">
+    function CalcClk() {
+      var mfi  = parseInt(document.getElementById("MFI").value);
+      var mfd  = parseInt(document.getElementById("MFD").value);
+      var mfn  = parseInt(document.getElementById("MFN").value);
+      var pdf  = parseInt(document.getElementById("PDF").value);
+      var out  = document.getElementById("out");
+      var mac  = document.getElementById("macros");
+      var freq = Math.ceil(4 * 24 * ((mfi + (mfn/(mfd)))/(pdf)));
+      out.innerHTML = freq + " MHz";
+      mac.innerHTML = "#define DP_OP_"  + freq + " ((" + mfi + " << 4) + ((" + pdf + " - 1)  << 0))</br>" +
+                      "#define DP_MFD_" + freq + " (" + mfd + " - 1)                     </br>" +
+                      "#define DP_MFN_" + freq + " " + mfn
+    }
+    </script>
+  </head>
+  <body onload="CalcClk()">
+    <label for="MFI">MFI</label><input id="MFI" value="8" onchange="CalcClk()"/><br/>
+    <label for="PDF">PDF</label><input id="PDF" value="2" onchange="CalcClk()"/><br/>
+    <label for="MFD">MFD</label><input id="MFD" value="3" onchange="CalcClk()"/><br/>
+    <label for="MFN">MFN</label><input id="MFN" value="1" onchange="CalcClk()"/><br/>
+    <hr>
+    <div id="out"></div>
+    <hr>
+    <div id="macros"></div>
+  </body>
+</html>
