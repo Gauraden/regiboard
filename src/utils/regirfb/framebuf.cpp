@@ -219,6 +219,84 @@ void Screen::GeneratePalette() {
     _palette[kColors[idx].GetId()] = kColors[idx];
 }
 
+bool Screen::Convert24ToPalette(uint8_t *dst, uint8_t *src, uint32_t body_sz) {
+  if (dst == 0 || src == 0 || body_sz == 0)
+    return false;
+  // Реализация алгоритма на асме + neon. Алгоритм изменён, расчёт ведётся с
+  // учетом веса компоненты RGB
+  __asm__ __volatile__ (
+    " mov       r0, %[src]\n\t"
+    " mov       r1, %[dst]\n\t"
+    " mov       r2, %[size]\n\t"
+    " lsr       r2, r2, #3\n\t" // shift right >> 3 bit
+    " mov       r3, %[rw]\n\t"  // weight of R component
+    " mov       r4, %[gw]\n\t"  // weight of G component
+    " mov       r5, %[bw]\n\t"  // weight of B component
+    " vdup.8    d3, r3\n\t"
+    " vdup.8    d4, r4\n\t"
+    " vdup.8    d5, r5\n\t"
+    
+    ".loop24bits: \n\t"
+    " vld3.8    {d0-d2}, [r0]!\n\t" // vld3.8 для режима 24bit
+    " vmull.u8  q3, d0, d3\n\t"
+    " vmlal.u8  q3, d1, d4\n\t"
+    " vmlal.u8  q3, d2, d5\n\t"
+    " vshrn.u16 d6, q3, #8\n\t"
+    " vst1.8	  {d6}, [r1]!\n\t"     
+    " subs      r2, r2, #1\n\t"
+    " bne       .loop24bits\n\t"
+    : // no output
+    : [size]  "r" (body_sz),
+      [src]   "r" (src),
+      [dst]   "r" (dst),
+      [rw]    "r" (kRGBWeight[0]),
+      [gw]    "r" (kRGBWeight[1]),
+      [bw]    "r" (kRGBWeight[2])
+    : "r0", "r1", "r2", "r3", "r4", "r5",
+      "d0", "d1", "d2", "d3", "d4", "d5", "d6"
+  );
+  return true;
+}
+
+bool Screen::Convert32ToPalette(uint8_t *dst, uint8_t *src, uint32_t body_sz) {
+  if (dst == 0 || src == 0 || body_sz == 0)
+    return false;
+  // Реализация алгоритма на асме + neon. Алгоритм изменён, расчёт ведётся с
+  // учетом веса компоненты RGB
+  __asm__ __volatile__ (
+    " mov       r0, %[src]\n\t"
+    " mov       r1, %[dst]\n\t"
+    " mov       r2, %[size]\n\t"
+    " lsr       r2, r2, #3\n\t" // shift right >> 3 bit (divide by 8)
+    " mov       r3, %[rw]\n\t"  // weight of R component
+    " mov       r4, %[gw]\n\t"  // weight of G component
+    " mov       r5, %[bw]\n\t"  // weight of B component
+    " vdup.8    d4, r3\n\t"
+    " vdup.8    d5, r4\n\t"
+    " vdup.8    d6, r5\n\t"
+    
+    ".loop32bits: \n\t"
+    " vld4.8    {d0-d3}, [r0]!\n\t" // vld4.8 для режима 32bit
+    " vmull.u8  q7, d0, d4\n\t"
+    " vmlal.u8  q7, d1, d5\n\t"
+    " vmlal.u8  q7, d2, d6\n\t"
+    " vshrn.u16 d7, q7, #8\n\t"
+    " vst1.8	  {d7}, [r1]!\n\t" // move 8 elements to dst (r1)
+    " subs      r2, r2, #1\n\t"  // decrease by 1
+    " bne       .loop32bits\n\t"
+    : // no output
+    : [size]  "r" (body_sz),
+      [src]   "r" (src),
+      [dst]   "r" (dst),
+      [rw]    "r" (kRGBWeight[0]),
+      [gw]    "r" (kRGBWeight[1]),
+      [bw]    "r" (kRGBWeight[2])
+    : "r0", "r1", "r2", "r3", "r4", "r5",
+      "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7"
+  );
+  return true;
+}
+
 bool Screen::SendFrameAsBmp(int socket) {
 	if (not FrameTimeout()) {
 	 	SendUData(socket);
@@ -226,17 +304,17 @@ bool Screen::SendFrameAsBmp(int socket) {
   }
 	Header header;
 	Info   info;
-	static const int kWidth       = _width;
-	static const int kHeight      = _height;
-	static const int kDepth       = kBmpDepth;
-	static const int kHeadSize    = sizeof(header) + sizeof(info);
-	static const int kBodySize    = kWidth * kDepth * kHeight;
-	static const int kPaletteSize = kPaletteColors * sizeof(RGBQuad);
+	static const uint32_t kWidth       = _width;
+	static const uint32_t kHeight      = _height;
+	static const uint8_t  kDepth       = kBmpDepth;
+	static const uint32_t kHeadSize    = sizeof(header) + sizeof(info);
+	static const uint32_t kBodySize    = kWidth * kDepth * kHeight;
+	static const uint32_t kPaletteSize = kPaletteColors * sizeof(RGBQuad);
 	header.bfType        = 0x42 | (0x4D << 8);    // тип файла, символы «BM» (в HEX: 0x42 0x4d).
-	header.bfSize        = kHeadSize + kBodySize; // размер всего файла в байтах.
+	header.bfSize        = kHeadSize + kPaletteSize + kBodySize; // размер всего файла в байтах.
 	header.bfReserved1   = 0;
 	header.bfReserved2   = 0;
-	header.bfOffBits     = kHeadSize + (kPaletteSize * sizeof(RGBQuad)); // смещение на данные
+	header.bfOffBits     = kHeadSize + kPaletteSize; // смещение на данные
 	info.biSize          = sizeof(info);
 	info.biWidth         = kWidth;
 	info.biHeight        = kHeight * (-1);
@@ -258,9 +336,20 @@ bool Screen::SendFrameAsBmp(int socket) {
  	memcpy(_png_buf.get() + _png_udata.offs, (void*)&_palette, kPaletteSize);
 	_png_udata.offs += kPaletteSize;
   // подготовка кадра
- 	uint8_t   *dst_row  = _png_buf.get() + _png_udata.offs;
- 	uint8_t   *src_row  = _fbmmap;
-  const int  kSrcStep = _depth * 8;
+  // __attribute__ ((aligned(32)))
+ 	uint8_t *dst_row = _png_buf.get() + _png_udata.offs;
+ 	uint8_t *src_row = _fbmmap;
+ 	// конвертация кадра 
+  switch (_depth) {
+    case 3:
+      Convert24ToPalette(dst_row, src_row, kBodySize);
+      break;
+    case 4:
+      Convert32ToPalette(dst_row, src_row, kBodySize);
+      break;
+    default:
+      break;
+  };
   // Реализация алгоритма с помощью arm_neon.h
   /*uint8x8_t  out;
   uint8x8_t  alpha = vdup_n_u8(128);
@@ -275,48 +364,16 @@ bool Screen::SendFrameAsBmp(int socket) {
     src_row += kSrcStep;
     dst_row += 8;
   }*/
-  // Реализация алгоритма на асме + neon. Алгоритм изменён, расчёт ведётся с
-  // учетом веса компоненты RGB
-  __asm__ __volatile__ (
-    " mov       r0, %[src]\n\t"
-    " mov       r1, %[dst]\n\t"
-    " mov       r2, %[size]\n\t"
-    " lsr       r2, r2, #3\n\t" // shift right >> 3 bit
-    " mov       r3, %[rw]\n\t"  // weight of R component
-    " mov       r4, %[gw]\n\t"  // weight of G component
-    " mov       r5, %[bw]\n\t"  // weight of B component
-    " vdup.8    d3, r3\n\t"
-    " vdup.8    d4, r4\n\t"
-    " vdup.8    d5, r5\n\t"
-    
-    ".loop: \n\t"
-    " vld3.8    {d0-d2}, [r0]!\n\t" // vld3_u8(src_row)
-    " vmull.u8  q3, d0, d3\n\t"
-    " vmlal.u8  q3, d1, d4\n\t"
-    " vmlal.u8  q3, d2, d5\n\t"
-    " vshrn.u16 d6, q3, #8\n\t"
-    " vst1.8	  {d6}, [r1]!\n\t"     
-    " subs      r2, r2, #1\n\t"
-    " bne       .loop\n\t"
-    : // no output
-    : [size]  "r" (kBodySize),
-      [src]   "r" (src_row),
-      [dst]   "r" (dst_row),
-      [rw]    "r" (kRGBWeight[0]),
-      [gw]    "r" (kRGBWeight[1]),
-      [bw]    "r" (kRGBWeight[2])
-    : "r0", "r1", "r2", "r3", "r4", "r5",
-      "d0", "d1", "d2", "d3", "d4", "d5", "d6"
-  );
-	_png_udata.offs += kBodySize - (kWidth * kDepth);
+	_png_udata.offs += kBodySize;
  	SendUData(socket);
 	return true;
 }
 
 size_t Screen::GetFrameSize(uint8_t color_depth) const {
-	static const int kHeadSize = sizeof(Header) + sizeof(Info);
-	static const int kBodySize = _width * _height * color_depth;
-	return kHeadSize + kBodySize;
+	static const int kHeadSize    = sizeof(Header) + sizeof(Info);
+	static const int kPaletteSize = kPaletteColors * sizeof(RGBQuad);
+	static const int kBodySize    = _width * _height * color_depth;
+	return kHeadSize + kPaletteSize + kBodySize;
 }
 
 } // namespace fb

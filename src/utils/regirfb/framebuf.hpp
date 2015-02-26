@@ -59,7 +59,7 @@ struct RGBQuad {
 class Screen {
 	public:
 		static const int     kPaletteColors = 256;
-		static const uint8_t kPngDepth      = 3;
+		static const uint8_t kPngDepth      = 4;
 		static const uint8_t kBmpDepth      = 1;
 		Screen()
 			: _fbdev(-1),
@@ -96,6 +96,8 @@ class Screen {
 		void   SendUData(int socket);
 		size_t GetFrameSize(uint8_t color_depth) const;
 		void   GeneratePalette();
+		bool   Convert24ToPalette(uint8_t *dst, uint8_t *src, uint32_t body_sz);
+		bool   Convert32ToPalette(uint8_t *dst, uint8_t *src, uint32_t body_sz);
 
 		int         _fbdev;
 		uint32_t    _width;

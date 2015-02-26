@@ -50,7 +50,8 @@ PreparingUBIFS() {
 	ubiformat /dev/${mtd_dev}
 	Notice "Creating UBI volume (${vol_size}): "
 	ubiattach /dev/ubi_ctrl -m $mtd_num
-	ubimkvol  /dev/${ubi_dev} -N ${vol_name} -s ${vol_size} || Throw "Check size: ${vol_size}!"
+	ubimkvol  /dev/${ubi_dev} -N ${vol_name} -s ${vol_size} || \
+	  Throw "Check params: /dev/${ubi_dev} -N ${vol_name} -s ${vol_size}"
 }
 
 SetupRootFS() {

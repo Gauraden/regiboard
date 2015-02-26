@@ -5,16 +5,15 @@ FBREC_DIR='/usr/bin'
 FBREC_BIN="regirfb"
 
 StartCmd() {
+  sleep 1 # задержка для запуска после программы regigraf (S39gui)
 	echo -n "Starting $FBREC_NAME: "
-	$FBREC_DIR/$FBREC_BIN &
-	echo "OK"
+	$FBREC_DIR/$FBREC_BIN && echo "OK" &
 }
 
 StopCmd() {
 	echo -n "Stopping $FBREC_NAME: "
 	#pidof $FBREC_BIN | xargs kill -SIGTERM
-	killall -9 $FBREC_BIN && ipcrm -q0
-	echo "OK"
+	killall $FBREC_BIN && ipcrm -q0 && echo "OK"
 }
 
 case "$1" in

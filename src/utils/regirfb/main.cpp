@@ -53,7 +53,11 @@ static int CreateServerSocket() {
 	serverAddr.sin_family      = AF_INET;
 	serverAddr.sin_port        = htons(8080);
 	serverAddr.sin_addr.s_addr = INADDR_ANY;
-	bind(serverSock, (struct sockaddr*)&serverAddr, sizeof(struct sockaddr));
+	if (bind(serverSock, (struct sockaddr*)&serverAddr, sizeof(struct sockaddr)) < 0) {
+	  std::cout << "Binding was failed!" << std::endl;
+	  close(serverSock);
+	  return -1;
+	}
 	listen(serverSock, 4);
 	return serverSock;
 }
@@ -89,7 +93,6 @@ static void WaitForRequest(int socket, fb::Screen &screen) {
 	      SendNewCoords(x, y, s);
     }
     screen.SendFrameAsBmp(clientSock);
-//    usleep(10000);
 		close(clientSock);
 }
 
@@ -102,17 +105,15 @@ void SignalCatcher(int sig_num) {
 	switch (sig_num) {
 		case SIGPWR:
 			break;
-		case SIGUSR1: {
+		case SIGUSR1:
 			break;
-		}
-		case SIGUSR2: {
+		case SIGUSR2:
 			break;
-		}
 		case SIGTERM:
 		case SIGINT:
-		  stop_sig = true;
+ 	    stop_sig = true;
 		default:
-			break;
+		  break;
 	}
 }
 
@@ -121,11 +122,16 @@ int main(int argc, char *argv[]) {
 	fb::Screen screen;
 	screen.BindToFbDev("/dev/fb0");
 	const int kSocket = CreateServerSocket();
+	if (kSocket < 0)
+	  return 1;
 	fb_screen = &screen;
 	signal(SIGTERM, SignalCatcher);
 	signal(SIGINT,  SignalCatcher);
-	while (not stop_sig)
+	while (not stop_sig) {
 		WaitForRequest(kSocket, screen);
+  }
 	TerminateIPC();
+	close(kSocket);
+	std::cout << "Работа завершена!" << std::endl;
 	return 0;
 }

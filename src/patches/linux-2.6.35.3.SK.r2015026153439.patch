@@ -265,15 +265,6 @@
  	void __iomem *m4if_base;
  	void __iomem *eim_base;
  	void __iomem *nfc_base;
-@@ -732,7 +835,7 @@
- 	printk("Regiboard devices init...\n");
- 	/* iMX53 diagnostic interface */
- // 	platform_device_register(&mx53_diagnostic_device);
--//	mxc_register_device(&imx_ahci_device_hwmon, NULL);
-+	mxc_register_device(&imx_ahci_device_hwmon, NULL);
- 	/* I2C devices */
- 	i2c_register_board_info(0, mxc_i2c1_board_info, ARRAY_SIZE(mxc_i2c1_board_info));
-   i2c_register_board_info(2, mxc_i2c3_board_info, ARRAY_SIZE(mxc_i2c3_board_info));
 @@ -761,5 +864,7 @@
  	mxc_register_device(&mxc_nandv2_mtd_device, &mxc_nand_data);
  	/* LCD */

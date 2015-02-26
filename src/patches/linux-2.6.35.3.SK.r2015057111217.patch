@@ -1,0 +1,156 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2015-02-26 10:59:12.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2015-02-26 11:02:19.800772817 +0300
+@@ -23,6 +23,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/flash.h>
+ #include "devices.h"
++#include "mx53_diagnostic_drv.h"
+ 
+ //#define MX53_REGIBOARD_V1
+ #define MX53_SPI2GPIO_TOUCH
+@@ -381,6 +382,12 @@
+ 		FB_VMODE_NONINTERLACED,
+ 		0,
+ 	},
++	{ // Regigraf 7" (mx1) display
++		"PD104VT2", 30, 640, 480, 19200, 0x4e, 0x0e, 0x23, 0, 0x3f, 1,
++		0,
++		FB_VMODE_NONINTERLACED,
++		0,
++	},
+ };
+ 
+ struct LCDControl {
+@@ -403,6 +410,10 @@
+     .rsc   = 0,
+     .sel68 = 0
+   },
++  { // kPD104VT2
++    .rsc   = 0, // NU
++    .sel68 = 0  // NU
++  },
+ };
+ 
+ enum LCDModel {
+@@ -410,7 +421,8 @@
+ 	kG150XG01       = 1,
+ 	kNLB150XG01L_01 = 2,
+ 	kCLAA_WVGA      = 3,
+-	kLcdAmount      = 4, // must be the last
++	kPD104VT2       = 4,
++	kLcdAmount      = 5, // must be the last
+ };
+ 
+ static struct mxc_fb_platform_data fb_data[] = {
+@@ -434,7 +446,12 @@
+ 		.mode_str          = "CLAA-WVGA",
+ 		.mode              = video_modes,
+ 		.num_modes         = ARRAY_SIZE(video_modes),
+-	},
++	}, {
++		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
++		.mode_str          = "PD104VT2",
++		.mode              = video_modes,
++		.num_modes         = ARRAY_SIZE(video_modes),	  
++	}
+ };
+ 
+ static struct resource mxcfb_resources[] = {
+@@ -815,6 +832,13 @@
+ };
+ 
+ /* Setup of specific devices **************************************************/
++static struct platform_device mx53_diagnostic_device = {
++	.name          = MX53_DIAGNOSTIC_DRV_NAME,
++	.id            = -1,
++	.num_resources = 0,
++	.resource      = 0,
++};
++
+ void mx53_regiboard_fixup(int fb_mem, int mem_start) {
+ 	if (!fb_mem)
+ 		return;
+@@ -825,6 +849,9 @@
+ 
+ void mx53_regigraf_devices(void) {
+ 	printk("Regiboard devices init...\n");
++	/* iMX53 diagnostic interface */
++// 	platform_device_register(&mx53_diagnostic_device);
++	mxc_register_device(&imx_ahci_device_hwmon, NULL);
+ 	/* I2C devices */
+ 	i2c_register_board_info(0, mxc_i2c1_board_info, ARRAY_SIZE(mxc_i2c1_board_info));
+   i2c_register_board_info(2, mxc_i2c3_board_info, ARRAY_SIZE(mxc_i2c3_board_info));
+@@ -852,8 +879,5 @@
+   /* NAND */
+ 	mxc_register_device(&mxc_nandv2_mtd_device, &mxc_nand_data);
+ 	/* LCD */
+-//	mx53_regiboard_init_fb(kG150XGE_L04, 0); // 0 - LVDS; Main 15" display
+-//	mx53_regiboard_init_fb(kG150XG01, 0); // 0 - LVDS; Alt_0 15" display
+-//	mx53_regiboard_init_fb(kNLB150XG01L_01, 0); // 0 - LVDS; Alt_1 15" display
+   mx53_regiboard_init_fb(mx53_detect_lcd_model(), 0);
+ }
+--- ./build/linux-2.6.35.3.SK/drivers/rtc/rtc-ds1307.c.orig	2014-12-04 15:32:47.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/drivers/rtc/rtc-ds1307.c	2015-01-27 12:26:59.286185011 +0300
+@@ -17,7 +17,7 @@
+ #include <linux/string.h>
+ #include <linux/rtc.h>
+ #include <linux/bcd.h>
+-
++#include <linux/delay.h>
+ 
+ 
+ /* We can't determine type by probing, but if we expect pre-Linux code
+@@ -751,19 +751,19 @@
+ static int __devinit ds1307_probe(struct i2c_client *client,
+ 				  const struct i2c_device_id *id)
+ {
+-	struct ds1307		*ds1307;
+-	int			err = -ENODEV;
+-	int			tmp;
+-	const struct chip_desc	*chip = &chips[id->driver_data];
+-	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
+-	int			want_irq = false;
+-	unsigned char		*buf;
+-	static const int	bbsqi_bitpos[] = {
++	const struct chip_desc *chip    = &chips[id->driver_data];
++	struct i2c_adapter     *adapter = to_i2c_adapter(client->dev.parent);
++	struct ds1307          *ds1307;
++	int		 	          tmp;
++	unsigned char		 *buf;
++	int			          err      = -ENODEV;
++	int			          want_irq = false;
++	unsigned          tries    = 0;
++	static const int  bbsqi_bitpos[] = {
+ 		[ds_1337] = 0,
+ 		[ds_1339] = DS1339_BIT_BBSQI,
+ 		[ds_3231] = DS3231_BIT_BBSQW,
+ 	};
+-
+ 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)
+ 	    && !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_I2C_BLOCK))
+ 		return -EIO;
+@@ -774,7 +774,7 @@
+ 	i2c_set_clientdata(client, ds1307);
+ 
+ 	ds1307->client	= client;
+-	ds1307->type	= id->driver_data;
++	ds1307->type	  = id->driver_data;
+ 	ds1307->offset	= 0;
+ 
+ 	buf = ds1307->regs;
+@@ -796,8 +796,13 @@
+ 			want_irq = true;
+ 		}
+ 		/* get registers that the "rtc" read below won't read... */
+-		tmp = ds1307->read_block_data(ds1307->client,
+-				DS1337_REG_CONTROL, 2, buf);
++		for (tries = 0; tries < 3; tries++) {
++		  tmp = ds1307->read_block_data(ds1307->client, DS1337_REG_CONTROL, 2, buf);
++		  if (tmp == 2)
++		    break;
++		  printk("#.%u - i2c read block data fail (tmp = %d), delay before next try...", tries, tmp);
++		  udelay(100);
++	  }
+ 		if (tmp != 2) {
+ 			pr_debug("read error %d\n", tmp);
+ 			err = -EIO;
