@@ -23,6 +23,8 @@ PrintNotice 'Copying of system scripts and configs...'
 cp "${SRC_SHELL_DIR}/S00gpio_init"     "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_SHELL_DIR}/S11ubi"           "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_SHELL_DIR}/S40network"       "${TARGET_DIR}/etc/init.d/"
+cp "${SRC_SHELL_DIR}/S41sysinfo"       "${TARGET_DIR}/etc/init.d/"
+cp "${SRC_SHELL_DIR}/sysinfo.sh"       "${TARGET_DIR}/usr/lib/"
 cp "${SRC_ETC_DIR}/interfaces"         "${TARGET_DIR}/etc/network/"
 cp "${SRC_ETC_DIR}/sshd_config"        "${TARGET_DIR}/etc/"
 cp "${SRC_ETC_DIR}/directfbrc"         "${TARGET_DIR}/etc/"

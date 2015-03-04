@@ -1,0 +1,24 @@
+#!/bin/sh
+
+. /usr/lib/sysinfo.sh
+
+PublishBoardInfo() {
+  local features="$(Kernel 'HIGH_RES_TIMERS')"
+  features=${features:='no'}
+  echo "${BOARD_NAME}: ${BOARD_ID} [${HW_ADDR}];" \
+       "Regigraf v${REGIGRAF_VER};" \
+       "DDR: ${HW_DDR};" \
+       "CPU: ${HW_CPU};" \
+       "Features: ${features}" > $WWW_ROOT/board_info.txt
+}
+
+case "$1" in
+  start)
+    PublishBoardInfo
+    ;;
+  *)
+    echo "Usage: $0 {start}"
+    exit 1
+esac
+
+exit $?

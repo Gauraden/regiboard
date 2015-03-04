@@ -2,19 +2,7 @@
 #
 # Start the network....
 #
-WWW_ROOT='/var/www/data/'
-
-BOARD_NAME=$(cat /proc/cpuinfo | grep -E 'Hardware(.*):(.*)' | sed -r 's/(.+): (.+)/\2/g') #'
-BOARD_ID=$(cat /proc/cmdline | grep -Eo 'board=([0-9\.]+)' | sed -r 's/board=//g')
-HW_ADDR=$(cat /etc/hwaddr)
-REGIGRAF_PKG=$(ipkg-cl list_installed | grep regigraf)
-REGIGRAF_INITD=$(ls -l /etc/init.d/S39gui 2> /dev/null)
-
-BOARD_ID=${BOARD_ID:='unknown'}
-
-PublishBoardInfo() {
-  echo "${BOARD_NAME}: ${BOARD_ID} [${HW_ADDR}]" > $WWW_ROOT/board_info.txt
-}
+. /usr/lib/sysinfo.sh
 
 case "$1" in
   start)
@@ -32,7 +20,6 @@ case "$1" in
       echo "--------------------------------------------"
       ifconfig > /dev/tty0
     fi
-    PublishBoardInfo
     ;;
   stop)
     echo -n "Stopping network..."
