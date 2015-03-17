@@ -13,22 +13,39 @@
 
 #define ERROR(msg) std::cout << __LINE__ << ": " << __FUNCTION__ << ": " << msg << std::endl
 
+struct Config {
+  bool rotate_scr;
+};
+
+static Config SplashConf;
+
+struct PixelRGB;
+
 struct PixelRGBA {
 	PixelRGBA(uint8_t _r = 0, uint8_t _g = 0, uint8_t _b = 0)
 		: r(_r), g(_g), b(_b), a(0) {}
+	void operator= (const PixelRGB &src);
 	uint8_t r, g, b, a;
 };
 
 struct PixelRGB {
 	PixelRGB(uint8_t _r = 0, uint8_t _g = 0, uint8_t _b = 0)
 		: r(_r), g(_g), b(_b) {}
-	void operator= (const PixelRGBA &src) {
-		r = src.r;
-		g = src.g;
-		b = src.b;
-	}
+	void operator= (const PixelRGBA &src);
 	uint8_t r, g, b;
 };
+
+void PixelRGBA::operator= (const PixelRGB &src) {
+	r = src.r;
+	g = src.g;
+	b = src.b;
+}
+
+void PixelRGB::operator= (const PixelRGBA &src) {
+	r = src.r;
+	g = src.g;
+	b = src.b;
+}
 
 struct Screen {
 	Screen(): width(0), height(0), depth(0), buffer(0) {}
@@ -99,7 +116,16 @@ bool SetVideoMode(int fbdev, Screen *scr) {
 	return true;
 }
 
+void Copy24RowTo32(uint8_t *dst, PixelRGB *src, uint16_t w) {
+  PixelRGBA *scr_px = (PixelRGBA*)dst;
+	for (int col = 0; col < w; col++) {
+		scr_px[col] = src[col];
+	}
+}
+
 bool PrintBMP(const char *name, Screen *screen) {
+  if (SplashConf.rotate_scr)
+    return true;
 	const int kBMPFile = open(name, O_RDONLY);
 	if (kBMPFile == -1) {
 		ERROR("Ошибка " << strerror(errno));
@@ -115,7 +141,7 @@ bool PrintBMP(const char *name, Screen *screen) {
 	const unsigned kScrXOffset  = ((screen->width - info_header.biWidth) / 2) * screen->depth;
 	const unsigned kScrYOffset  = (screen->height - info_header.biHeight) / 2;
 	BMPData data(new uint8_t[kExtRowWidth]);
-	//PixelRGBA *bmp_px = (PixelRGBA*)data.get();
+	PixelRGB *bmp_px = (PixelRGB*)data.get();
 	lseek(kBMPFile, file_header.bfOffBits, SEEK_SET);
 	const unsigned kScrWidth = screen->width * screen->depth;
 	for (int row = info_header.biHeight; row >= 0 ; row--) {
@@ -125,24 +151,30 @@ bool PrintBMP(const char *name, Screen *screen) {
 			memcpy(&screen->buffer[kScrRowOffset + kScrXOffset],
 			       data.get(),
 			       kRowWidth);
-		} else {
-			/*
-			PixelRGB *scr_px = (PixelRGB*)&screen->buffer[kScrRowOffset];
-			for (int col = 0; col < info_header.biWidth; col++) {
-				scr_px[col] = bmp_px[col];
-			}
-			*/
+			continue;
 		}
+		switch (screen->depth) {
+		  case 4:
+		    Copy24RowTo32(&screen->buffer[kScrRowOffset + kScrXOffset],
+		                   bmp_px,
+		                   info_header.biWidth);
+		    break;
+		  default:
+		    break;
+		};
 	}
 	close(kBMPFile);
 	return true;
 }
 
 int main(int argc, char *argv[]) {
-	Screen screen(800, 600, 3);
+	Screen screen(800, 600, 4);
 	if (argc < 2) {
 		ERROR("Не указан BMP файл!");
 		return 0;
+	}
+	if (argc > 2) {
+	  SplashConf.rotate_scr = (strstr("rotate", argv[2]) != 0);
 	}
 	const int kFBDev = open("/dev/fb0", O_RDWR);
 	if (not SetVideoMode(kFBDev, &screen)) {

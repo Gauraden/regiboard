@@ -1,0 +1,193 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2015-02-26 11:02:19.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2015-03-17 16:09:34.579463040 +0300
+@@ -265,23 +265,166 @@
+ 	},
+ };
+ #endif
+-static struct ads7846_platform_data ads_info = {
++
++struct mx53_ts_filter {
++  int *samps;
++  int *samps_ids;
++  u8   samps_amount;
++  u8   samps_limit;
++  u8   skip_first;
++  u8   skip_last;
++  int  tolerance;
++} static ads_filter_data = {
++  .samps_amount = 0,
++  .samps_limit  = 12,
++  .skip_first   = 2,
++  .skip_last    = 0,
++  .tolerance    = 5,
++};
++
++static void reset_mx53_ts_filter(struct mx53_ts_filter *filter)
++{
++  filter->samps_amount = 0;
++}
++
++static int ads_filter_init(const struct ads7846_platform_data  *pdata,
++                           void                               **filter_data)
++{
++  u8 samp_id;
++  if (pdata == 0)
++    return -1;
++  printk("Regiboard TS setup: %d\n", pdata->model);
++  reset_mx53_ts_filter(&ads_filter_data);
++  ads_filter_data.samps     = kzalloc(sizeof(int) * ads_filter_data.samps_limit, GFP_KERNEL);
++  ads_filter_data.samps_ids = kzalloc(sizeof(int) * ads_filter_data.samps_limit, GFP_KERNEL);
++  *filter_data = &ads_filter_data;
++  return 0; // it's ok
++}
++
++static void ads_filter_cleanup(void *filter_data)
++{
++  printk("Regiboard TS cleanup");
++  kfree(ads_filter_data.samps);
++  kfree(ads_filter_data.samps_ids);
++}
++
++static int ads_filter(void *filter_data, int data_idx, int *val)
++{
++  u32                    id;
++  u32                    diff;
++  u32                    min_diff;
++  struct mx53_ts_filter *data = (struct mx53_ts_filter*)filter_data;
++  min_diff = 0xFFFFFFFF;
++  // searching of old values for min difference
++  for (id = data->skip_first; id < data->samps_amount; id++) {
++    diff = abs(data->samps[id] - *val);
++    if (diff < min_diff) {
++      data->samps_ids[data->samps_amount] = data->samps[id];
++      min_diff = diff;
++    }
++  }
++  data->samps[data->samps_amount] = *val;
++  data->samps_amount++;
++  if (data->samps_amount < data->samps_limit)
++    return ADS7846_FILTER_REPEAT;
++  // searching for min diff
++  min_diff = 0xFFFFFFFF;
++  for (id = data->skip_first; id < data->samps_amount; id++) {
++    diff = abs(data->samps[id] - data->samps_ids[id]);
++    if (diff < min_diff) {
++      min_diff = diff;
++      *val = data->samps[id] + data->samps_ids[id];
++    }
++  }
++  *val >>= 1;
++  if (min_diff > data->tolerance) {
++    reset_mx53_ts_filter(data);
++    return ADS7846_FILTER_IGNORE;
++  }
++  reset_mx53_ts_filter(data);
++  return ADS7846_FILTER_OK;
++}
++
++static void ads_wait_for_sync()
++{
++  // do nothing...
++}
++// TS configurations
++static struct ads7846_platform_data ads_info_7843 = {
+ 	.model            = 7843, // ADS7843E
+ 	.vref_mv          = 2500, // 2.5V external VREF
+ 	.swap_xy          = false,
+-	.x_min            = 1155,//550,//150,
+-	.x_max            = 3079,//3030, //3830,
+-	.y_min            = 1089,//550,//190,
+-	.y_max            = 2886,//2900,//3830,
++	.x_min            = 0,//1155,//550,//150,
++	.x_max            = 0,//3079,//3030, //3830,
++	.y_min            = 0,//1089,//550,//190,
++	.y_max            = 0,//2886,//2900,//3830,
++	.vref_delay_usecs = 10,
++	.x_plate_ohms     = 0,     // NU for 7843   : was 450
++	.y_plate_ohms     = 0,     // NU for ADS78XX: was 250
++	.pressure_max     = 15000, // NU for 7843
++	.debounce_max     = 0,     // NU: was 5
++	.debounce_rep     = 0,     // NU: was 0
++	.debounce_tol     = 0,     // NU: was 10
++	.gpio_pendown     = TS_PENIRQ,
++	.filter_init      = ads_filter_init,
++	.filter_cleanup   = ads_filter_cleanup,
++	.filter           = ads_filter,
++	.wait_for_sync    = ads_wait_for_sync
++};
++
++static struct ads7846_platform_data ads_info_7845 = {
++	.model            = 7845, // ADS7845
++	.vref_mv          = 2500, // 2.5V external VREF
++	.swap_xy          = false,
++	.x_min            = 0,
++	.x_max            = 0,
++	.y_min            = 0,
++	.y_max            = 0,
+ 	.vref_delay_usecs = 10,
+ 	.x_plate_ohms     = 450,
+ 	.y_plate_ohms     = 250,
+ 	.pressure_max     = 15000,
+-	.debounce_max     = 5,
++	.debounce_max     = 0,
+ 	.debounce_rep     = 0,
+-	.debounce_tol     = 10,
++	.debounce_tol     = 0,
+ 	.gpio_pendown     = TS_PENIRQ,
++	.filter_init      = ads_filter_init,
++	.filter_cleanup   = ads_filter_cleanup,
++	.filter           = ads_filter,
++	.wait_for_sync    = ads_wait_for_sync
++};
++
++struct TSConfig {
++  char                          name[24];
++  struct ads7846_platform_data *data;
++} static const kTSConfig[] = {
++  {
++    .name = "ADS7843E",
++    .data = &ads_info_7843
++  },
++  { // does not work
++    .name = "ADS7845",
++    .data = &ads_info_7845
++  },
++  { // should be the last record
++    .name = "",
++    .data = 0
++  }
+ };
++
++static struct ads7846_platform_data* mx53_detect_ts_model()
++{
++  int id = 0;
++  printk("Regiboard trying to detect TS:\n");
++  while (kTSConfig[id].data != 0) {
++    printk("* %d - %s\n", id, kTSConfig[id].name);
++    if (strstr(saved_command_line, kTSConfig[id].name) != 0)
++      return kTSConfig[id].data;
++    id++;
++  }
++  printk("Regiboard TS was not detected! Using default \"ADS7843E\"\n");
++  return kTSConfig[0].data;
++}
+ /* Displays *******************************************************************/
+ /*
+  pixclock    : Pixel clock, dot clock or just clock, usually in MHz. It needs to
+@@ -805,7 +948,7 @@
+ 	{ // Touchscreen
+     // for debug we can use modalias = "spidev" -> /dev/(spidev1.0 | spidev0.0)
+ 		.modalias        = TS_MODEL, 
+-		.platform_data   = &ads_info,
++		.platform_data   = &ads_info_7843,
+ 		.mode            = SPI_MODE_0,
+ 		.irq             = gpio_to_irq(TS_PENIRQ),
+ 		.max_speed_hz    = TS_SCK_HZ, // max: 52 Mbps
+@@ -866,6 +1009,7 @@
+   // Register CSPI devices
+   spi_register_board_info(mxc_cspi_device, ARRAY_SIZE(mxc_cspi_device));
+   // Register ECSPI devices
++  mxc_ecspi_device[0].platform_data = mx53_detect_ts_model();
+   spi_register_board_info(mxc_ecspi_device, ARRAY_SIZE(mxc_ecspi_device));
+ #ifdef MX53_SPI2GPIO_TOUCH
+   platform_device_register(&spi_gpio_device);

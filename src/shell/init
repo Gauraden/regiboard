@@ -24,12 +24,13 @@ IsFileExists() {
 mount -t proc none /proc
 mount -t sysfs none /sys
 mount -t devtmpfs devtmpfs /dev
+
+CMD_LINE=$(cat /proc/cmdline)
 # ------------------------------------------------------------------------------
 # Do your stuff here.
-/bin/regisplash /root/vbr_splash.bmp
+/bin/regisplash /root/vbr_splash.bmp "$(echo ${CMD_LINE} | sed -r 's/(.*)splash=([^ ]+)(.*)/\2/')"
 # ------------------------------------------------------------------------------
 # Mount rootfs
-CMD_LINE=$(cat /proc/cmdline)
 ROOT=$(echo "$CMD_LINE" | sed -r 's/(.*)root=([^ ]+)(.*)/\2/')
 ROOT_FS_TYPE=$(echo "$CMD_LINE" | sed -r 's/(.*)rootfstype=([^ ]+)(.*)/\2/')
 

@@ -4,12 +4,15 @@
 
 PublishBoardInfo() {
   local features="$(Kernel 'HIGH_RES_TIMERS')"
+  local regigraf_inf=$(${REGIGRAF_BIN} --version 2> /dev/null | tr -d '\n' | sed -e 's/\;/\; /g')
   features=${features:='no'}
   echo "${BOARD_NAME}: ${BOARD_ID} [${HW_ADDR}];" \
-       "Regigraf v${REGIGRAF_VER};" \
+       "${regigraf_inf}" \
+       "Regigraf: v${REGIGRAF_VER};" \
+       "Device name: ${REGIGRAF_NAME};" \
        "DDR: ${HW_DDR};" \
        "CPU: ${HW_CPU};" \
-       "Features: ${features}" > $WWW_ROOT/board_info.txt
+       "Features: ${features};" > $WWW_ROOT/board_info.txt
 }
 
 case "$1" in
