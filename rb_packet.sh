@@ -94,7 +94,7 @@ MakeIpkg() {
 	# control file
 	SetPacketControl "$ctl_dir"
 	# install binary files
-	PacketInstall $ipk_dir
+	PacketInstall $ipk_dir 2> $RB_INSTALL_LOG
 	# creating ipkg
 	# archive is indeed a Debian[esque] package
 #	echo '2.0' > "$ipk_dir/debian-binary"
@@ -121,11 +121,12 @@ PacketBuild() {
 	}
 	local packet=$1
 	. "${CONF_PAK_DIR}/$packet"
+  RB_INSTALL_LOG="${LOG_DIR}/${PACKET_NAME}.install.log"
 	DieIfNotDefined "${PACKET_NAME}"    'Name of packet'
 	PrintNotice "Packet: ---==< ${PACKET_NAME} >==---"
 	# Maybe there is no need to build the packet. It will be marked as external!
 	if [ "$PACKET_EXTERN" = 'true' ]; then
-	  PacketInstall
+    PacketInstall 2> $RB_INSTALL_LOG
 	  return
 	fi
 	# Trying to build the packet...
@@ -186,7 +187,7 @@ PacketBuild() {
 	fi
 	if IsPacketForHost; then
   	PrintNotice 'Installing to "bin" directory...'
-  	PacketInstall
+  	PacketInstall $BIN_DIR
 	  return
 	fi
 	# Making ipkg packet
