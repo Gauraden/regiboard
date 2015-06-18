@@ -13,6 +13,7 @@ PublishBoardInfo() {
        "DDR: ${HW_DDR};" \
        "CPU: ${HW_CPU};" \
        "Features: ${features};" > $WWW_ROOT/board_info.txt
+  chmod g+r,o+r $WWW_ROOT/board_info.txt
 }
 
 case "$1" in

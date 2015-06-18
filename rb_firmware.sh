@@ -14,6 +14,7 @@ ConfigurateFirmware() {
 
 FirmwareList() {
 	Print "Доступные прошивки:"
+	local firmws=''
 	for firmws in $(ls "${CONF_FIRMWARE_DIR}"); do
   	ResetFirmwareConfig
   	. "${CONF_FIRMWARE_DIR}/${firmws}"
@@ -24,6 +25,7 @@ FirmwareList() {
 
 CopyListOfFiles() {
   DieIfNotDefined $3 "директория куда требуется копировать файлы"  
+  local file_name=''
   for file_name in $1; do
     # копирование пакета в образ прошивки
     local file_path=${2/\%file_name\%/$file_name}
@@ -52,6 +54,7 @@ CreatePackagesFile() {
 }
 
 FirmwareRebuildPackets() {
+  local file_name=''
   for file_name in $1; do
     PacketBuild "${file_name}.conf"
   done
@@ -91,7 +94,7 @@ FirmwareCreate() {
   CreatePackagesFile "$tmp_dir"
   # копирование файлов с метаданными прошивки
   PrintNotice "Копирование метаданных..."
-  sudo cp ${FIRMWARE_INFO}/* $tmp_dir
+  sudo cp ${FIRMWARE_INFO}/${FIRMWARE_NAME}.inf $tmp_dir
   # упаковка
   PrintNotice "Упаковка образа..."
   sync
