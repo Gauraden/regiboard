@@ -94,7 +94,7 @@ FirmwareCreate() {
   CreatePackagesFile "$tmp_dir"
   # копирование файлов с метаданными прошивки
   PrintNotice "Копирование метаданных..."
-  sudo cp ${FIRMWARE_INFO}/${FIRMWARE_NAME}.inf $tmp_dir
+  sudo cp ${FIRMWARE_INFO}/${FIRMWARE_NAME}.inf $tmp_dir/${BOARD_NAME}.meta
   sudo cp ${FIRMWARE_INFO}/Packages $tmp_dir
   sudo cp ${FIRMWARE_INFO}/boards.ver $tmp_dir
   # упаковка
