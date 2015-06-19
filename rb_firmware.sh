@@ -42,7 +42,7 @@ CreatePackagesFile() {
   local ipkg_dir=$1
   local repo_file="${FIRMWARE_INFO}/Packages"
   local tmp_dir="${TMP_DIR}/pkt_info"
-  rm $repo_file
+  rm -f $repo_file
   mkdir -p $tmp_dir
   cd $tmp_dir
   for pkg in $(ls "$ipkg_dir"); do
@@ -50,7 +50,7 @@ CreatePackagesFile() {
     ar -x "$ipkg_dir/$pkg" control.tar.gz && tar xvf ./control.tar.gz > ${_DEV_NULL}
     cat ./control >> $repo_file
   done
-  rm -r $tmp_dir
+  rm -rf $tmp_dir
 }
 
 FirmwareRebuildPackets() {
@@ -88,6 +88,8 @@ FirmwareCreate() {
   FirmwareRebuildPackets "$FIRMWARE_REBUILD"
   # копирование пакетов
   PrintNotice "Копирование пакетов:"
+  rm -f "${PACKETS_DIR}/${FIRMWARE_REBUILD}.ipk"
+  mv "${PACKETS_DIR}/${FIRMWARE_NAME}.ipk" "${PACKETS_DIR}/${FIRMWARE_REBUILD}.ipk"
   CopyListOfFiles "$FIRMWARE_IPK" "${PACKETS_DIR}/%file_name%.ipk" "$tmp_dir"
   # создание файла-репозитория
   PrintNotice "Создание файла-репозитория..."
@@ -96,7 +98,6 @@ FirmwareCreate() {
   PrintNotice "Копирование метаданных..."
   sudo cp ${FIRMWARE_INFO}/${FIRMWARE_NAME}.inf $tmp_dir/${BOARD_NAME}.meta
   sudo cp ${FIRMWARE_INFO}/Packages $tmp_dir
-  sudo cp ${FIRMWARE_INFO}/boards.ver $tmp_dir
   # упаковка
   PrintNotice "Упаковка образа..."
   sync
