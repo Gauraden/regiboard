@@ -103,6 +103,12 @@ FirmwareCreate() {
   sync
   sudo umount $tmp_dir
   sudo losetup -d /dev/$loop_dev
+  # запись метаданных
+  # ... TODO
+  # обфусикация
+  # ... TODO
+  # установка контрольной суммы
+  $UTIL_CRC --file $firm_file --crc_value DEADBEAF --threads 2
 }
 
 BuildFirmware() {
