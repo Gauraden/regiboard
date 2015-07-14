@@ -6,6 +6,7 @@ ResetFirmwareConfig() {
   unset FIRMWARE_IPK
   unset FIRMWARE_FILES
   unset FIRMWARE_SIZE_KB
+  unset FIRMWARE_CRC
 }
 
 ConfigurateFirmware() {
@@ -103,12 +104,10 @@ FirmwareCreate() {
   sync
   sudo umount $tmp_dir
   sudo losetup -d /dev/$loop_dev
-  # запись метаданных
-  # ... TODO
-  # обфусикация
-  # ... TODO
+  # запись метаданных и обфусикация
+  $UTIL_PROTECTOR --sign ${FIRMWARE_INFO}/${FIRMWARE_NAME}.inf --file $firm_file
   # установка контрольной суммы
-  $UTIL_CRC --file $firm_file --crc_value DEADBEAF --threads 2
+  $UTIL_CRC --file $firm_file --crc_value ${FIRMWARE_CRC} --threads 2
 }
 
 BuildFirmware() {
