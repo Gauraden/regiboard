@@ -1,10 +1,17 @@
 cmake_minimum_required(VERSION 2.6)
 project("regiloader")
 
+add_definitions(
+  --std=gnu++0x
+)
+
+set(CMAKE_CXX_FLAGS "")
+
 add_executable(regiloader
 	regiloader.cpp
 	sdp.cpp
 	ymodem.cpp
+	tftp.cpp
 )
 
 target_link_libraries(regiloader

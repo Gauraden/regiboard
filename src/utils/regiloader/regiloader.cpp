@@ -1,12 +1,17 @@
+#include "regiloader.hpp"
 #include "sdp.hpp"
 #include "ymodem.hpp"
 #include "tftp.hpp"
 #include <iostream>
+#include <sstream>
 #include <list>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 
 static const std::string kTtyDev("ttyUSB0");
+static const std::string kUBootImg("u-boot.imx");
+static const std::string kKernelImg("uImage");
+static const std::string kRamFsImg("ramFs");
 
 static bool UploadDCD(boost::asio::serial_port &port, ImxFirmware &firm) {
   const ImxFirmware::DCDCmd::List &cmds = firm.GetDCDCommands();
@@ -38,7 +43,8 @@ static bool UploadDCD(boost::asio::serial_port &port, ImxFirmware &firm) {
   return true;
 }
 
-typedef std::list<std::string> ListOfStrings;
+typedef std::list<std::string>   ListOfStrings;
+typedef boost::asio::serial_port SerialPort;
 
 struct UBootInfo {
   std::string loadaddr;
@@ -53,14 +59,20 @@ struct PeripheralsInfo {
   std::string   mmc;
   std::string   rtc;
   std::string   ts;
+  std::string   lcd;
 };
 
 struct SysInfo {
-  std::string board;
+  std::string     board;
   std::string     u_boot_build;
+  std::string     kernel_build;
+  std::string     gcc_ver;
+  std::string     ct_ng_ver; // crosstool-NG
   std::string     cpu;
   std::string     ddr;
   std::string     dram_size;
+  std::string     nor;
+  std::string     nor_size;
   std::string     nand;
   std::string     nand_size;
   std::string     sd_mmc;
@@ -69,18 +81,41 @@ struct SysInfo {
   PeripheralsInfo kernel;
 };
 
+static void PrintListOfStrings(const std::string   &pref, 
+                               const ListOfStrings &list) {
+  for (auto str_it = list.begin(); str_it != list.end(); str_it++) {
+    std::cout << pref << *str_it << "\n";
+  }
+}
+
 static void PrintSysInfo(const SysInfo &inf) {
   std::cout << "Описание:\n"
-            << "\t* Плата....: " << inf.board << "\n"
-            << "\t* Загрузчик: " << inf.u_boot_build << " (U-Boot)\n"
-            << "\t* Процессор: " << inf.cpu << "\n"
-            << "\t* ОЗУ......: " << inf.dram_size << " (" << inf.ddr << ")\n"
-            << "\t* ПЗУ......: " << inf.nand_size << " (" << inf.nand << ")\n"
-            << "\t* SD/MMC...: " << inf.sd_mmc << "\n"
-            << "\t* Ethernet.: " << inf.eth << "\n"
+            << "\t * Плата.....: " << inf.board << "\n"
+            << "\t * Процессор.: " << inf.cpu << "\n"
             << "\t--- UBOOT ---------------------------" << std::endl
-            << "\t* loadaddr.: " << inf.uboot.loadaddr << "\n"
-            << std::endl;
+            << "\t * Версия....: " << inf.u_boot_build << "\n"
+            << "\t * loadaddr..: " << inf.uboot.loadaddr << "\n"
+            << "\t--- Kernel (Linux) ------------------" << std::endl
+            << "\t * Версия....: " << inf.kernel_build << "\n"
+            << "\t * GCC.......: " << inf.gcc_ver << "\n"
+            << "\t * Crosstool.: " << inf.ct_ng_ver << "(crosstool-NG)\n"
+            << "\t--- Периферия -----------------------" << std::endl
+            << "\t * ОЗУ.......: " << inf.dram_size << " (" << inf.ddr << ")\n"
+            << "\t * ПЗУ (NOR).: " << inf.nor_size << " (" << inf.nor << ")\n"
+            << "\t * ПЗУ (NAND): " << inf.nand_size << " (" << inf.nand << ")\n"
+            << "\t * SD/MMC....: " << inf.sd_mmc << "\n"
+            << "\t * Ethernet..: " << inf.eth << "\n"
+            << "\t * Сенсор.эк.: " << inf.kernel.ts << "\n"
+            << "\t * Дисплей...: " << inf.kernel.lcd << "\n";
+  std::cout << "\t * SPI.......: " << (unsigned)inf.kernel.spi.size() << "\n";
+  PrintListOfStrings("\t\t - ", inf.kernel.spi);
+  std::cout << "\t * UART......: " << (unsigned)inf.kernel.uarts.size() << "\n";
+  PrintListOfStrings("\t\t - ", inf.kernel.uarts);
+  std::cout << "\t * USB-UART..: " << (unsigned)inf.kernel.usb_uart.size() << "\n";
+  PrintListOfStrings("\t\t - ", inf.kernel.usb_uart);
+  std::cout << "\t * Разделы...: " << (unsigned)inf.kernel.partitions.size() << "\n";
+  PrintListOfStrings("\t\t - ", inf.kernel.partitions);
+  std::cout << std::endl;
 }
 
 static bool Parse(const std::string &str,
@@ -98,7 +133,7 @@ static bool Parse(const std::string &str,
   return true;
 }
 
-static void SendCmd(boost::asio::serial_port &port, const std::string &cmd) {
+static void SendCmd(SerialPort &port, const std::string &cmd) {
   boost::asio::write(port, boost::asio::buffer(cmd + "\n"));
 }
 
@@ -113,10 +148,39 @@ static bool FillInSysInfo(const std::string &str, SysInfo &inf) {
   Parse(str, "MMC:(\\s*)([^:]+)(.*)",    2, &inf.sd_mmc);
   Parse(str, "FEC0(.*)",                 0, &inf.eth);
   Parse(str, "loadaddr=(.+)",            1, &inf.uboot.loadaddr);
+  // dmesg
+  std::string kernel_ver;
+  std::string kernel_builder;
+  std::string kernel_build_dt;
+  if (Parse(str, "(.+)Linux version ([0-9a-z\\.\\-]+)(.+)", 2, &kernel_ver)) {
+    Parse(str, "(.+)\\(([a-z@A-Z]+)\\) \\(gcc(.+)",           2, &kernel_builder);
+    Parse(str, "(.+)gcc version (.+) \\(prerelease\\)(.+)", 2, &inf.gcc_ver);
+    Parse(str, "(.+)crosstool-NG ([^\\)]+)\\)(.+)",         2, &inf.ct_ng_ver);
+    Parse(str, "(.+)PREEMPT (.*)",                          2, &kernel_build_dt);
+    inf.kernel_build = kernel_ver + " (" + kernel_builder + ": " + kernel_build_dt + ")";
+  }
+  if (Parse(str, "(.+)mxc_dataflash spi([^\\:]+): ([a-z0-9]+)(.+)", 3, &inf.nor)) {
+    Parse(str, "(.+)\\(([^\\)]+)\\) pagesize(.+)", 2, &inf.nor_size);
+  }
+  Parse(str, "(.+)Regiboard TS: (.+)",        2, &inf.kernel.ts);
+  Parse(str, "(.+)Regiboard LCD setup: (.+)", 2, &inf.kernel.lcd);
+  std::string t_str;
+  if (Parse(str, "(.+)CSPI: ([^\\x20]+)(.+)", 2, &t_str)) {
+    inf.kernel.spi.push_back(t_str);
+  }
+  if (Parse(str, "(.+)mxcintuart.(\\d+): (\\w+)(.+)", 3, &t_str)) {
+    inf.kernel.uarts.push_back(t_str);
+  }
+  if (Parse(str, "(.+)USB Serial Device converter now attached to (\\w+)", 2, &t_str)) {
+    inf.kernel.usb_uart.push_back(t_str);
+  }
+  if (Parse(str, "(.+)0x([0-9a-f]+)-0x([0-9a-f]+) : \"(\\w+)\"", 4, &t_str)) {
+    inf.kernel.partitions.push_back(t_str);
+  }
   return true;
 }
 
-static void SkipLines(boost::asio::serial_port &port, const size_t limit) {
+static void SkipLines(SerialPort &port, const size_t limit) {
   uint8_t resp[1] = {0};
   size_t lines = 0;
   do {
@@ -126,26 +190,32 @@ static void SkipLines(boost::asio::serial_port &port, const size_t limit) {
   } while (lines < limit);
 }
 
-static bool ParseUntil(boost::asio::serial_port &port,
-                       const std::string        &wait_for,
-                       SysInfo                  *out) {
-  if (out == 0)
+static bool ParseUntil(SerialPort        &port,
+                       const std::string &wait_for,
+                       SysInfo           *out) {
+  if (out == 0) {
     return false;
+  }
   std::string str;
   uint8_t resp[1] = {0};
   while (not Parse(str, wait_for + "(.*)", 0, 0)) {
     boost::asio::read(port, boost::asio::buffer(resp, 1));
     if (resp[0] == 0x0A) {
+      ShowProcess("\t * Ожидание");
+      // DEBUG --------------------
+      // std::cout << "DEBUG: " << str << std::endl;
+      // --------------------------
       FillInSysInfo(str, *out);
       str = "";
     } else if (resp[0] != 0x0D) {
       str += (char)resp[0];
     }
   }
+  std::cout << std::endl;
   return true;
 }
 
-static bool UploadUBoot(boost::asio::serial_port &port, const std::string &file) {
+static bool UploadUBoot(SerialPort &port, const std::string &file) {
   ImxFirmware firm;
   std::cout << "Чтение образа..." << std::endl;
   firm.LoadFromFile(file);
@@ -159,22 +229,70 @@ static bool UploadUBoot(boost::asio::serial_port &port, const std::string &file)
   return true;
 }
 
-static bool UploadKernel(boost::asio::serial_port &port, const std::string &file) {
+static bool UploadKernelBegin(SerialPort &port, SysInfo *inf) {
   // ожидание приглашения u-boot
-  SysInfo inf;
-  if (not ParseUntil(port, "Hit any key to stop autoboot", &inf)) {
+  if (inf == 0 || not ParseUntil(port, "Hit any key to stop autoboot", inf)) {
     return false;
   }
   SendCmd(port, "");
-  ParseUntil(port, "Regiboard U-Boot >", &inf);
+  ParseUntil(port, "Regiboard U-Boot >", inf);
   SendCmd(port, "print");
-  ParseUntil(port, "Regiboard U-Boot >", &inf);
-  PrintSysInfo(inf);
+  ParseUntil(port, "Regiboard U-Boot >", inf);
   std::cout << "Загрузка ядра Linux..." << std::endl;
-  SendCmd(port, "loady " + inf.uboot.loadaddr + " 115200; bootm " + inf.uboot.loadaddr);
+  return true;
+}
+
+static bool UploadKernelEnd(SerialPort &port, SysInfo *inf) {
+  if (inf == 0) {
+    return false;
+  }
+  ParseUntil(port, "\\[([^\\]]+)\\] usb 2-1.3: FTDI USB Serial Device converter now attached to ttyUSB11", inf);
+  inf->kernel.usb_uart.push_back("ttyUSB11");
+  PrintSysInfo(*inf);
+  return true;
+}
+
+static std::string BootM(const SysInfo &inf) {
+  return std::string("; bootm ${loadaddr}");
+}
+
+static bool UploadKernelOverUart(SerialPort &port, const std::string &file) {
+  SysInfo inf;
+  if (not UploadKernelBegin(port, &inf)) {
+    return false;
+  }
+  SendCmd(port, "loady ${loadaddr} 115200" + BootM(inf));
   SkipLines(port, 2);
   YModem modem;
   modem.SendFile(file, port);
+  return UploadKernelEnd(port, &inf);
+}
+
+static bool UploadKernelOverEth(SerialPort   &port,
+                                TFtp::Server *srv) {
+  if (srv == 0) {
+    return false;
+  }
+  SysInfo inf;
+  if (not UploadKernelBegin(port, &inf)) {
+    return false;
+  }  
+  SendCmd(port, "dhcp ${loadaddr} " + srv->get_ip() + ":" + kKernelImg + 
+          BootM(inf));
+  srv->Run();
+  return UploadKernelEnd(port, &inf);
+}
+
+static bool UploadRamFsOverEth(SerialPort   &port,
+                               TFtp::Server *srv) {
+  // TODO
+  if (srv == 0) {
+    return false;
+  }
+  /*
+  SysInfo inf;
+  srv->Run();
+  */
   return true;
 }
 
@@ -182,19 +300,27 @@ struct Settings {
   std::string tty_dev;
   std::string imx_img;
   std::string kernel_img;
+  std::string ramfs_img;
+  std::string use_tftp;
 };
 
 static bool ParseArgs(int argc, char **argv, Settings &set) {
   namespace po = boost::program_options;
-  po::options_description desc("Программа загрузки плат Regiboard через COM порт");
+  po::options_description desc("Программа загрузки плат Regiboard через COM/Ethernet порты.");
 	desc.add_options()
-		("help", "описание аргументов")
+		("help", "описание аргументов.")
 		("tty",  po::value<std::string>()->default_value("/dev/" + kTtyDev),
-             "путь к устройству COM")
-		("img",  po::value<std::string>()->default_value("u-boot.imx"),
-             "путь к образу загрузчика u-boot")
-		("kernel", po::value<std::string>()->default_value(""),
-             "путь к образу ядра Linux. Ядро не будет загружено если не указать файл");
+             "путь к устройству COM.")
+		("img",  po::value<std::string>()->default_value(kUBootImg),
+             "путь к образу загрузчика u-boot.")
+		("kernel", po::value<std::string>()->default_value(kKernelImg),
+             "путь к образу ядра Linux. Ядро не будет загружено если не указать файл.")
+		("ramfs", po::value<std::string>()->default_value(kRamFsImg),
+             "путь к образу файловой системы. Необязательный параметр, работает "
+             "только совместно с флагом: --tftp.")
+    ("tftp", po::value<std::string>()->default_value(""),
+             "использовать TFTP, необходимо указать IP интерфейса для запуска "
+             "сервера.");
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
 	po::notify(vm);
@@ -205,13 +331,40 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
 	set.tty_dev    = vm["tty"].as<std::string>();
 	set.imx_img    = vm["img"].as<std::string>();
   set.kernel_img = vm["kernel"].as<std::string>();
+  set.ramfs_img  = vm["ramfs"].as<std::string>();
+  set.use_tftp   = vm["tftp"].as<std::string>();
 	return true;
+}
+
+void ShowPercentage(const std::string &msg, uint8_t percent) {
+  if (percent > 100) {
+    percent = 100;
+  }
+  std::cout << "\r\033[K"
+            << msg << ": "
+            << (unsigned)percent << " %"
+            << std::flush;
+}
+
+void ShowProcess(const std::string &msg) {
+  static const uint8_t kMaxNum = 10;
+  static uint8_t num = 1;
+  std::stringstream dots;
+  for (uint8_t i = 0; i < num; i++) {
+    dots << ".";
+  }
+  std::cout << "\r\033[K" << msg << ": " << dots.str() << std::flush;
+  num++;
+  if (num > kMaxNum) {
+    num = 1;
+  }
 }
 
 int main(int argc, char **argv) {
   Settings set;
-  if (not ParseArgs(argc, argv, set))
+  if (not ParseArgs(argc, argv, set)) {
     return 0;
+  }
   boost::asio::io_service io_service;
   boost::asio::serial_port port(io_service, set.tty_dev);
   std::cout << "Порт \"" << set.tty_dev << "\": "
@@ -223,8 +376,21 @@ int main(int argc, char **argv) {
   port.set_option( boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none) );
   if (PktStatus().Send(port) && 
       UploadUBoot(port, set.imx_img) &&
-      set.kernel_img.size() > 0) {
-    UploadKernel(port, set.kernel_img);
+      set.kernel_img.size() > 0 &&
+      set.use_tftp.size() == 0) {
+    UploadKernelOverUart(port, set.kernel_img);
+  }
+  // загрузка через Ethernet
+  if (set.use_tftp.size() > 0) {
+    TFtp::Server srv(set.use_tftp);
+    srv.PublishFile(kKernelImg, set.kernel_img);
+    srv.PublishFile(kRamFsImg,  set.ramfs_img);
+    if (set.ramfs_img.size() > 0) {
+      UploadRamFsOverEth(port, &srv);
+    }
+    if (set.kernel_img.size() > 0) {
+      UploadKernelOverEth(port, &srv);
+    }
   }
   port.close();
   return 0;

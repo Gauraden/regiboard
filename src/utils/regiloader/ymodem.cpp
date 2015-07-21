@@ -1,4 +1,5 @@
 #include "ymodem.hpp"
+#include "regiloader.hpp"
 #include <cstring>
 #include <iomanip>
 #include <fstream>
@@ -173,7 +174,6 @@ bool YModem::SendFile(const std::string &path, YModem::SPort &out) {
   Array frame(NewFrame());
   size_t was_send     = 0;
   size_t last_percent = 0;
-  std::cout << "Загрузка: " << std::endl;
   do {
     firm_str.sync();
     firm_str.read((char*)frame.get(), kFrameSize);
@@ -189,10 +189,11 @@ bool YModem::SendFile(const std::string &path, YModem::SPort &out) {
     }
     const size_t kPercent = was_send * 100 / kFileSize;
     if (kPercent > last_percent) {
-      std::cout << "\t - " << (unsigned)kPercent << "%" << std::endl;
+      ShowPercentage("\t * Прогресс", kPercent);
       last_percent = kPercent;
     }
   } while (was_send < kFileSize);
+  std::cout << std::endl;
   seq.Send(Packet(Packet::kEOT));
   IsResponse(out, Packet::kACK);
   seq.Send(Packet(Packet::kEOT));

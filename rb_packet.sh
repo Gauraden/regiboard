@@ -1,7 +1,7 @@
 #!/bin/sh
 
 IsPacketForHost() {
-  if [ "${PACKET_FOR_HOST}" = "true" ]; then
+  if [ "${PACKET_FOR_HOST}" == "true" ]; then
     return 0
   fi
   return 1
@@ -40,7 +40,10 @@ PacketConfigure() {
   IsFileExists "$build_dir/CMakeLists.txt" || \
     PrintAndDie 'Do not know how to configurate Automake'
   # host
-	IsPacketForHost && cmake ./ && return
+	if IsPacketForHost; then
+	  cmake ./
+	  return
+	fi
   # target
 	FLAGS="-I'${INCLUDE_DIR}' -I'${rfs_include}' -L'${rfs_lib}' ${PACKET_CONFIGURE}"
 	export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} \
@@ -59,8 +62,11 @@ PacketClean() {
 PacketMake() {
 	local build_dir=$1
 	PrintNotice "Building..."
-  IsPacketForHost && TcHostMakeSources ${build_dir} \
-  || TcTargetMakeSources ${build_dir}
+  if IsPacketForHost; then
+    TcHostMakeSources ${build_dir}
+  else
+    TcTargetMakeSources ${build_dir}
+  fi
 }
 
 SetPacketControl() {

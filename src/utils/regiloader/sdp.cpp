@@ -267,7 +267,7 @@ bool PktWriteF::Write() {
 SdpPacket::Transfer PktWriteF::Read() {
   FieldU32 ack;
   GetVal(0, ack);
-  std::cout << "Режим загрузки (ACK): " << GetAckName(ack) << std::endl;
+  std::cout << "\t * Режим загрузки : " << GetAckName(ack) << std::endl;
   return (ack.value == kOtherwise ? kContinue : kStop);
 }
 
@@ -276,7 +276,7 @@ bool PktWriteF::Write(boost::asio::serial_port &port) {
     return false;
   const size_t kWasWrote = boost::asio::write(port, boost::asio::buffer(_firm->GetData(), _firm->GetSize()));
   std::cout << std::dec
-            << "\t * Записано   : " << (unsigned)kWasWrote << " байт\n"
+            << "\t * Записано       : " << (unsigned)kWasWrote << " байт\n"
             << std::endl;
   return (kWasWrote == _firm->GetSize());
 }
