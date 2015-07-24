@@ -107,7 +107,9 @@ FirmwareCreate() {
   # запись метаданных и обфусикация
   $UTIL_PROTECTOR --sign ${FIRMWARE_INFO}/${FIRMWARE_NAME}.inf --file $firm_file
   # установка контрольной суммы
-  $UTIL_CRC --file $firm_file --crc_value ${FIRMWARE_CRC} --threads 2
+  # значение контрольной суммы берётся то что установелно по умолчанию, см.
+  # исходники утилиты: $UTIL_CRC
+  $UTIL_CRC --file $firm_file --threads 2
 }
 
 BuildFirmware() {
