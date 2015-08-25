@@ -5,8 +5,20 @@ _EXPORT_ONLY_FUNCS='y'
 . ../../rb_helpers.sh
 
 TARGET_DIR=$1
+TARGET_TTY_FONT="${TARGET_DIR}/usr/share/fonts/tty"
+
 SRC_SHELL_DIR="../../src/shell"
 SRC_ETC_DIR="../../src/etc"
+SRC_FONTS_DIR="../../src/tty_font"
+
+#PrintNotice 'Copying "sysroot" from toolchain...'
+#cp -r $TARGET_DIR/../../toolchain/sysroot/* ${TARGET_DIR}/
+
+PrintNotice 'Copying fonts...'
+mkdir ${TARGET_TTY_FONT}
+cp ${SRC_FONTS_DIR}/* ${TARGET_TTY_FONT}/
+
+echo "cp ${SRC_FONTS_DIR}/* ${TARGET_TTY_FONT}/"
 
 PrintNotice 'Copying linux setup scripts...'
 OS_SETUP_DIR=${TARGET_DIR}/root/os_setup

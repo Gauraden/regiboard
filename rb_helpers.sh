@@ -303,8 +303,8 @@ UndefineConfigVar() {
 #   < name of variable
 #   < new value for variable
 SetConfigVar() {
-	CheckConfigBeforeEdit $1 $2 $3
-	sed -r -e "s:^$2=(.+)$:$2=${CONFIG_VAR_VAL}:" $1 > "$1.tmp"
+	CheckConfigBeforeEdit $1 $2 "$3"
+ 	sed -r -e "s:^$2=(.+)$:$2=${CONFIG_VAR_VAL}:" $1 > "$1.tmp"
 	mv "$1.tmp" "$1"
 }
 # Function for retrieving list of directories with executable files.

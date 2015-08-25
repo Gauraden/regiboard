@@ -302,6 +302,7 @@ struct Settings {
   std::string kernel_img;
   std::string ramfs_img;
   std::string use_tftp;
+  bool        just_eth;
 };
 
 static bool ParseArgs(int argc, char **argv, Settings &set) {
@@ -318,9 +319,12 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
 		("ramfs", po::value<std::string>()->default_value(kRamFsImg),
              "путь к образу файловой системы. Необязательный параметр, работает "
              "только совместно с флагом: --tftp.")
-    ("tftp", po::value<std::string>()->default_value(""),
+    ("tftp", po::value<std::string>()->default_value("0.0.0.0"),
              "использовать TFTP, необходимо указать IP интерфейса для запуска "
-             "сервера.");
+             "сервера.")
+    ("just_eth", po::value<bool>()->default_value(false)->zero_tokens(),
+                 "использовать только загрузку через Ethernet, не использовать"
+                 "UART");
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
 	po::notify(vm);
@@ -333,6 +337,7 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
   set.kernel_img = vm["kernel"].as<std::string>();
   set.ramfs_img  = vm["ramfs"].as<std::string>();
   set.use_tftp   = vm["tftp"].as<std::string>();
+  set.just_eth   = vm["just_eth"].as<bool>();
 	return true;
 }
 
@@ -363,6 +368,15 @@ void ShowProcess(const std::string &msg) {
 int main(int argc, char **argv) {
   Settings set;
   if (not ParseArgs(argc, argv, set)) {
+    return 0;
+  }
+  if (set.just_eth) {
+    TFtp::Server srv(set.use_tftp);
+    srv.PublishFile(kKernelImg, set.kernel_img);
+    srv.PublishFile(kRamFsImg,  set.ramfs_img);
+    if (set.kernel_img.size() > 0) {
+      srv.Run();
+    }
     return 0;
   }
   boost::asio::io_service io_service;

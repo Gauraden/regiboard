@@ -1,0 +1,5 @@
+#!/bin/sh
+
+setfont /usr/share/fonts/tty/eurorus.f16.psf -C /dev/tty0
+
+

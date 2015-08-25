@@ -51,9 +51,9 @@ RFSPrepareConfig() {
 	SetConfigVar ${br_config_path} 'BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX' "${TC_PREFIX}"
 	SetConfigVar ${br_config_path} 'BR2_TOOLCHAIN_EXTERNAL_PREFIX'        "${TC_PREFIX}"
 	SetConfigVar ${br_config_path} 'BR2_TARGET_GENERIC_HOSTNAME'          "${BOARD_NAME}"
-	#TODO: we have a BUG, string is cutted!
-	SetConfigVar ${br_config_path} 'BR2_TARGET_GENERIC_ISSUE'             "Welcome to RegiBoard (${BOARD_CONFIG})"
+	SetConfigVar ${br_config_path} 'BR2_TARGET_GENERIC_ISSUE'             "Welcome to RegiBoard [${BOARD_CONFIG}]"
 	SetConfigVar ${br_config_path} 'BR2_ROOTFS_POST_BUILD_SCRIPT'         "${WORK_DIR}/rb_patch_rootfs_image.sh"
+	SetConfigVar ${br_config_path} 'BR2_PACKAGE_BUSYBOX_CONFIG'           "${CONF_DIR}/busybox-1.20.x.config"
 	# Enable UDev
 	SetConfigVar ${br_config_path} 'BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_UDEV' 'y'
 	UndefineConfigVar ${br_config_path} 'BR2_ROOTFS_DEVICE_CREATION_STATIC'
@@ -99,6 +99,10 @@ BuildRootFS() {
 	mkdir -p "${RFS_BUILD_DIR}/output/target/lib"
 	ln -fs "${KERNEL_MODULES_DIR}" "${RFS_BUILD_DIR}/output/target/lib/modules" || 
 	  PrintAndDie 'Directory with kernel modules was not found!'
+	# цепляем sysroot toolchain`a к buildroot
+	cp -r ${TC_ROOT_DIR}/${TC_PREFIX}/sysroot ${RFS_BUILD_DIR}/toolchain/
+	chmod -R a+w ${RFS_BUILD_DIR}/toolchain/sysroot
+  rm -r ${RFS_BUILD_DIR}/toolchain/sysroot/usr/include
 	# building root FS
 	PrintNotice "Building root file system..."
 	TcTargetMakeSources  "${RFS_BUILD_DIR}"
