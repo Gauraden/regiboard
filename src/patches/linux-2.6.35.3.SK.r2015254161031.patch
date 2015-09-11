@@ -1,0 +1,311 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2015-03-17 16:09:34.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2015-09-10 11:04:06.463858486 +0300
+@@ -373,7 +373,7 @@
+ };
+ 
+ static struct ads7846_platform_data ads_info_7845 = {
+-	.model            = 7845, // ADS7845
++	.model            = 7846, // ADS7845
+ 	.vref_mv          = 2500, // 2.5V external VREF
+ 	.swap_xy          = false,
+ 	.x_min            = 0,
+@@ -418,12 +418,16 @@
+   printk("Regiboard trying to detect TS:\n");
+   while (kTSConfig[id].data != 0) {
+     printk("* %d - %s\n", id, kTSConfig[id].name);
+-    if (strstr(saved_command_line, kTSConfig[id].name) != 0)
++    if (strstr(saved_command_line, kTSConfig[id].name) != 0) {
++      printk("Regiboard TS: %s\n", kTSConfig[id].name);
+       return kTSConfig[id].data;
++    }
+     id++;
+   }
+-  printk("Regiboard TS was not detected! Using default \"ADS7843E\"\n");
+-  return kTSConfig[0].data;
++  id = 0;
++  printk("Regiboard TS was not detected!\n");
++  printk("Regiboard TS: %s\n", kTSConfig[id].name);
++  return kTSConfig[id].data;
+ }
+ /* Displays *******************************************************************/
+ /*
+@@ -525,12 +529,24 @@
+ 		FB_VMODE_NONINTERLACED,
+ 		0,
+ 	},
+-	{ // Regigraf 7" (mx1) display
++	{ // Regigraf 10.4" (mx1) display
+ 		"PD104VT2", 30, 640, 480, 19200, 0x4e, 0x0e, 0x23, 0, 0x3f, 1,
+ 		0,
+ 		FB_VMODE_NONINTERLACED,
+ 		0,
+ 	},
++  { // Regigraf 10.4" display
++		"AA104SL02", 30, 800, 600, 15385, 0x4e, 0x0e, 0x23, 0, 0x3f, 1,
++		0,
++		FB_VMODE_NONINTERLACED,
++		0,
++	},
++	{ // Regigraf 10.4" display
++		"AA104XF02", 30, 1024, 768, 15385, 0x4e, 0x0e, 0x23, 0, 0x3f, 1,
++		0,
++		FB_VMODE_NONINTERLACED,
++		0,
++	},
+ };
+ 
+ struct LCDControl {
+@@ -557,6 +573,14 @@
+     .rsc   = 0, // NU
+     .sel68 = 0  // NU
+   },
++  { // kAA104SL02
++    .rsc   = 0, // NU
++    .sel68 = 1  // NU
++  },
++  { // kAA104XF02
++    .rsc   = 0, // NU
++    .sel68 = 1  // NU
++  },
+ };
+ 
+ enum LCDModel {
+@@ -565,7 +589,9 @@
+ 	kNLB150XG01L_01 = 2,
+ 	kCLAA_WVGA      = 3,
+ 	kPD104VT2       = 4,
+-	kLcdAmount      = 5, // must be the last
++	kAA104SL02      = 5,
++	kAA104XF02      = 6,
++	kLcdAmount      = 7, // must be the last
+ };
+ 
+ static struct mxc_fb_platform_data fb_data[] = {
+@@ -594,7 +620,17 @@
+ 		.mode_str          = "PD104VT2",
+ 		.mode              = video_modes,
+ 		.num_modes         = ARRAY_SIZE(video_modes),	  
+-	}
++	}, {
++		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
++		.mode_str          = "AA104SL02",
++		.mode              = video_modes,
++		.num_modes         = ARRAY_SIZE(video_modes),	  
++	}, {
++		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
++		.mode_str          = "AA104XF02",
++		.mode              = video_modes,
++		.num_modes         = ARRAY_SIZE(video_modes),	  
++	}	
+ };
+ 
+ static struct resource mxcfb_resources[] = {
+--- ./build/linux-2.6.35.3.SK/drivers/hwmon/imx_ahci_hwmon.c.orig	2011-11-10 01:55:29.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/hwmon/imx_ahci_hwmon.c	2015-09-11 15:31:55.861531483 +0300
+@@ -24,18 +24,27 @@
+ #include <linux/platform_device.h>
+ #include <linux/hwmon.h>
+ #include <linux/time.h>
++#include <linux/hrtimer.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/ahci_sata.h>
+ 
++#define HWMON_TIMER_POLL_DELAY ktime_set(5, 0) // (sec, nsec) => 5 sec
+ /**
+  * struct imx_ahci_hwmon - hwmon information
+  * @lock: Access lock to serialise the conversions.
+  * @hwmon_dev: The hwmon device we created.
+ */
+-struct imx_ahci_hwmon {
+-	struct mutex		lock;
+-	struct device		*hwmon_dev;
++static struct imx_ahci_hwmon {
++	struct mutex		    lock;
++	spinlock_t          temp_lock;
++	struct device      *hwmon_dev;
++	struct hrtimer      timer;
++	struct work_struct  work;
++	int                 temperature;
++} hwmon = {
++  .hwmon_dev   = 0,
++  .temperature = 0,
+ };
+ 
+ static ssize_t imx_ahci_hwmon_name_show(struct device *dev,
+@@ -45,14 +54,14 @@
+ }
+ 
+ /**
+- * imx_ahci_hwmon_temp_show - show value of the temperature
++ * imx_ahci_hwmon_temp_read - read value of the temperature
+  * @dev: The device that the attribute belongs to.
+  * @attr: The attribute being read.
+  * @buf: The result buffer.
+  *
+  * Read a value from the IMX AHCI temperature monitor.
+  */
+-static ssize_t imx_ahci_hwmon_temp_show(struct device *dev,
++static ssize_t imx_ahci_hwmon_temp_read(struct device *dev,
+ 				 struct device_attribute *attr,
+ 				 char *buf)
+ {
+@@ -61,11 +70,8 @@
+ 	u32 str1, str2, str3, str4, read_sum, index;
+ 	int m1, m2, a, temp, ret;
+ 	struct clk *sata_clk, *sata_ref_clk;
+-	struct imx_ahci_hwmon *hwmon;
+-
+-	hwmon = platform_get_drvdata(to_platform_device(dev));
+ 
+-	ret = mutex_lock_interruptible(&hwmon->lock);
++	ret = mutex_lock_interruptible(&hwmon.lock);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -237,9 +243,37 @@
+ 	clk_put(sata_ref_clk);
+ 	clk_disable(sata_clk);
+ 	clk_put(sata_clk);
+-	mutex_unlock(&hwmon->lock);
++	mutex_unlock(&hwmon.lock);
++	
++  spin_lock(&hwmon.temp_lock);
++  hwmon.temperature = temp * 1000;
++  spin_unlock(&hwmon.temp_lock);
++  return 0;
++}
++
++static void imx_ahci_hwmon_work(struct work_struct *work)
++{
++  imx_ahci_hwmon_temp_read(hwmon.hwmon_dev, 0, 0);
++}
+ 
+-	return sprintf(buf, "%d\n", temp * 1000);
++static enum hrtimer_restart imx_ahci_hwmon_temp_timer(struct hrtimer *timer)
++{
++  schedule_work(&hwmon.work);
++  hrtimer_forward(timer, hrtimer_cb_get_time(timer), HWMON_TIMER_POLL_DELAY);
++  return HRTIMER_RESTART;
++}
++
++static ssize_t imx_ahci_hwmon_temp_show(struct device *dev,
++				 struct device_attribute *attr,
++				 char *buf)
++{
++  if (buf == 0) {
++    return 0;
++  }
++  spin_lock(&hwmon.temp_lock);
++  ssize_t res = sprintf(buf, "%d\n", hwmon.temperature);
++  spin_unlock(&hwmon.temp_lock);
++  return res;
+ }
+ 
+ static DEVICE_ATTR(name, S_IRUGO, imx_ahci_hwmon_name_show, NULL);
+@@ -261,16 +295,8 @@
+ */
+ static int __devinit imx_ahci_hwmon_probe(struct platform_device *dev)
+ {
+-	struct imx_ahci_hwmon *hwmon;
+ 	int ret = 0;
+-
+-	hwmon = kzalloc(sizeof(struct imx_ahci_hwmon), GFP_KERNEL);
+-	if (hwmon == NULL) {
+-		dev_err(&dev->dev, "no memory\n");
+-		return -ENOMEM;
+-	}
+-
+-	platform_set_drvdata(dev, hwmon);
++	platform_set_drvdata(dev, &hwmon);
+ 
+ 	/* add attributes for device. */
+ 	ret = sysfs_create_group(&dev->dev.kobj, &imx_ahci_hwmon_attrgroup);
+@@ -279,15 +305,21 @@
+ 
+ 	/* register with the hwmon core */
+ 
+-	hwmon->hwmon_dev = hwmon_device_register(&dev->dev);
+-	if (IS_ERR(hwmon->hwmon_dev)) {
++	hwmon.hwmon_dev = hwmon_device_register(&dev->dev);
++	if (IS_ERR(hwmon.hwmon_dev)) {
+ 		dev_err(&dev->dev, "error registering with hwmon\n");
+-		ret = PTR_ERR(hwmon->hwmon_dev);
++		ret = PTR_ERR(hwmon.hwmon_dev);
+ 		goto err_raw_attribute;
+ 	}
+ 
+-	mutex_init(&hwmon->lock);
+-
++	mutex_init(&hwmon.lock);
++	spin_lock_init(&hwmon.temp_lock);
++  // background function for slow measuring and reading of temperature
++  INIT_WORK(&hwmon.work, imx_ahci_hwmon_work);
++	// timer for periodical reading of temperature
++  hrtimer_init(&hwmon.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
++  hwmon.timer.function = imx_ahci_hwmon_temp_timer;
++	hrtimer_start(&hwmon.timer, HWMON_TIMER_POLL_DELAY, HRTIMER_MODE_REL);
+ 	return 0;
+ 
+ err_raw_attribute:
+@@ -295,20 +327,15 @@
+ 
+ err_mem:
+ 	platform_set_drvdata(dev, NULL);
+-	kfree(hwmon);
+ 	return ret;
+ }
+ 
+ static int __devexit imx_ahci_hwmon_remove(struct platform_device *dev)
+ {
+-	struct imx_ahci_hwmon *hwmon = platform_get_drvdata(dev);
+-
+-	mutex_destroy(&hwmon->lock);
++	mutex_destroy(&hwmon.lock);
+ 	sysfs_remove_group(&dev->dev.kobj, &imx_ahci_hwmon_attrgroup);
+-	hwmon_device_unregister(hwmon->hwmon_dev);
++	hwmon_device_unregister(hwmon.hwmon_dev);
+ 	platform_set_drvdata(dev, NULL);
+-	kfree(hwmon);
+-
+ 	return 0;
+ }
+ 
+--- ./build/linux-2.6.35.3.SK/drivers/mtd/nand/nand_ids.c.orig	2011-11-10 01:53:40.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/mtd/nand/nand_ids.c	2015-06-22 14:24:56.578400343 +0300
+@@ -101,6 +101,7 @@
+ 	/* 8 Gigabit */
+ 	{"NAND 1GiB 1,8V 8-bit",	0xA3, 0, 1024, 0, LP_OPTIONS},
+ 	{"NAND 1GiB 3,3V 8-bit",	0xD3, 0, 1024, 0, LP_OPTIONS},
++	{"NAND 1GiB 3,3V 8-bit",	0x38, 0, 1024, 0, LP_OPTIONS},
+ 	{"NAND 1GiB 1,8V 16-bit",	0xB3, 0, 1024, 0, LP_OPTIONS16},
+ 	{"NAND 1GiB 3,3V 16-bit",	0xC3, 0, 1024, 0, LP_OPTIONS16},
+ 
+--- ./build/linux-2.6.35.3.SK/drivers/mtd/nand/nand_device_info.c.orig	2014-07-29 15:42:23.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/drivers/mtd/nand/nand_device_info.c	2015-06-22 14:26:29.505232095 +0300
+@@ -419,6 +419,25 @@
+ 	.tRHOH_in_ns              = -1,
+ 	"MT29F8G08FABWG",
+ 	},
++	{ // iMX53-Regiboard.v3 NAND
++	.end_of_table             = false,
++	.manufacturer_code        = 0x2c,
++	.device_code              = 0x38, // in datasheet (MT29F8G08ABABAWPIT.pdf) 0x28
++	.cell_technology          = NAND_DEVICE_CELL_TECH_SLC,
++	.chip_size_in_bytes       = 1LL*SZ_1G,
++	.block_size_in_pages      = 128,
++	.page_total_size_in_bytes = 4*SZ_1K + 218,
++	.ecc_strength_in_bits     = 4,
++	.ecc_size_in_bytes        = 512,
++	.data_setup_in_ns         = 25,
++	.data_hold_in_ns          = 15,
++	.address_setup_in_ns      = 10,
++	.gpmi_sample_delay_in_ns  = 6,
++	.tREA_in_ns               = -1,
++	.tRLOH_in_ns              = -1,
++	.tRHOH_in_ns              = -1,
++	"MT29F8G08ABABA",
++	},
+ 	{
+ 	.end_of_table             = false,
+ 	.manufacturer_code        = 0x98,
