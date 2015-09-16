@@ -1,12 +1,12 @@
 
-// Last Ver. 0.0.2.17
-// Prev Ver. 0.0.2.16
+// Last Ver. 0.0.2.28
+// Prev Ver. 0.0.2.28
 
 
 // Номера регистров конфигурации
 
-#define   c_ModbusParams  78//36 //26
-#define   c_ModbusConfig  54 //45//172 //140 //105 //73
+#define   c_ModbusParams  110 //78//36 //26
+#define   c_ModbusConfig  67 //54 //45//172 //140 //105 //73
 #define   c_ModbusCoil    16
 #define   c_ModbusLogic   2
 
@@ -32,6 +32,7 @@
 #define  r_LogicOutRaw   end_adr_coil_reg16  - 2
 
 
+// Помощник-макрос получения числа без знака
 #define MAKE_ABS(a)      (a < 0 ? -(a) : a)
 
 // === Measure Reg [0x04] === Плата ADC ===
@@ -44,26 +45,28 @@
 #define  r_ADCh6         c_ModbusParams  - 6
 #define  r_ADCh7         c_ModbusParams  - 7
 #define  r_ADCh8         c_ModbusParams  - 8
-// this is a definition of a special macros that helps to address registers properly. This approach you will see through the whole file. Done.
+
+
+// Заведем специальные макросы по которым будут адресоваться регистры.
+// Таким образом избавимся от привязки к конкретным адресам регистров.
 // GET_ADCh(n)    n = 1..8
-// descr: get a float value of an analog input channel
-// returning: float
-//#define GET_ADCh(n)                                               MAKE_ABS( (r_ADCh1) - c_ModbusParams + 1 - (2 * (n - 1)) )
+// descr: получиь значение аналогового входа
+// return: float число
 #define GET_ADCh(n)                                               ( -2 * ((r_ADCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
 #define  r_LastReadTimeCh12   c_ModbusParams  - 9
 #define  r_LastReadTimeCh34   c_ModbusParams  - 10
 #define  r_LastReadTimeCh56   c_ModbusParams  - 11
 #define  r_LastReadTimeCh78   c_ModbusParams  - 12
-// GET_LASTREADTIMECH(n)   n - number of pair, n = 1..4
-// descr: get the last read time of a channel. (It might be useful for synchronization dealing and etc)
-// returning: unsigned long (that you have to parse as a pair of short values)
+// GET_LASTREADTIMECH(n)   n - номер пары, n = 1..4
+// descr: получить время последнего обновления регистра в программе прошивки (для синхронизации может быть пригодится?)
+// return: unsigned long, в котором лежит пара коротких значений, которые надо распарсить будет
 #define GET_LASTREADTIMECH(n)                                     ( -2 * ((r_LastReadTimeCh12) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
 #define  r_TempHS		     c_ModbusParams  - 13
-// GET_COLDJUNCTION_TEMP(n)    n - number of junction, this time it must be equal to one only. n = 1
-// descr: get a cold junction temperature
-// returning: float
+// GET_COLDJUNCTION_TEMP(n)    n - номер датчика, n = 1..1 (пока на плате он только один, так что только n = 1)
+// descr: получить температуру холодного спая в градусах
+// return: float
 #define GET_COLDJUNCTION_TEMP(n)                                  ( -2 * ((r_TempHS) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
 #define  r_ADTempCh1     c_ModbusParams  - 14
@@ -74,10 +77,9 @@
 #define  r_ADTempCh6     c_ModbusParams  - 19
 #define  r_ADTempCh7     c_ModbusParams  - 20
 #define  r_ADTempCh8     c_ModbusParams  - 21
-// GET_ADTEMPCH(n)  n - number of a channel. n = 1..8
-// descr: get a temperature of a channel
-// returning: float
-//#define GET_ADTEMPCH(n)                                           MAKE_ABS( (r_ADTempCh1) - c_ModbusParams + 1 - (2 * (n - 1)) )
+// GET_ADTEMPCH(n)  n - номер канала. n = 1..8
+// descr: получить температуру канала
+// return: float
 #define GET_ADTEMPCH(n)                                           ( -2 * ((r_ADTempCh1) - c_ModbusParams + 1) - (2 * (n - 1)) )
 
 #define  r_ADUsuppCh1     c_ModbusParams  - 22
@@ -88,10 +90,9 @@
 #define  r_ADUsuppCh6     c_ModbusParams  - 27
 #define  r_ADUsuppCh7     c_ModbusParams  - 28
 #define  r_ADUsuppCh8     c_ModbusParams  - 29
-// GET_ADVOLTAGESUPP(n)  n - number of a channel. n = 1..8
-// descr: get a voltage supply of a channel
-// returning: float?
-//#define GET_ADVOLTAGESUPP(n)                                      MAKE_ABS( (r_ADUsuppCh1) - c_ModbusParams + 1 - (2 * (n - 1)) )
+// GET_ADVOLTAGESUPP(n)  n - номер канала. n = 1..8
+// descr: получить напряжение на канале
+// return: float
 #define GET_ADVOLTAGESUPP(n)                                      ( -2 * ((r_ADUsuppCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
 
@@ -103,17 +104,17 @@
 
 
 #define  r_AllCurSupply		c_ModbusParams  - 35
-// GET_ALLCURSUPPLY(n)   n - number that must be equal to one only at this time. n = 1
-// descr: get the whole current supply
-// returning: float?
-//#define GET_ALLCURSUPPLY(n)                                       MAKE_ABS( (r_AllCurSupply) - c_ModbusParams + 1 - (2 * (n - 1)) )
+// GET_ALLCURSUPPLY(n)   n - 1..1
+// descr: получить общее потребление тока
+// return: float
 #define GET_ALLCURSUPPLY(n)                                       ( -2 * ((r_AllCurSupply) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-#define  r_ADCType			  c_ModbusParams  - 36  //  0x00XX   1 - AD7795 (16-bit), 0 - AD7794 (24-bit)
-// GET_ADCTYPE     no params
-// descr: get a type of ADC
-// returning: float?
-#define GET_ADCTYPE                                               MAKE_ABS( (r_ADCType) - c_ModbusParams + 1 )
+#define  r_ADCType_10VDet	c_ModbusParams  - 36  //  0x00XX   1 - AD7795 (16-bit), 			0 - AD7794 (24-bit)
+																								//  0xXX00   1 - Делитель отсутствует, 	0 - Делитель присутствует
+// GET_ADCTYPE     нет параметров
+// descr: получить тип ADC
+// return: Long
+#define GET_ADCTYPE                                               MAKE_ABS( 2 * ( (r_ADCType_10VDet) - c_ModbusParams + 1 ) )
 
 #define  r_ADStatus		    c_ModbusParams  - 37  //  0x00XX   1 - Event, 0 - No event         Addr 0x3C - 0x3D
 																									 //  0 bit - AD_BreakLine
@@ -131,13 +132,17 @@
 																									 // 12 bit - AD_InputElementCrash4
 																									 // 13 bit - PCB_SystemError
 																									 
-// GET_ADSTATUS   no params
-// descr: get a status of a system
-// returning: float?
-#define GET_ADSTATUS                                              MAKE_ABS( (r_ADStatus) - c_ModbusParams + 1 )
+// GET_ADSTATUS   нет параметров
+// descr: получить статус системы (определение обрывов, сбоев; всё тут)
+// return: Long
+#define GET_ADSTATUS                                              MAKE_ABS( 2 * ( (r_ADStatus) - c_ModbusParams + 1 ) )
 
 #define  r_AD_BreakLine   		 c_ModbusParams  - 38                           				//        Addr 0x3E - 0x3F
 //r_ADBreakLine		//  0x0000000XX   1 - Input Line is break,				 0 - Input Line is OK
+// GET_AD_BREAKLINE    нет параметров
+// descr: получить карту входов, на которых случился обрыв
+// return: Long
+#define GET_AD_BREAKLINE                                          MAKE_ABS( 2 * ( (r_AD_BreakLine) - c_ModbusParams + 1 ) )
 
 #define  r_AD_DownDiap_UpDiap_DownNom_UpNom   c_ModbusParams  - 39                           				//        Addr 0x40 - 0x41
 //UpNom			//  0x0000000XX   1 - Input Line is below min, 0 - Input Line is OK
@@ -207,140 +212,169 @@
 
 // === Measure Reg [0x04] === Плата дискр вх./вых. === 
 #define  r_DInput      c_ModbusParams  - 1
-// GET_DINPUT
-// descr: get logic inputs
-// returning: unsigned long (a bit mask!)
-#define GET_DINPUT                                                MAKE_ABS( (r_DInput) - c_ModbusParams + 1 )
+// GET_DINPUT    без параметров
+// descr: получить маску битов выставленных лог.входов в 1
+// return: unsigned long
+#define GET_DINPUT                                                ( -2 * ((r_DInput) - c_ModbusParams + 1) )
 
 #define  r_DIFreqCh1   c_ModbusParams  - 2
 #define  r_DIFreqCh2   c_ModbusParams  - 3
 #define  r_DIFreqCh3   c_ModbusParams  - 4
 #define  r_DIFreqCh4   c_ModbusParams  - 5
-// GET_DIFREQ(n)    n - number of channel. n = 1..4
-// descr: get a frequence of a channel
-// returning: unsigned long
-//#define GET_DIFREQ(n)                                              MAKE_ABS( (r_DIFreqCh1) - c_ModbusParams + 1 - (2 * (n - 1)) )
+#define  r_DIFreqCh5   c_ModbusParams  - 6
+#define  r_DIFreqCh6   c_ModbusParams  - 7
+#define  r_DIFreqCh7   c_ModbusParams  - 8
+#define  r_DIFreqCh8   c_ModbusParams  - 9
+#define  r_DIFreqCh9   c_ModbusParams  - 10
+#define  r_DIFreqCh10  c_ModbusParams  - 11
+#define  r_DIFreqCh11  c_ModbusParams  - 12
+#define  r_DIFreqCh12  c_ModbusParams  - 13
+// GET_DIFREQ(n)    n - номер канала. n = 1..4
+// descr: получить частоту по каналу
+// return: unsigned long
 #define GET_DIFREQ(n)                                              ( -2 * ((r_DIFreqCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-#define  r_DIPerDurCh1   c_ModbusParams  - 6
-#define  r_DIPerDurCh2   c_ModbusParams  - 7
-#define  r_DIPerDurCh3   c_ModbusParams  - 8
-#define  r_DIPerDurCh4   c_ModbusParams  - 9
+#define  r_DIPerDurCh1   c_ModbusParams  - 14
+#define  r_DIPerDurCh2   c_ModbusParams  - 15
+#define  r_DIPerDurCh3   c_ModbusParams  - 16
+#define  r_DIPerDurCh4   c_ModbusParams  - 17
+#define  r_DIPerDurCh5   c_ModbusParams  - 18
+#define  r_DIPerDurCh6   c_ModbusParams  - 19
+#define  r_DIPerDurCh7   c_ModbusParams  - 20
+#define  r_DIPerDurCh8   c_ModbusParams  - 21
+#define  r_DIPerDurCh9   c_ModbusParams  - 22
+#define  r_DIPerDurCh10  c_ModbusParams  - 23
+#define  r_DIPerDurCh11  c_ModbusParams  - 24
+#define  r_DIPerDurCh12  c_ModbusParams  - 25
+
 // GET_DIPERDUR(n)  n - number of a channel. n = 1..4
 // descr: get a duration period of a channel
 // returning: unsigned long
 #define GET_DIPERDUR(n)                                            ( -2 * ((r_DIPerDurCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-#define  r_DIPosDurCh1   c_ModbusParams  - 10
-#define  r_DIPosDurCh2   c_ModbusParams  - 11
-#define  r_DIPosDurCh3   c_ModbusParams  - 12
-#define  r_DIPosDurCh4   c_ModbusParams  - 13
+#define  r_DIPosDurCh1   c_ModbusParams  - 26
+#define  r_DIPosDurCh2   c_ModbusParams  - 27
+#define  r_DIPosDurCh3   c_ModbusParams  - 28
+#define  r_DIPosDurCh4   c_ModbusParams  - 29
+#define  r_DIPosDurCh5   c_ModbusParams  - 30
+#define  r_DIPosDurCh6   c_ModbusParams  - 31
+#define  r_DIPosDurCh7   c_ModbusParams  - 32
+#define  r_DIPosDurCh8   c_ModbusParams  - 33
+#define  r_DIPosDurCh9   c_ModbusParams  - 34
+#define  r_DIPosDurCh10  c_ModbusParams  - 35
+#define  r_DIPosDurCh11  c_ModbusParams  - 36
+#define  r_DIPosDurCh12  c_ModbusParams  - 37
+
 // GET_DIPOSDUR(n)  n - number of a channel. n = 1..4
 // descr: get a positive duration of a channel
 // returning: unsigned long
 #define GET_DIPOSDUR(n)                                            ( -2 * ((r_DIPosDurCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-#define  r_DINegDurCh1   c_ModbusParams  - 14
-#define  r_DINegDurCh2   c_ModbusParams  - 15
-#define  r_DINegDurCh3   c_ModbusParams  - 16
-#define  r_DINegDurCh4   c_ModbusParams  - 17
+#define  r_DINegDurCh1   c_ModbusParams  - 38
+#define  r_DINegDurCh2   c_ModbusParams  - 39
+#define  r_DINegDurCh3   c_ModbusParams  - 40
+#define  r_DINegDurCh4   c_ModbusParams  - 41
+#define  r_DINegDurCh5   c_ModbusParams  - 42
+#define  r_DINegDurCh6   c_ModbusParams  - 43
+#define  r_DINegDurCh7   c_ModbusParams  - 44
+#define  r_DINegDurCh8   c_ModbusParams  - 45
+#define  r_DINegDurCh9   c_ModbusParams  - 46
+#define  r_DINegDurCh10  c_ModbusParams  - 47
+#define  r_DINegDurCh11  c_ModbusParams  - 48
+#define  r_DINegDurCh12  c_ModbusParams  - 49
+
 // GET_DINEGDUR(n)  n - number of a channel. n = 1..4
 // descr: get a negative period of a channel
 // returning: unsigned long
 #define GET_DINEGDUR(n)                                            ( -2 * ((r_DINegDurCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-#define  r_DIPosDurPPCh1   c_ModbusParams  - 18
-#define  r_DIPosDurPPCh2   c_ModbusParams  - 19
-#define  r_DIPosDurPPCh3   c_ModbusParams  - 20
-#define  r_DIPosDurPPCh4   c_ModbusParams  - 21
+#define  r_DIPosDurPPCh1   c_ModbusParams  - 50
+#define  r_DIPosDurPPCh2   c_ModbusParams  - 51
+#define  r_DIPosDurPPCh3   c_ModbusParams  - 52
+#define  r_DIPosDurPPCh4   c_ModbusParams  - 53
+#define  r_DIPosDurPPCh5   c_ModbusParams  - 54
+#define  r_DIPosDurPPCh6   c_ModbusParams  - 55
+#define  r_DIPosDurPPCh7   c_ModbusParams  - 56
+#define  r_DIPosDurPPCh8   c_ModbusParams  - 57
+#define  r_DIPosDurPPCh9   c_ModbusParams  - 58
+#define  r_DIPosDurPPCh10  c_ModbusParams  - 59
+#define  r_DIPosDurPPCh11  c_ModbusParams  - 60
+#define  r_DIPosDurPPCh12  c_ModbusParams  - 61
+
 // GET_DIPOSDURPP(n)  n - number of a channel. n = 1..4
 // descr: get a positive period PP of a channel
 // returning: unsigned long
 #define GET_DIPOSDURPP(n)                                          ( -2 * ((r_DIPosDurPPCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-#define  r_DINegDurPPCh1   c_ModbusParams  - 22
-#define  r_DINegDurPPCh2   c_ModbusParams  - 23
-#define  r_DINegDurPPCh3   c_ModbusParams  - 24
-#define  r_DINegDurPPCh4   c_ModbusParams  - 25
+#define  r_DINegDurPPCh1   c_ModbusParams  - 62
+#define  r_DINegDurPPCh2   c_ModbusParams  - 63
+#define  r_DINegDurPPCh3   c_ModbusParams  - 64
+#define  r_DINegDurPPCh4   c_ModbusParams  - 65
+#define  r_DINegDurPPCh5   c_ModbusParams  - 66
+#define  r_DINegDurPPCh6   c_ModbusParams  - 67
+#define  r_DINegDurPPCh7   c_ModbusParams  - 68
+#define  r_DINegDurPPCh8   c_ModbusParams  - 69
+#define  r_DINegDurPPCh9   c_ModbusParams  - 70
+#define  r_DINegDurPPCh10  c_ModbusParams  - 71
+#define  r_DINegDurPPCh11  c_ModbusParams  - 72
+#define  r_DINegDurPPCh12  c_ModbusParams  - 73
 // GET_DINEGDURPP(n)  n - number of a channel. n = 1..4
 // descr: get a negative duration period PP of a channel
 // returning: unsigned long
 #define GET_DINEGDURPP(n)                                          ( -2 * ((r_DINegDurPPCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-#define  r_DIDutyCh1     c_ModbusParams  - 26
-#define  r_DIDutyCh2     c_ModbusParams  - 27
-#define  r_DIDutyCh3     c_ModbusParams  - 28
-#define  r_DIDutyCh4     c_ModbusParams  - 29
+#define  r_DIDutyCh1     c_ModbusParams  - 74
+#define  r_DIDutyCh2     c_ModbusParams  - 75
+#define  r_DIDutyCh3     c_ModbusParams  - 76
+#define  r_DIDutyCh4     c_ModbusParams  - 77
+#define  r_DIDutyCh5     c_ModbusParams  - 78
+#define  r_DIDutyCh6     c_ModbusParams  - 79
+#define  r_DIDutyCh7     c_ModbusParams  - 80
+#define  r_DIDutyCh8     c_ModbusParams  - 81
+#define  r_DIDutyCh9     c_ModbusParams  - 82
+#define  r_DIDutyCh10    c_ModbusParams  - 83
+#define  r_DIDutyCh11    c_ModbusParams  - 84
+#define  r_DIDutyCh12    c_ModbusParams  - 85
+
 // GET_DIPERDUR(n)  n - number of a channel. n = 1..4
 // descr: get a duration period of a channel
 // returning: unsigned long
 #define GET_DIDUTY(n)                                              ( -2 * ((r_DIDutyCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-/*
-#define  r_DIImpQtyCh1z   c_ModbusParams  - 30
-#define  r_DIImpQtyCh2z   c_ModbusParams  - 31
-#define  r_DIImpQtyCh3z   c_ModbusParams  - 32
-#define  r_DIImpQtyCh4z   c_ModbusParams  - 33
-#define  r_DIImpQtyCh5z   c_ModbusParams  - 34
-#define  r_DIImpQtyCh6z   c_ModbusParams  - 35
-#define  r_DIImpQtyCh7z   c_ModbusParams  - 36
-#define  r_DIImpQtyCh8z   c_ModbusParams  - 37
-#define  r_DIImpQtyCh9z   c_ModbusParams  - 38
-#define  r_DIImpQtyCh10z	c_ModbusParams  - 39
-#define  r_DIImpQtyCh11z  c_ModbusParams  - 40
-#define  r_DIImpQtyCh12z  c_ModbusParams  - 41
-*/
 // GET_DIPERDUR(n)  n - number of a channel. n = 1..12
 // descr: get an impulse count
 // returning: unsigned long
 //#define GET_DIIMPQTY(n)                                            ( -2 * ((r_DIImpQtyCh1) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-#define  r_DIImpQtyCh1H   c_ModbusParams  - 42
-#define  r_DIImpQtyCh1L   c_ModbusParams  - 43
-#define  r_DIImpQtyCh2H   c_ModbusParams  - 44
-#define  r_DIImpQtyCh2L   c_ModbusParams  - 45
-#define  r_DIImpQtyCh3H   c_ModbusParams  - 46
-#define  r_DIImpQtyCh3L   c_ModbusParams  - 47
-#define  r_DIImpQtyCh4H   c_ModbusParams  - 48
-#define  r_DIImpQtyCh4L   c_ModbusParams  - 49
-#define  r_DIImpQtyCh5H   c_ModbusParams  - 50
-#define  r_DIImpQtyCh5L   c_ModbusParams  - 51
-#define  r_DIImpQtyCh6H   c_ModbusParams  - 52
-#define  r_DIImpQtyCh6L   c_ModbusParams  - 53
-#define  r_DIImpQtyCh7H   c_ModbusParams  - 54
-#define  r_DIImpQtyCh7L   c_ModbusParams  - 55
-#define  r_DIImpQtyCh8H   c_ModbusParams  - 56
-#define  r_DIImpQtyCh8L   c_ModbusParams  - 57
-#define  r_DIImpQtyCh9H   c_ModbusParams  - 58
-#define  r_DIImpQtyCh9L   c_ModbusParams  - 59
-#define  r_DIImpQtyCh10H  c_ModbusParams  - 60
-#define  r_DIImpQtyCh10L  c_ModbusParams  - 61
-#define  r_DIImpQtyCh11H  c_ModbusParams  - 62
-#define  r_DIImpQtyCh11L  c_ModbusParams  - 63
-#define  r_DIImpQtyCh12H  c_ModbusParams  - 64
-#define  r_DIImpQtyCh12L  c_ModbusParams  - 65
-// GET_DIPERDUR(n)  n - number of a part of channel. (two registers per a value)  n = 1..24
-// descr: get an impulse count
-// returning: unsigned long
-//#define GET_DIIMPTQTY64(n)                                         MAKE_ABS( (r_DIImpQtyCh1H) - c_ModbusParams + 1 - (2 * (n - 1)) )
-//#define GET_DIIMPTQTY64(n)                                         ( -2 * ((r_DIImpQtyCh1) - c_ModbusParams + 1) + (4 * (n - 1)) )
-
+#define  r_DIImpQtyCh1H   c_ModbusParams  - 86
+#define  r_DIImpQtyCh1L   c_ModbusParams  - 87
+#define  r_DIImpQtyCh2H   c_ModbusParams  - 88
+#define  r_DIImpQtyCh2L   c_ModbusParams  - 89
+#define  r_DIImpQtyCh3H   c_ModbusParams  - 90
+#define  r_DIImpQtyCh3L   c_ModbusParams  - 91
+#define  r_DIImpQtyCh4H   c_ModbusParams  - 92
+#define  r_DIImpQtyCh4L   c_ModbusParams  - 93
+#define  r_DIImpQtyCh5H   c_ModbusParams  - 94
+#define  r_DIImpQtyCh5L   c_ModbusParams  - 95
+#define  r_DIImpQtyCh6H   c_ModbusParams  - 96
+#define  r_DIImpQtyCh6L   c_ModbusParams  - 97
+#define  r_DIImpQtyCh7H   c_ModbusParams  - 98
+#define  r_DIImpQtyCh7L   c_ModbusParams  - 99
+#define  r_DIImpQtyCh8H   c_ModbusParams  - 100
+#define  r_DIImpQtyCh8L   c_ModbusParams  - 101
+#define  r_DIImpQtyCh9H   c_ModbusParams  - 102
+#define  r_DIImpQtyCh9L   c_ModbusParams  - 103
+#define  r_DIImpQtyCh10H  c_ModbusParams  - 104
+#define  r_DIImpQtyCh10L  c_ModbusParams  - 105
+#define  r_DIImpQtyCh11H  c_ModbusParams  - 106
+#define  r_DIImpQtyCh11L  c_ModbusParams  - 107
+#define  r_DIImpQtyCh12H  c_ModbusParams  - 108
+#define  r_DIImpQtyCh12L  c_ModbusParams  - 109
+// GET_DIPERDUR(n)  n - номер части канала. (потому что 2 регистра на одно значение)  n = 1..24
+// descr: получить кол-во импульсов
+// return: unsigned long
 #define GET_DIIMPTQTY64(n)                                         ( -2 * ((r_DIImpQtyCh1H) - c_ModbusParams + 1) + (2 * (n - 1)) )
 
-/*
-#define  r_DIImpQtyCh1   c_ModbusParams  - 66
-#define  r_DIImpQtyCh2   c_ModbusParams  - 67
-#define  r_DIImpQtyCh3   c_ModbusParams  - 68
-#define  r_DIImpQtyCh4   c_ModbusParams  - 69
-#define  r_DIImpQtyCh5   c_ModbusParams  - 70
-#define  r_DIImpQtyCh6   c_ModbusParams  - 71
-#define  r_DIImpQtyCh7   c_ModbusParams  - 72
-#define  r_DIImpQtyCh8   c_ModbusParams  - 73
-#define  r_DIImpQtyCh9   c_ModbusParams  - 74
-#define  r_DIImpQtyCh10  c_ModbusParams  - 75
-#define  r_DIImpQtyCh11  c_ModbusParams  - 76
-#define  r_DIImpQtyCh12  c_ModbusParams  - 77
-*/
 // ====================================================
 
 
@@ -398,7 +432,8 @@
 #define GET_UARTPARAM                                              MAKE_ABS( (r_UARTparam) - end_adr_conf_reg16 + 1 )
 
 #define  r_Reserv1	     end_adr_conf_reg16 - 9	
-#define  r_Reserv2       end_adr_conf_reg16 - 10
+#define  r_HSScale       end_adr_conf_reg16 - 10
+#define GET_CJScale                                                MAKE_ABS( (r_HSScale) - end_adr_conf_reg16 + 1 )
 
 #define  r_HardwareVer   end_adr_conf_reg16 - 11
 #define GET_HARDWAREVER                                            MAKE_ABS( (r_HardwareVer) - end_adr_conf_reg16 + 1 )
@@ -420,13 +455,13 @@
 
 #define  r_ReservPass    end_adr_conf_reg16 - 18
 
-#define  r_Cmd       end_adr_conf_reg16 - 19
+#define  r_Cmd       		 end_adr_conf_reg16 - 19
 #define GET_SYSTCMDR                                               MAKE_ABS( (r_Cmd) - end_adr_conf_reg16 + 1 )
 
 // --------------------------------------------------
 
 // === [0x03/0x10] === Плата ADC ===
-#define  r_BreakLinePeriod  end_adr_conf_reg16 - 20
+#define  r_BreakLinePeriod end_adr_conf_reg16 - 20
 #define  r_ADChipType      end_adr_conf_reg16 - 21  // For ADC 0x00XX  1 - AD7794 (24bit), 0 - AD7795 (16bit)
 
 
@@ -450,27 +485,31 @@
 //                         /  /    \  \.
 //     	           ___[]__/  /      \  \__[Measure Speed]___
 //                          /        \.
-//      ___[FIFO Buffer]___/          \___[Break Line Detect]___
-
+//___[Break Line Detect]___/          \___[FIFO Buffer]___
+//
+//
+// Measure Speed:
+//    0 - None,  1 -   2мс,  2 - 	 4мс,  3 -   8мс,  4 -  16мс, 5 - 20мс, 6 - 24мс, 7 - 30мс, 8 - 50мс, 9 - 60мс (80дБ) DEFAULT FILTER, 10 - 60мс (65дБ),
+//   11 - 80мс, 12 - 100мс, 13 - 120мс, 14 - 160мс, 15 - 240мс
+//
+//
 // when you work with ADMode and ADSettings u r supposed to use these definitions (when calibrating don't forget to increase range as +1. Yes, I'm not a freak)
 // channel ranges:
-#define  CHANNEL_MODE_VOLTAGE_100mV        0
-#define  CHANNEL_MODE_VOLTAGE_1V           1
-#define  CHANNEL_MODE_CURRENT_5mA          2
-#define  CHANNEL_MODE_CURRENT_20mA         3
-#define  CHANNEL_MODE_RESISTANCE_100Om4w   4
-#define  CHANNEL_MODE_RESISTANCE_400Om4w   5
-#define  CHANNEL_MODE_RESISTANCE_4000Om4w  6
-#define  CHANNEL_MODE_RESISTANCE_100Om3w   7
-#define  CHANNEL_MODE_RESISTANCE_400Om3w   8
-#define  CHANNEL_MODE_RESISTANCE_4000Om3w  9
-#define  CHANNEL_MODE_RESISTANCE_100Om2w  10
-#define  CHANNEL_MODE_RESISTANCE_400Om2w  11
-#define  CHANNEL_MODE_RESISTANCE_4000Om2w 12
-
-//#define  CHANNEL_MODE_RESISTANCE_100Om     4
-//#define  CHANNEL_MODE_RESISTANCE_400Om     5
-//#define  CHANNEL_MODE_RESISTANCE_4000Om    6
+#define  CHANNEL_MODE_VOLTAGE_30mV         0
+#define  CHANNEL_MODE_VOLTAGE_100mV        1
+#define  CHANNEL_MODE_VOLTAGE_1V           2
+#define  CHANNEL_MODE_VOLTAGE_10V          3
+#define  CHANNEL_MODE_CURRENT_5mA          4
+#define  CHANNEL_MODE_CURRENT_20mA         5
+#define  CHANNEL_MODE_RESISTANCE_100Om4w   6
+#define  CHANNEL_MODE_RESISTANCE_400Om4w   7
+#define  CHANNEL_MODE_RESISTANCE_4000Om4w  8
+#define  CHANNEL_MODE_RESISTANCE_100Om3w   9
+#define  CHANNEL_MODE_RESISTANCE_400Om3w   10
+#define  CHANNEL_MODE_RESISTANCE_4000Om3w  11
+#define  CHANNEL_MODE_RESISTANCE_100Om2w   12
+#define  CHANNEL_MODE_RESISTANCE_400Om2w   13
+#define  CHANNEL_MODE_RESISTANCE_4000Om2w  14
 
 
 #define  r_AD1Mode       end_adr_conf_reg16 - 24  // 0x1234  [1] -   [2] - Measure Mode  [3][4] - Input Type & Range
@@ -490,16 +529,16 @@
 #define  r_AD8Mode       end_adr_conf_reg16 - 38
 #define  r_AD8Settings   end_adr_conf_reg16 - 39
 // GET_ADModeR
-// descr: read mode or set one of a channel
-// returning: unsigned long
-#define GET_ADModeR(n)                                             MAKE_ABS( (r_AD1Mode) - end_adr_conf_reg16 + 1 - (2 * (n - 1)) )
-                                                                   // 2 * (n - 1) you see, but remember all regs are 16-bit here
+// descr: прочитать или выставить режим канала
+// return: unsigned long
+// FIXME: формула неверная (адресует верно только при n = 1)
+#define GET_ADModeR(n)                                               ( -1 * ((r_AD1Mode) - end_adr_conf_reg16 + 1) + (2 * (n - 1)) )
 
 // GET_ADSettingsR
-// descr: read settings or set ones of a channel
-// returning: unsigned long
-#define GET_ADSettingsR(n)                                         MAKE_ABS( (r_AD1Settings) - end_adr_conf_reg16 + 1 - (2 * (n - 1)) )
-                                                                   //2 * (n - 1) you see, but remember all regs are 16-bit here
+// descr: прочитать или выставить настройка канала
+// return: unsigned long
+// FIXME: формула неверная (адресует верно только при n = 1)
+#define GET_ADSettingsR(n)                                           ( -1 * ((r_AD1Settings) - end_adr_conf_reg16 + 1) + (2 * (n - 1)) )
 
 // Калибровки аналоговых каналов
 // Команда записи регистров платы в регистры АЦП выбранного канала
@@ -567,8 +606,9 @@
 #define  r_DACh8H        end_adr_conf_reg16 - 38
 #define  r_DACh8L        end_adr_conf_reg16 - 39
 // GET_DACHR
-// descr: get a part of an analog output register
-// returning: unsigned short (16-bit)
+// descr: получить значение части канала аналогового выхода
+// return: unsigned short (16-bit) (из двух регистров значение)
+// FIXME: расчет неверный регистра если n != 1
 #define GET_DACHR(n)                                             MAKE_ABS((r_DACh1H) - end_adr_conf_reg16 + 1 - (n - 1) )
 
 #define  r_DANum         end_adr_conf_reg16 - 50
@@ -590,8 +630,8 @@
 // === [0x03/0x10] === Плата Реле ===
 #define  r_Rele		       end_adr_conf_reg16 - 24
 // GET_RELAYR
-// descr: get a relay register
-// returning: unsigned long (why not short?)
+// descr: выставление значения реле (битовая маска)
+// return: unsigned long (реле бывает: 8, 16, 24 штук на плате)
 #define GET_RELAYR                                               MAKE_ABS((r_Rele) - end_adr_conf_reg16 + 1 )
 
 // Адреса с 55 по 64 зарезервированы
@@ -620,8 +660,21 @@
 // 10 - спад
 // 11 - фронт и спад
 #define  r_DIImpTrigType1			end_adr_conf_reg16  - 24    // b0000FFEEDDCCBBAA  AA = Ch1Trig; BB = Ch2Trig; CC = Ch3Trig; DD = Ch4Trig;  EE = Ch5Trig;  FF = Ch6Trig
+// GET_DI_PULSE_SIGNAL_MODE_1_6
+// descr: получить/установить режим работы дискретного входа. работа по фронту, по спаду или по обоим частям сигнала
+//        в этом регистре по 2 бита на каждый канал. Настраиваются только с 1 по 6
+// return: uint16_t
+#define GET_DI_PULSE_SIGNAL_MODE_1_6                                ( -1 * ((r_DIImpTrigType1) - end_adr_conf_reg16 + 1) )
+
 #define  r_DIImpTrigType2			end_adr_conf_reg16  - 25    // b0000LLKKJJIIHHGG  GG = Ch7Trig; HH = Ch8Trig; II = Ch9Trig; JJ = Ch10Trig; KK = Ch11Trig; LL = Ch12Trig
+// GET_DI_PULSE_SIGNAL_MODE_7_12
+// descr: получить/установить режим работы дискретного входа. работа по фронту, по спаду или по обоим частям сигнала
+//        в этом регистре по 2 бита на каждый канал. Настраиваются только с 7 по 12
+// return: uint16_t
+#define GET_DI_PULSE_SIGNAL_MODE_7_12                               ( -1 * ((r_DIImpTrigType2) - end_adr_conf_reg16 + 1) )
+
 #define  r_DIImpFilterType		end_adr_conf_reg16  - 26    // b0000CBA987654321  b0000xxxxxxxxxxxx   if x = 0  {FilterM=FilterP= XXX ms};   if x = 1  {FilterP= XXX ms  FilterM= YYY ms}
+#define GET_DI_FILTER_TYPE                                          ( -1 * ((r_DIImpFilterType) - end_adr_conf_reg16 + 1) )
 
 #define  r_DIImpFilterPCh1		end_adr_conf_reg16  - 27    // Фильтр положительного импульса 10 ... 60000 ms
 #define  r_DIImpFilterPCh2		end_adr_conf_reg16  - 28
@@ -635,6 +688,11 @@
 #define  r_DIImpFilterPCh10	 	end_adr_conf_reg16  - 36
 #define  r_DIImpFilterPCh11	 	end_adr_conf_reg16  - 37
 #define  r_DIImpFilterPCh12	 	end_adr_conf_reg16  - 38
+// GET_DI_FILTER_POSITIVE(n)     n - номер 1..12
+// descr: получить/установить значение фильтра в мс (фронт)
+// return: uint16_t
+#define GET_DI_FILTER_POSITIVE(n)                                   ( -1 * ((r_DIImpFilterPCh1) - end_adr_conf_reg16 + 1) + (1 * (n - 1)) )
+
 #define  r_DIImpFilterMCh1		end_adr_conf_reg16  - 39    // Фильтр отрицательного импульса 10 ... 60000 ms
 #define  r_DIImpFilterMCh2		end_adr_conf_reg16  - 40
 #define  r_DIImpFilterMCh3		end_adr_conf_reg16  - 41
@@ -647,21 +705,12 @@
 #define  r_DIImpFilterMCh10	 	end_adr_conf_reg16  - 48
 #define  r_DIImpFilterMCh11	 	end_adr_conf_reg16  - 49
 #define  r_DIImpFilterMCh12	 	end_adr_conf_reg16  - 50
+// GET_DI_FILTER_NEGATIVE(n)     n - номер 1..12
+// descr: получить/установить значение фильтра в мс (спад)
+// return: uint16_t
+#define GET_DI_FILTER_NEGATIVE(n)                                   ( -1 * ((r_DIImpFilterMCh1) - end_adr_conf_reg16 + 1) + (1 * (n - 1)) )
 
-/*
-#define  r_DIImpQtyPeriodCh1 	 end_adr_conf_reg16  - 27
-#define  r_DIImpQtyPeriodCh2	 end_adr_conf_reg16  - 28
-#define  r_DIImpQtyPeriodCh3	 end_adr_conf_reg16  - 29
-#define  r_DIImpQtyPeriodCh4	 end_adr_conf_reg16  - 30
-#define  r_DIImpQtyPeriodCh5	 end_adr_conf_reg16  - 31
-#define  r_DIImpQtyPeriodCh6	 end_adr_conf_reg16  - 32
-#define  r_DIImpQtyPeriodCh7	 end_adr_conf_reg16  - 33
-#define  r_DIImpQtyPeriodCh8	 end_adr_conf_reg16  - 34
-#define  r_DIImpQtyPeriodCh9	 end_adr_conf_reg16  - 35
-#define  r_DIImpQtyPeriodCh10	 end_adr_conf_reg16  - 36
-#define  r_DIImpQtyPeriodCh11	 end_adr_conf_reg16  - 37
-#define  r_DIImpQtyPeriodCh12	 end_adr_conf_reg16  - 38
-*/
+
 #define  r_DIImpEnable			 		end_adr_conf_reg16  - 51
 #define  r_DIImpEdgeLevel		 		end_adr_conf_reg16  - 52
 #define  r_DIImpFrontRear			 	end_adr_conf_reg16  - 53
@@ -702,41 +751,48 @@
 #define  cm_ZSCopy_Mask			   					 	0x0E200
 #define  cm_CalibZero_Mask						  	0x0E300
 #define  cm_CalibScale_Mask								0x0E400
+#define  cm_CalibHalfScale_Mask						0x0E500
 #define  cm_CalibDAC_Mask 						 		0x0E500
 #define  cm_Correct3w2w_Mask							0x0E700
 //#define  cm_CalibTestRefZero_Mask					0x0E800
 //#define  cm_CalibTestRefZeroProcess_Mask	0x0D800
+#define  cm_CalibHS_Mask									0x0EA00
+#define  cm_Correct10V_Mask								0x0EB00
 // **********************************************
 
 
 
 // *** Reset Zero & Scale ****************
 #define  cm_ZSReset_D01V_ChAll  0x0E110
-#define  cm_ZSReset_D01V_Ch1    0x0E111
+#define  cm_ZSReset_D003V_Ch1   0x0E111
+#define  cm_ZSReset_D01V_Ch1    0x0E121
 // .........
-#define  cm_ZSReset_D4k_Ch8     0x0E178
+#define  cm_ZSReset_D4k_Ch8     0x0E1F8
 // ***************************************
 
 // *** Copy Zero & Scale to all other channel ****
 #define  cm_ZSCopy_D01V_ChAll  0x0E210
 #define  cm_ZSCopy_D01V_Ch1    0x0E211
+#define  cm_ZSCopy_D01V_Ch1    0x0E211
 // .........
-#define  cm_ZSCopy_D4k_Ch8     0x0E278
+#define  cm_ZSCopy_D4k_Ch8     0x0E2F8
 // ************************************************
 
 
 // *** Calibrate Zero ********************
 #define  cm_CalibZero_D01V_ChAll  0x0E310
-#define  cm_CalibZero_D01V_Ch1    0x0E311
+#define  cm_CalibZero_D003V_Ch1   0x0E311
+#define  cm_CalibZero_D01V_Ch1    0x0E321
 // .........
-#define  cm_CalibZero_D4k_Ch8     0x0E378
+#define  cm_CalibZero_D4k_Ch8     0x0E3F8
 // ***************************************
 
 // *** Calibrate Scale *******************
 #define  cm_CalibScale_D01V_ChAll 0x0E410
-#define  cm_CalibScale_D01V_Ch1   0x0E411
+#define  cm_CalibScale_D003V_Ch1  0x0E411
+#define  cm_CalibScale_D01V_Ch1   0x0E421
 // .........
-#define  cm_CalibScale_D4k_Ch8    0x0E478
+#define  cm_CalibScale_D4k_Ch8    0x0E4F8
 // ***************************************
 
 // *** Correction Line Zero ********************
@@ -768,6 +824,11 @@
 // ......
 #define  cm_CalibTestRefZero_Ch8 		 0x0E808
 // ***************************************
+
+// *** Correction Line Zero ********************
+#define  cm_CalibHS							 		 0x0EA00
+// ***************************************
+
 
 // ===============================================
 //  Формат команды  0 x 0  E  0  x  x
@@ -807,6 +868,7 @@
 #define  err_ADCDiapNotEqu 		 0x04000   // Команда - код  (0x0E310 - 0x4000 = 0x0A310) калибровка нуля АЦП не произведена, нет такого диапазона
 #define  err_ADCCalibOverNorm  0x05000   // Команда - код  (0x0E310 - 0x5000 = 0x09310) калибровка нуля АЦП не произведена, некорректный входной сигнал
 #define  err_ADCZeroCalibNotOk 0x06000   // Команда - код  (0x0E310 - 0x6000 = 0x08310) калибровка нуля АЦП не произведена, нет такого диапазона
+#define  err_ADCNoHalfDiap 		 0x07000   // Команда - код  (0x0E310 - 0x7000 = 0x07310) калибровка нуля АЦП не произведена, нет такого диапазона
 
 // =======================================================================================
 

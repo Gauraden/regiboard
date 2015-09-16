@@ -45,9 +45,12 @@ PacketConfigure() {
 	  return
 	fi
   # target
-	FLAGS="-I'${INCLUDE_DIR}' -I'${rfs_include}' -L'${rfs_lib}' ${PACKET_CONFIGURE}"
+	FLAGS="-I\"${INCLUDE_DIR}\" -I\"${rfs_include}\" -L\"${rfs_lib}\"" #  ${PACKET_CONFIGURE}
 	export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} \
 	  CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
+#  cmake -DCMAKE_CXX_COMPILER="${TC_CXX}" \
+#        -DCMAKE_C_COMPILER="${TC_C}" \
+#        -DCMAKE_CXX_FLAGS="${FLAGS}" ./
 }
 
 PacketClean() {

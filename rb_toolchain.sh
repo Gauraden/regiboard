@@ -13,6 +13,9 @@ TC_CXX='g++'
 TC_CPP='cpp'
 TC_CTNG='ct-ng'
 TC_LDD='ldd'
+TC_LD='ld'
+TC_AR='ar'
+TC_RANLIB='ranlib'
 
 TC_CONFIGURE_FLAGS="CC=${TC_C} CPP=${TC_CPP} CXX=${TC_CXX}"
 
@@ -32,10 +35,13 @@ ConfigurateToolchain() {
 	TC_CXX="${TC_PREFIX}-${TC_CXX}"
 	TC_CPP="${TC_PREFIX}-${TC_CPP}"
 	TC_LDD="${TC_PREFIX}-${TC_LDD}"
+	TC_LD="${TC_PREFIX}-${TC_LD}"
+	TC_AR="${TC_PREFIX}-${TC_AR}"
+	TC_RANLIB="${TC_PREFIX}-${TC_RANLIB}"
 	
 	TC_CONFIGURE_FLAGS="CC=${TC_C} CPP=${TC_CPP} CXX=${TC_CXX}"
 	# preparing of environment variable
-	export PATH=${PATH}:${TC_ROOT_DIR}/bin:${TC_CROSSTOOL_DIR}/bin
+#	export PATH=${PATH}:${TC_ROOT_DIR}/bin:${TC_CROSSTOOL_DIR}/bin
 	# preparing of directories
 	if [ "${BOARD_TOOLCHAIN}" != "" ]; then
 		BindOrCreateDir "${TC_ROOT_DIR}" "${BOARD_TOOLCHAIN}"	

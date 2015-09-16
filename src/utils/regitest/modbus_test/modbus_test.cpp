@@ -176,6 +176,16 @@ bool ReadFirstBlock(modbus_t *ctx) {
   return true;
 }
 */
+// REGIGRAF modbus ---------------------
+bool F1772ReadSerial(modbus_t *ctx) {
+  uint16_t tab_reg[128];
+  const int kRes = SendRequest_0x3(ctx, 0x180, 4, tab_reg);
+  if (kRes < 1)
+    return false;
+  PrintRegs(tab_reg, kRes);
+  return true;
+}
+
 int main(int argc, char *argv[]) {
   uint16_t           tab_reg[64];
   std::stringstream  buf;
@@ -215,6 +225,7 @@ int main(int argc, char *argv[]) {
   float     last_cold_jun = FloatLimit::infinity();
   size_t    tries = 0;
   const Clock kBegin;
+  /*
 #ifdef POLL_COLD_JUNCTION
   do {
     ReadID(ctx, inf);
@@ -242,6 +253,8 @@ int main(int argc, char *argv[]) {
   ReadLastTm(ctx);
   ReadADTemp(ctx);
 #endif
+*/
+  F1772ReadSerial(ctx);
   modbus_close(ctx);
   modbus_free(ctx);
 }

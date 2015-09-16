@@ -21,7 +21,7 @@ ConfigurateRootFS() {
 		export CPPFLAGS="$CPPFLAGS --sysroot=${RFS_ROOT_DIR}/staging"
 		export CFLAGS="$CFLAGS -I${RFS_ROOT_DIR}/staging/usr/include -L${RFS_ROOT_DIR}/target/usr/lib"
 		export CXXFLAGS="$CXXFLAGS -I${RFS_ROOT_DIR}/staging/usr/include -L${RFS_ROOT_DIR}/target/usr/lib"
-		export LDFLAGS="$LDFLAGS -Wl,-rpath-link,${RFS_ROOT_DIR}/target/usr/lib"
+		export LDFLAGS="$LDFLAGS -Wl,-rpath-link,-L${RFS_ROOT_DIR}/target/usr/lib"
 	fi
 	# check configuration of board, may be user want to use external BuildRoot
 	if [ "$BOARD_BUILDROOT" != "" ]; then

@@ -1,0 +1,37 @@
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/Makefile.orig	2015-09-15 11:57:40.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/Makefile	2015-09-15 12:29:26.663741103 +0300
+@@ -8,7 +8,7 @@
+ check_fuse.o
+ 
+ obj-$(CONFIG_ARCH_MX51) += clock.o suspend.o
+-obj-$(CONFIG_ARCH_MX53) += clock.o suspend.o mx53_wp.o mx53_diagnostic_drv.o
++obj-$(CONFIG_ARCH_MX53) += clock.o suspend.o mx53_wp.o
+ obj-$(CONFIG_ARCH_MX50) += clock_mx50.o dmaengine.o dma-apbh.o mx50_suspend.o mx50_freq.o mx50_ddr_freq.o mx50_wfi.o
+ 
+ obj-$(CONFIG_MACH_MX51_3DS) += mx51_3stack.o mx51_3stack_gpio.o mx51_3stack_pmic_mc13892.o
+--- ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c.orig	2015-09-15 11:57:40.000000000 +0300
++++ ./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c	2015-09-15 12:31:58.941826709 +0300
+@@ -23,7 +23,6 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/flash.h>
+ #include "devices.h"
+-#include "mx53_diagnostic_drv.h"
+ 
+ //#define MX53_REGIBOARD_V1
+ #define MX53_SPI2GPIO_TOUCH
+@@ -1011,13 +1010,14 @@
+ };
+ 
+ /* Setup of specific devices **************************************************/
++/*
+ static struct platform_device mx53_diagnostic_device = {
+ 	.name          = MX53_DIAGNOSTIC_DRV_NAME,
+ 	.id            = -1,
+ 	.num_resources = 0,
+ 	.resource      = 0,
+ };
+-
++*/
+ void mx53_regiboard_fixup(int fb_mem, int mem_start) {
+ 	if (!fb_mem)
+ 		return;
