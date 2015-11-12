@@ -18,10 +18,11 @@ ConfigurateRootFS() {
 	# preparing of environment variable
 	export PATH="${PATH}:${RFS_HOST_DIR}/usr/bin"
 	if [ "${SUBPROG_TYPE}" = 'packets' ]; then
-		export CPPFLAGS="$CPPFLAGS --sysroot=${RFS_ROOT_DIR}/staging"
-		export CFLAGS="$CFLAGS -I${RFS_ROOT_DIR}/staging/usr/include -L${RFS_ROOT_DIR}/target/usr/lib"
-		export CXXFLAGS="$CXXFLAGS -I${RFS_ROOT_DIR}/staging/usr/include -L${RFS_ROOT_DIR}/target/usr/lib"
-		export LDFLAGS="$LDFLAGS -Wl,-rpath-link,-L${RFS_ROOT_DIR}/target/usr/lib"
+#		export CPPFLAGS="$CPPFLAGS --sysroot=${RFS_ROOT_DIR}/staging"
+#		export CFLAGS="$CFLAGS -I${RFS_ROOT_DIR}/staging/usr/include -L${RFS_ROOT_DIR}/target/usr/lib"
+#		export CXXFLAGS="$CXXFLAGS -I${RFS_ROOT_DIR}/staging/usr/include -L${RFS_ROOT_DIR}/target/usr/lib"
+#		export LDFLAGS="$LDFLAGS -Wl,-rpath-link,${RFS_ROOT_DIR}/target/usr/lib"
+    echo "skipping initialisation of environment variables "
 	fi
 	# check configuration of board, may be user want to use external BuildRoot
 	if [ "$BOARD_BUILDROOT" != "" ]; then

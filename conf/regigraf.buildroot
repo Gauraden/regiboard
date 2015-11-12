@@ -1,6 +1,6 @@
 #
 # Automatically generated make config: don't edit
-# Buildroot 2012.05-g9fca841-dirty Configuration
+# Buildroot 2012.05-gfd53ae5-dirty Configuration
 #
 BR2_HAVE_DOT_CONFIG=y
 BR2_arm=y
@@ -816,7 +816,7 @@ BR2_PACKAGE_LIBGTK2=y
 BR2_PACKAGE_LIBGTK2_DEMO=y
 BR2_PACKAGE_LIBPNG=y
 # BR2_PACKAGE_LIBRAW is not set
-# BR2_PACKAGE_LIBRSVG is not set
+BR2_PACKAGE_LIBRSVG=y
 # BR2_PACKAGE_LIBSVGTINY is not set
 # BR2_PACKAGE_LIBUNGIF is not set
 # BR2_PACKAGE_OPENCV is not set

@@ -41,7 +41,7 @@ ConfigurateToolchain() {
 	
 	TC_CONFIGURE_FLAGS="CC=${TC_C} CPP=${TC_CPP} CXX=${TC_CXX}"
 	# preparing of environment variable
-#	export PATH=${PATH}:${TC_ROOT_DIR}/bin:${TC_CROSSTOOL_DIR}/bin
+	export PATH=${PATH}:${TC_ROOT_DIR}/bin:${TC_CROSSTOOL_DIR}/bin
 	# preparing of directories
 	if [ "${BOARD_TOOLCHAIN}" != "" ]; then
 		BindOrCreateDir "${TC_ROOT_DIR}" "${BOARD_TOOLCHAIN}"	

@@ -25,12 +25,21 @@ PacketConfigure() {
 	  IsPacketForHost && ./configure ${PACKET_CONFIGURE} && return
     # target
 	  local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
-	  local conf_flags="--host=${TC_PREFIX} --prefix=${RFS_ROOT_DIR}/target"
+	  # --prefix=${RFS_ROOT_DIR}/target
+	  local conf_flags="--host=${TC_PREFIX}"
 	  if [ "${PACKET_ENV_VARS}" != '' ]; then
 		  export ${PACKET_ENV_VARS}
 	  fi
-	  ./configure $conf_flags ${TC_CONFIGURE_FLAGS} ${PACKET_CONFIGURE} $pkg_config # || \
-      #./configure ${PACKET_CONFIGURE}
+	  #${TC_CONFIGURE_FLAGS}
+ 	  echo -e "DEBUG: ----------------------------------------------\n"
+	  echo -e "DEBUG: ${rfs_include}\n"
+	  echo -e "DEBUG: ${rfs_lib}\n"
+	  echo -e "DEBUG: --host=${TC_PREFIX}\n"
+	  echo -e "DEBUG: PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config\n"
+	  echo -e "DEBUG: PATH=${PATH}\n"
+ 	  echo -e "DEBUG: ----------------------------------------------\n"
+    export LDFLAGS="-L$rfs_lib ${RFS_ROOT_DIR}/target/lib"
+	  ./configure $conf_flags $pkg_config ${PACKET_CONFIGURE}
     PACKET_CONFIGURE=''
 		return
 	fi
