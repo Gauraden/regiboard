@@ -1,0 +1,83 @@
+--- ./build/u-boot-2009.08.01-regigraf/drivers/mtd/nand/nand_device_info.c.orig	2014-05-07 16:30:15.000000000 +0400
++++ ./build/u-boot-2009.08.01-regigraf/drivers/mtd/nand/nand_device_info.c	2015-06-22 13:57:32.000000000 +0300
+@@ -420,6 +420,25 @@
+ 	.tRHOH_in_ns              = -1,
+ 	"MT29F8G08FABWG",
+ 	},
++	{ // iMX53-Regiboard.v3 NAND
++	.end_of_table             = false,
++	.manufacturer_code        = 0x2c,
++	.device_code              = 0x38, // in datasheet (MT29F8G08ABABAWPIT.pdf) 0x28
++	.cell_technology          = NAND_DEVICE_CELL_TECH_SLC,
++	.chip_size_in_bytes       = 1LL*SZ_1G,
++	.block_size_in_pages      = 128,
++	.page_total_size_in_bytes = 4*SZ_1K + 218,
++	.ecc_strength_in_bits     = 4,
++	.ecc_size_in_bytes        = 512,
++	.data_setup_in_ns         = 25,
++	.data_hold_in_ns          = 15,
++	.address_setup_in_ns      = 10,
++	.gpmi_sample_delay_in_ns  = 6,
++	.tREA_in_ns               = -1,
++	.tRLOH_in_ns              = -1,
++	.tRHOH_in_ns              = -1,
++	"MT29F8G08ABABA",
++	},
+ 	{
+ 	.end_of_table             = false,
+ 	.manufacturer_code        = 0x98,
+@@ -918,7 +937,7 @@
+  */
+ static struct nand_device_info nand_device_info_table_type_7[] =
+ {
+-	{ // Regigraf NAND
++	{ // Regiboard NAND
+ 	.end_of_table             = false,
+ 	.manufacturer_code        = 0x2c,
+ 	.device_code              = 0xa5,
+@@ -2318,7 +2337,7 @@
+ 	nand_device_info_test_data();
+ 
+ 	/* Look for information about this manufacturer. */
+-
++  
+ 	for (i = 0; nand_device_mfr_directory[i].id; i++) {
+ 		if (nand_device_mfr_directory[i].id == mfr_id) {
+ 			fn = nand_device_mfr_directory[i].fn;
+--- ./build/u-boot-2009.08.01-regigraf/drivers/mtd/nand/nand_ids.c.orig	2012-09-07 13:00:15.000000000 +0400
++++ ./build/u-boot-2009.08.01-regigraf/drivers/mtd/nand/nand_ids.c	2015-06-22 13:57:19.000000000 +0300
+@@ -99,6 +99,7 @@
+ 	/* 8 Gigabit */
+ 	{"NAND 1GiB 1,8V 8-bit",	0xA3, 0, 1024, 0, LP_OPTIONS},
+ 	{"NAND 1GiB 3,3V 8-bit",	0xD3, 0, 1024, 0, LP_OPTIONS},
++	{"NAND 1GiB 3,3V 8-bit",	0x38, 0, 1024, 0, LP_OPTIONS},
+ 	{"NAND 1GiB 1,8V 16-bit",	0xB3, 0, 1024, 0, LP_OPTIONS16},
+ 	{"NAND 1GiB 3,3V 16-bit",	0xC3, 0, 1024, 0, LP_OPTIONS16},
+ 
+--- ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/lowlevel_init.S.orig	2015-02-11 11:54:58.000000000 +0300
++++ ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/lowlevel_init.S	2015-03-18 11:53:44.000000000 +0300
+@@ -119,8 +119,8 @@
+ 	mov r1, #0x4
+ 	str r1, [r0, #CLKCTL_CCSR]
+ 
+-//	setup_pll PLL1_BASE_ADDR, 800
+-	setup_pll PLL1_BASE_ADDR, 1100 // FIXIT: was 800
++	setup_pll PLL1_BASE_ADDR, 800
++//	setup_pll PLL1_BASE_ADDR, 1100 // FIXIT: was 800
+ 
+         setup_pll PLL3_BASE_ADDR, 400
+ 
+--- ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/mx53_regigraf.c.orig	2015-06-22 14:20:49.000000000 +0300
++++ ./build/u-boot-2009.08.01-regigraf/board/freescale/mx53_regigraf/mx53_regigraf.c	2015-06-22 14:21:17.000000000 +0300
+@@ -1148,7 +1148,11 @@
+ int checkboard(void)
+ {
+ 	printf("Board: ");
++#ifdef CONFIG_IMX_CSPI
++	printf("MX53-Regiboard 2.0 ");
++#else
+ 	printf("MX53-Regiboard 1.0 ");
++#endif
+ 	switch (get_board_rev_from_fuse()) {
+ 	case 0x3:
+ 		printf("Rev. B\n");

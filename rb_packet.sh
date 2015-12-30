@@ -14,8 +14,9 @@ GetPacketBuildDir() {
 
 PacketConfigure() {
 	local build_dir="$1"
-	local rfs_include="${RFS_ROOT_DIR}/staging/usr/include"
-	local rfs_lib="${RFS_ROOT_DIR}/target/usr/lib"
+	local staging_dir="${RFS_ROOT_DIR}/staging"
+	local rfs_include="${staging_dir}/usr/include"
+	local rfs_lib="${staging_dir}/usr/lib"
 	PrintNotice 'Configuring...'
 	# Running: autogen
 	IsFileExists "$build_dir/autogen.sh" && ./autogen.sh
@@ -25,20 +26,11 @@ PacketConfigure() {
 	  IsPacketForHost && ./configure ${PACKET_CONFIGURE} && return
     # target
 	  local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
-	  # --prefix=${RFS_ROOT_DIR}/target
-	  local conf_flags="--host=${TC_PREFIX}"
+	  local 
+	  local conf_flags="--host=${TC_PREFIX} --prefix=${staging_dir}/usr --exec-prefix=${staging_dir}/usr"
 	  if [ "${PACKET_ENV_VARS}" != '' ]; then
 		  export ${PACKET_ENV_VARS}
 	  fi
-	  #${TC_CONFIGURE_FLAGS}
- 	  echo -e "DEBUG: ----------------------------------------------\n"
-	  echo -e "DEBUG: ${rfs_include}\n"
-	  echo -e "DEBUG: ${rfs_lib}\n"
-	  echo -e "DEBUG: --host=${TC_PREFIX}\n"
-	  echo -e "DEBUG: PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config\n"
-	  echo -e "DEBUG: PATH=${PATH}\n"
- 	  echo -e "DEBUG: ----------------------------------------------\n"
-    export LDFLAGS="-L$rfs_lib ${RFS_ROOT_DIR}/target/lib"
 	  ./configure $conf_flags $pkg_config ${PACKET_CONFIGURE}
     PACKET_CONFIGURE=''
 		return
@@ -54,12 +46,12 @@ PacketConfigure() {
 	  return
 	fi
   # target
-	FLAGS="-I\"${INCLUDE_DIR}\" -I\"${rfs_include}\" -L\"${rfs_lib}\"" #  ${PACKET_CONFIGURE}
-	export CC=${TC_C} CXX=${TC_CXX} CPP=${TC_CPP} \
-	  CFLAGS="${FLAGS}" CXXFLAGS="${FLAGS}" && cmake ./
-#  cmake -DCMAKE_CXX_COMPILER="${TC_CXX}" \
-#        -DCMAKE_C_COMPILER="${TC_C}" \
-#        -DCMAKE_CXX_FLAGS="${FLAGS}" ./
+  cmake -DCMAKE_CXX_COMPILER="${TC_CXX}" \
+        -DCMAKE_C_COMPILER="${TC_C}" \
+        -DCMAKE_FIND_ROOT_PATH="${RFS_HOST_DIR}" \
+        -DRB_CROSS_CONF="${SRC_UTILS_DIR}/CMakeList.base.txt" \
+        -DRB_INCLUDE_DIR="${INCLUDE_DIR};${rfs_include};${PACKET_INCLUDE}" \
+        -DRB_LINK_DIR="${rfs_lib};${staging_dir}/lib"
 }
 
 PacketClean() {
@@ -236,3 +228,4 @@ BuidPackets() {
 		*     ) PacketBuild "$SUBPROG_ARG.conf";;
 	esac
 }
+

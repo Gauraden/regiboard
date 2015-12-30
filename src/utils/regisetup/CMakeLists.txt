@@ -5,4 +5,3 @@ project(regisetup)
 set (CMAKE_INSTALL_PREFIX "${PROJECT_SOURCE_DIR}/.out/")
 
 add_subdirectory("uboot_conf")
-add_subdirectory("mem_vir2phys")

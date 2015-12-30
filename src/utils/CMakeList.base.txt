@@ -1,0 +1,14 @@
+
+message(STATUS "--- Regiboard settings ---")
+
+foreach(dir ${RB_INCLUDE_DIR})
+  message(STATUS "RB_INCLUDE: '${dir}'")
+  include_directories(${dir})
+endforeach()
+
+foreach(dir ${RB_LINK_DIR})
+  message(STATUS "RB_LINK: '${dir}'")
+  link_directories(${dir})
+endforeach()
+
+message(STATUS "-------------------------")

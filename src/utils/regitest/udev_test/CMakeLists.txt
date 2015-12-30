@@ -5,6 +5,10 @@ add_executable(udev_test
 	udev_test.c
 )
 
+target_link_libraries(udev_test
+  udev
+)
+
 INSTALL(TARGETS udev_test
 	RUNTIME DESTINATION "./"
 )

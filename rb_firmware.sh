@@ -104,7 +104,7 @@ FirmwareCreate() {
   sync
   sudo umount $tmp_dir
   sudo losetup -d /dev/$loop_dev
-  # запись метаданных и обфусикация
+  # запись метаданных и обфускация
   $UTIL_PROTECTOR --sign ${FIRMWARE_INFO}/${FIRMWARE_NAME}.inf --file $firm_file
   # установка контрольной суммы
   # значение контрольной суммы берётся то что установелно по умолчанию, см.

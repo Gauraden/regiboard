@@ -22,7 +22,7 @@ ConfigurateRootFS() {
 #		export CFLAGS="$CFLAGS -I${RFS_ROOT_DIR}/staging/usr/include -L${RFS_ROOT_DIR}/target/usr/lib"
 #		export CXXFLAGS="$CXXFLAGS -I${RFS_ROOT_DIR}/staging/usr/include -L${RFS_ROOT_DIR}/target/usr/lib"
 #		export LDFLAGS="$LDFLAGS -Wl,-rpath-link,${RFS_ROOT_DIR}/target/usr/lib"
-    echo "skipping initialisation of environment variables "
+    PrintWarn "Skipping initialisation of environment variables "
 	fi
 	# check configuration of board, may be user want to use external BuildRoot
 	if [ "$BOARD_BUILDROOT" != "" ]; then

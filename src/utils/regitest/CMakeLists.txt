@@ -4,6 +4,8 @@ project(regitest)
 
 set (CMAKE_INSTALL_PREFIX "${PROJECT_SOURCE_DIR}/.out/")
 
+include(${RB_CROSS_CONF})
+
 add_subdirectory("dfb_test")
 add_subdirectory("dfb_cairo_test")
 add_subdirectory("dfb_chart_test")
