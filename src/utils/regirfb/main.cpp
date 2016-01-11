@@ -49,6 +49,10 @@ static bool SendNewCoords(int x, int y, int what) {
 
 static int CreateServerSocket() {
 	int serverSock = socket(AF_INET, SOCK_STREAM, 0);
+
+  int tmp = 1;
+  setsockopt(serverSock, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(int));
+
 	sockaddr_in serverAddr;
 	serverAddr.sin_family      = AF_INET;
 	serverAddr.sin_port        = htons(8080);

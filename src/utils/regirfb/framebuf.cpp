@@ -20,7 +20,26 @@ void Screen::AllocatePngRows() {
 void Screen::BindToFbDev(const char *fname) {
 	UnBind();
 	_fbdev = open(fname, O_RDONLY);
-	GetVideoMode();
+
+  for(int try_n = 1; try_n < 30; try_n++) {
+	  GetVideoMode();
+    if (_depth != 3 && _depth != 4) {
+      sleep(1);   // [©dsmover: 2015-10-22 Thu 04:57 PM]: должно быть 32 (или 24), если программа
+                  //   регистратура уже стартанула, которая меняет видео режим на правильный
+                  // А если глубина цвета уже правильная до запуска главного ПО регистратора,
+                  //   то тоже нормально. Главное чтобы глубина цвета была 4(32) (или 3 что 24бит), с которой она
+                  //   только умеет работать
+      continue;
+    }
+    break;
+  }
+
+  if (_depth != 3 && _depth != 4) {
+    ERROR("Ошибка " << "не удалось дождаться правильного выставленного видео режима: _depth=" << (int) _depth);
+  } else {
+    std::cout << "> Видео режим: " << _width << "x" << _height << " depth: " << (int) _depth << std::endl;
+  }
+
 	_size   = _width * _height * _depth;
 	_fbmmap = (uint8_t*)mmap(0, _size, PROT_READ, MAP_SHARED, _fbdev, 0);
 	AllocatePngRows();
@@ -94,12 +113,22 @@ bool Screen::GetVideoMode() {
 		ERROR("Ошибка " << strerror(errno));
 		return false;
 	}
+
+  /*
 	std::cout << "> Видео режим: " << fb_info.xres           << "x"
 	                               << fb_info.yres           << "x"
 	                               << fb_info.bits_per_pixel << std::endl;
+  */
+
 	_width  = fb_info.xres;
 	_height = fb_info.yres;
+  if (_width == 1024 && _height == 1024) {
+    // перевернутый экран что ли? тогда у него режим 1024x1024, что нужно чтобы картинка
+    // переворачивалась под directfb
+    _height = 768;
+  }
 	_depth  = fb_info.bits_per_pixel / 8;
+
 	return true;
 }
 
