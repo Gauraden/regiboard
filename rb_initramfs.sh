@@ -51,6 +51,12 @@ BuildBusyBox() {
  	ln -sf $busybox "${symlink}sleep"
  	ln -sf $busybox "${symlink}switch_root"
  	ln -sf $busybox "${symlink}umount"
+ 	ln -sf $busybox "${symlink}tftp"
+ 	ln -sf $busybox "${symlink}tar"
+ 	ln -sf $busybox "${symlink}mknod"
+ 	ln -sf $busybox "${symlink}ubidetach"
+ 	ln -sf $busybox "${symlink}ubiattach"
+ 	ln -sf $busybox "${symlink}ubimkvol"
 # 	ln -sf $busybox "${symlink}fsck"
 # 	ln -sf $busybox "${symlink}fsck.ext2"
 }
@@ -101,6 +107,7 @@ BuildInitRAMFS() {
 	# prepare utils and scripts
 	PrintNotice "Installing utils and scripts..."
 	cp "${init_file}" "${IRAMFS_BUILD_DIR}/sbin/"
+	#cp "./bin/ubiformat" "${IRAMFS_BUILD_DIR}/bin/"
 	cd ${IRAMFS_BUILD_DIR}
 	ln -sf sbin/init init
 #	ln -sf "${IRAMFS_BUILD_DIR}/sbin/init" "${IRAMFS_BUILD_DIR}/init"

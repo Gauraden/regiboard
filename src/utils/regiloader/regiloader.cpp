@@ -5,13 +5,14 @@
 #include <iostream>
 #include <sstream>
 #include <list>
+#include <map>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 
 static const std::string kTtyDev("ttyUSB0");
 static const std::string kUBootImg("u-boot.imx");
 static const std::string kKernelImg("uImage");
-static const std::string kRamFsImg("ramFs");
+static const std::string kRootFsImg("rootfs");
 
 static bool UploadDCD(boost::asio::serial_port &port, ImxFirmware &firm) {
   const ImxFirmware::DCDCmd::List &cmds = firm.GetDCDCommands();
@@ -203,7 +204,7 @@ static bool ParseUntil(SerialPort        &port,
     if (resp[0] == 0x0A) {
       ShowProcess("\t * Ожидание");
       // DEBUG --------------------
-      // std::cout << "DEBUG: " << str << std::endl;
+      std::cout << "DEBUG: " << str << std::endl;
       // --------------------------
       FillInSysInfo(str, *out);
       str = "";
@@ -283,24 +284,20 @@ static bool UploadKernelOverEth(SerialPort   &port,
   return UploadKernelEnd(port, &inf);
 }
 
-static bool UploadRamFsOverEth(SerialPort   &port,
-                               TFtp::Server *srv) {
-  // TODO
+static bool UploadRootFsOverEth(SerialPort   &port,
+                                TFtp::Server *srv) {
   if (srv == 0) {
     return false;
   }
-  /*
-  SysInfo inf;
-  srv->Run();
-  */
-  return true;
+//  SysInfo inf;
+  return srv->Run();
 }
 
 struct Settings {
   std::string tty_dev;
   std::string imx_img;
   std::string kernel_img;
-  std::string ramfs_img;
+  std::string rootfs_img;
   std::string use_tftp;
   bool        just_eth;
 };
@@ -316,14 +313,14 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
              "путь к образу загрузчика u-boot.")
 		("kernel", po::value<std::string>()->default_value(kKernelImg),
              "путь к образу ядра Linux. Ядро не будет загружено если не указать файл.")
-		("ramfs", po::value<std::string>()->default_value(kRamFsImg),
+		("rootfs", po::value<std::string>()->default_value(kRootFsImg),
              "путь к образу файловой системы. Необязательный параметр, работает "
              "только совместно с флагом: --tftp.")
     ("tftp", po::value<std::string>()->default_value("0.0.0.0"),
              "использовать TFTP, необходимо указать IP интерфейса для запуска "
              "сервера.")
     ("just_eth", po::value<bool>()->default_value(false)->zero_tokens(),
-                 "использовать только загрузку через Ethernet, не использовать"
+                 "использовать только загрузку через Ethernet, не использовать "
                  "UART");
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -335,7 +332,7 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
 	set.tty_dev    = vm["tty"].as<std::string>();
 	set.imx_img    = vm["img"].as<std::string>();
   set.kernel_img = vm["kernel"].as<std::string>();
-  set.ramfs_img  = vm["ramfs"].as<std::string>();
+  set.rootfs_img = vm["rootfs"].as<std::string>();
   set.use_tftp   = vm["tftp"].as<std::string>();
   set.just_eth   = vm["just_eth"].as<bool>();
 	return true;
@@ -365,15 +362,114 @@ void ShowProcess(const std::string &msg) {
   }
 }
 
+struct RecipeAct {
+  enum Id {
+    kUnknown,
+    kUBoot,
+    kKernelUart,
+    kKernelEth,
+    kRootFs
+  };
+  
+  typedef std::map<std::string, Id>  Map;
+  typedef std::pair<std::string, Id> Pair;
+
+  RecipeAct() {
+    actions.insert(Pair("uboot",       kUBoot));
+    actions.insert(Pair("kernel_uart", kKernelUart));
+    actions.insert(Pair("kernel_eth",  kKernelEth));
+    actions.insert(Pair("rootfs",      kRootFs));
+  }
+  
+  Id Identify(const std::string &in) const {
+    Map::const_iterator it = actions.find(in);
+    if (it != actions.end()) {
+      return it->second;
+    }
+    return kUnknown;
+  }
+  
+  Map actions;
+};
+
+bool DoAction(const Settings           &set,
+              const std::string        &act,
+              TFtp::Server             *srv,
+              boost::asio::serial_port *port) {
+  if (srv == 0 || port == 0) {
+    return false;
+  }
+  static const RecipeAct kActions;
+  switch (kActions.Identify(act)) {
+    case RecipeAct::kUBoot:
+      if (PktStatus().Send(*port)) {
+        return UploadUBoot(*port, set.imx_img);
+      }
+      break;
+    case RecipeAct::kKernelUart:
+      if (set.kernel_img.size() > 0) {
+        return UploadKernelOverUart(*port, set.kernel_img);
+      }
+      break;
+    case RecipeAct::kKernelEth:
+      if (set.kernel_img.size() > 0 &&
+          set.use_tftp.size() > 0) {
+        return UploadKernelOverEth(*port, srv);
+      }
+      break;
+    case RecipeAct::kRootFs:
+      if (set.rootfs_img.size() > 0 &&
+          set.use_tftp.size() > 0) {
+        return UploadRootFsOverEth(*port, srv);
+      }
+      break;
+    case RecipeAct::kUnknown:
+    default:
+      break;
+  }
+  return false;
+}
+
 int main(int argc, char **argv) {
   Settings set;
   if (not ParseArgs(argc, argv, set)) {
     return 0;
   }
+  // инициализация сервера TFTP
+  TFtp::Server srv(set.use_tftp);
+  srv.PublishFile(kKernelImg, set.kernel_img);
+  srv.PublishFile(kRootFsImg, set.rootfs_img);
+  // инициализация COM порта
+  boost::asio::io_service io_service;
+  boost::asio::serial_port port(io_service, set.tty_dev);
+  std::cout << "Порт \"" << set.tty_dev << "\": "
+            << (port.is_open() ? "открыт" : "закрыт") << std::endl;
+  port.set_option( boost::asio::serial_port_base::baud_rate(115200) );
+  port.set_option( boost::asio::serial_port_base::character_size(8) );
+  port.set_option( boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one) );
+  port.set_option( boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none) );
+  port.set_option( boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none) );
+  // разбор рецепта
+  const std::string kDelimiter("->");
+  std::string recipe;
+  std::cin >> recipe;
+  std::size_t found = 0;
+  do {
+    const std::size_t kFromOff = found;
+    found = recipe.find(kDelimiter, found);
+    const std::string kAction(recipe.substr(kFromOff, (found - kFromOff)));
+    DoAction(set, kAction, &srv, &port);
+    if (found == std::string::npos) {
+      break;
+    }
+    found += 2;
+  } while (1);
+  port.close();
+  /*
   if (set.just_eth) {
     TFtp::Server srv(set.use_tftp);
     srv.PublishFile(kKernelImg, set.kernel_img);
-    srv.PublishFile(kRamFsImg,  set.ramfs_img);
+    srv.PublishFile(kRootFsImg, set.rootfs_img);
     if (set.kernel_img.size() > 0) {
       srv.Run();
     }
@@ -398,14 +494,15 @@ int main(int argc, char **argv) {
   if (set.use_tftp.size() > 0) {
     TFtp::Server srv(set.use_tftp);
     srv.PublishFile(kKernelImg, set.kernel_img);
-    srv.PublishFile(kRamFsImg,  set.ramfs_img);
-    if (set.ramfs_img.size() > 0) {
-      UploadRamFsOverEth(port, &srv);
-    }
+    srv.PublishFile(kRootFsImg,  set.rootfs_img);
     if (set.kernel_img.size() > 0) {
       UploadKernelOverEth(port, &srv);
     }
+    if (set.rootfs_img.size() > 0) {
+      UploadRootFsOverEth(port, &srv);
+    }
   }
   port.close();
+  */
   return 0;
 }
