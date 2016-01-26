@@ -1,0 +1,31 @@
+--- ./build/busybox-1.20.1/scripts/kconfig/lxdialog/check-lxdialog.sh.orig	2016-01-26 14:33:32.000000000 +0300
++++ ./build/busybox-1.20.1/scripts/kconfig/lxdialog/check-lxdialog.sh	2016-01-26 15:01:29.238763063 +0300
+@@ -4,15 +4,20 @@
+ # What library to link
+ ldflags()
+ {
+-	for ext in so a dylib ; do
+-		for lib in ncursesw ncurses curses ; do
+-			$cc -print-file-name=lib${lib}.${ext} | grep -q /
+-			if [ $? -eq 0 ]; then
+-				echo "-l${lib}"
+-				exit
+-			fi
++	if type -p ncurses5-config &> /dev/null ; then
++		ncurses5-config --libs
++		exit 0
++	else
++		for ext in so a dylib ; do
++			for lib in ncursesw ncurses curses ; do
++				$cc -print-file-name=lib${lib}.${ext} | grep -q /
++				if [ $? -eq 0 ]; then
++					echo "-l${lib}"
++					exit
++				fi
++			done
+ 		done
+-	done
++	fi
+ 	exit 1
+ }
+ 
