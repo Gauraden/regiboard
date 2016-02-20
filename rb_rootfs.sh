@@ -111,6 +111,8 @@ BuildRootFS() {
 	PrintNotice "Copying root file system image to output directory..."
 	mv "${RFS_ROOT_DIR}/images/rootfs.tar" \
 	   "${ROOTFS_IMG_DIR}/${RFS_IMAGE}"
+	mv "${RFS_ROOT_DIR}/images/rootfs.tar.gz" \
+	   "${ROOTFS_IMG_DIR}/${RFS_IMAGE}.gz"
 	BindDirIfRequired "${RFS_BUILD_DIR}/output" "${RFS_ROOT_DIR}"
 	NotifyUser "Building of root FS for \"${BOARD_NAME}.${BOARD_PREFIX}\" was finished!"
 }
@@ -144,7 +146,8 @@ RootFSToMMC() {
 	local setup_dir="$1/root/os_setup"
 	PrintNotice 'Copying linux setup files...'
 	if IsFileExists "${setup_dir}"; then
-		sudo cp "${ROOTFS_IMG_DIR}/${RFS_IMAGE}" "${setup_dir}/rootfs.tar"
+		sudo cp "${ROOTFS_IMG_DIR}/${RFS_IMAGE}" "${setup_dir}/"
+		sudo cp "${ROOTFS_IMG_DIR}/${RFS_IMAGE}.gz" "${setup_dir}/"
 	else
 		PrintWarn "Failed to copy files, directory is not exists: ${setup_dir}"
 	fi

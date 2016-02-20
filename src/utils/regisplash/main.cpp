@@ -1,13 +1,15 @@
 #include <iostream>
-#include <sys/mman.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdint.h>
-#include <linux/fb.h>
+#include <cstdlib>
 #include <errno.h>
+#include <linux/fb.h>
+#include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <sys/reboot.h>
 #include <string.h>
 #include <memory>
-//#include <time.h>
 
 #pragma pack(push, 1)
 
@@ -169,9 +171,9 @@ bool PrintBMP(const char *name, Screen *screen) {
 
 int main(int argc, char *argv[]) {
 	Screen screen(800, 600, 4);
-	if (argc < 2) {
-		ERROR("Не указан BMP файл!");
-		return 0;
+	std::string splash_path="/root/vbr_splash.bmp";
+	if (argc > 1) {
+    splash_path = argv[1];
 	}
 	if (argc > 2) {
 	  SplashConf.rotate_scr = (strstr("rotate", argv[2]) != 0);
@@ -183,7 +185,7 @@ int main(int argc, char *argv[]) {
 	}
 	const int kSize = screen.width * screen.height * screen.depth;
 	screen.buffer = (uint8_t*)mmap(0, kSize, PROT_WRITE, MAP_SHARED, kFBDev, 0);
-	PrintBMP(argv[1], &screen);
+	PrintBMP(splash_path.c_str(), &screen);
 	munmap(screen.buffer, kSize);
 	close(kFBDev);
 	return 0;

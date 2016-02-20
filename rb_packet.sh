@@ -36,7 +36,9 @@ PacketConfigure() {
 		return
 	fi
 	# Running: make
-	IsFileExists "$build_dir/Makefile" && return
+	if IsFileExists "$build_dir/Makefile"; then
+	  return
+	fi
 	# Running: cmake
   IsFileExists "$build_dir/CMakeLists.txt" || \
     PrintAndDie 'Do not know how to configurate Automake'

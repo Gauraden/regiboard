@@ -3,6 +3,9 @@
 ConfigurateKernel() {
 	DieIfNotDefined ${BOARD_KERNEL_VER} "kernel version"
 	DieIfNotDefined ${BOARD_KERNEL_CNF} "kernel configuration"
+  if ! test ${BOARD_KERNEL_VER}; then
+	  BOARD_KERNEL_VER="${BOARD_KERNEL_BRANCH}"
+	fi
 	KERNEL_IMG="uImage.${BOARD_NAME}.${BOARD_CPU}.bin"
 	KERNEL_DIR="linux-${BOARD_KERNEL_VER}"
 	KERNEL_BUILD_DIR="${BUILD_DIR}/${KERNEL_DIR}"
@@ -10,12 +13,17 @@ ConfigurateKernel() {
 	KERNEL_MODULES_DIR="${KERNEL_IMG_DIR}/modules.${BOARD_NAME}.${BOARD_CPU}"
 	CreateDirIfNotExists "${KERNEL_MODULES_DIR}"
 	# We need it here because of toolchain dependency
+	# пробуем спулить проект
+  if IsFileExists "${KERNEL_BUILD_DIR}/.git"; then
+    pushd ${KERNEL_BUILD_DIR} && git pull origin && popd
+  fi
 	if ! IsFileExists ${KERNEL_BUILD_DIR}; then
-		# Downloading
-		# TODO
-		# Unpacking
-		UnpackArchive "${DOWNLOAD_DIR}/${KERNEL_DIR}.tar.bz2" "${BUILD_DIR}"
-		ApplyAllPatchesFor "${KERNEL_DIR}" "${KERNEL_BUILD_DIR}"
+	  git clone ${BOARD_KERNEL_GIT} ${KERNEL_BUILD_DIR} && pushd ${KERNEL_BUILD_DIR} && git checkout ${BOARD_KERNEL_BRANCH} && popd
+    # если не удалось скачать исходники из репозитория
+		if ! IsFileExists ${KERNEL_BUILD_DIR}; then
+  		UnpackArchive "${DOWNLOAD_DIR}/${KERNEL_DIR}.tar.bz2" "${BUILD_DIR}"
+	  	ApplyAllPatchesFor "${KERNEL_DIR}" "${KERNEL_BUILD_DIR}"
+	  fi
 	fi
 }
 
@@ -48,9 +56,9 @@ BuildKernel() {
 		TcTargetCleanSources "${KERNEL_BUILD_DIR}"
 	fi
 	PrintNotice "Building kernel: ${BOARD_KERNEL_CNF}"
-	TcTargetMakeSources "${KERNEL_BUILD_DIR}" uImage
+	TcTargetMakeSources "${KERNEL_BUILD_DIR}" uImage 'CROSS_COMPILE'
 	PrintNotice "Building modules..."
-	TcTargetMakeSources "${KERNEL_BUILD_DIR}" modules
+	TcTargetMakeSources "${KERNEL_BUILD_DIR}" modules 'CROSS_COMPILE'
 	PrintNotice "Installing modules: $KERNEL_MODULES_DIR"
 	TcTargetMakeSources "${KERNEL_BUILD_DIR}" "INSTALL_MOD_PATH=\"${KERNEL_MODULES_DIR}\" modules_install"
 	PrintNotice "Copying image to output directory..."

@@ -11,20 +11,13 @@ SRC_SHELL_DIR="../../src/shell"
 SRC_ETC_DIR="../../src/etc"
 SRC_FONTS_DIR="../../src/tty_font"
 
-#PrintNotice 'Copying "sysroot" from toolchain...'
-#cp -r $TARGET_DIR/../../toolchain/sysroot/* ${TARGET_DIR}/
-
 PrintNotice 'Copying fonts...'
 mkdir ${TARGET_TTY_FONT}
 cp ${SRC_FONTS_DIR}/* ${TARGET_TTY_FONT}/
 
 echo "cp ${SRC_FONTS_DIR}/* ${TARGET_TTY_FONT}/"
 
-PrintNotice 'Copying linux setup scripts...'
-OS_SETUP_DIR=${TARGET_DIR}/root/os_setup
 USR_SBIN_DIR=${TARGET_DIR}/usr/sbin
-
-CreateDirIfNotExists "${OS_SETUP_DIR}"
 IsFileExists "${USR_SBIN_DIR}" || PrintAndDie "Failed to find dir: ${USR_SBIN_DIR}"
 
 cp "${SRC_SHELL_DIR}/click"        "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
@@ -32,7 +25,13 @@ cp "${SRC_SHELL_DIR}/led"          "${USR_SBIN_DIR}" || PrintAndDie "Copy failed
 cp "${SRC_SHELL_DIR}/udhcpc_renew" "${USR_SBIN_DIR}" || PrintAndDie "Copy failed to: ${USR_SBIN_DIR}"
 
 PrintNotice 'Copying of system scripts and configs...'
+
+PROFILE_D_DIR="${TARGET_DIR}/etc/profile.d"
+CreateDirIfNotExists "${PROFILE_D_DIR}"
+
+cp "${SRC_SHELL_DIR}/colors.sh"        "${PROFILE_D_DIR}"
 cp "${SRC_SHELL_DIR}/S00gpio_init"     "${TARGET_DIR}/etc/init.d/"
+cp "${SRC_SHELL_DIR}/S02terminal_init" "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_SHELL_DIR}/S11ubi"           "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_SHELL_DIR}/S40network"       "${TARGET_DIR}/etc/init.d/"
 cp "${SRC_SHELL_DIR}/S51sysinfo"       "${TARGET_DIR}/etc/init.d/"

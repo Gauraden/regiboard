@@ -387,6 +387,8 @@ void TFtp::Session::AsyncAccept() {
 
 bool TFtp::Session::Send(const Byte *data, size_t size) {
   _input.reset();
+//  std::cout << " - отправка данных: " << (unsigned)size << "; "
+//            << std::endl;
   _socket.async_send_to(asio::buffer((const char*)data, size), _endpt,
     boost::bind(&TFtp::Session::HandlerWrite, this, 
                 asio::placeholders::error,
@@ -395,6 +397,8 @@ bool TFtp::Session::Send(const Byte *data, size_t size) {
 
 bool TFtp::Session::Receive(Byte *data, size_t size) {
   _input.reset();
+//  std::cout << " - ожидание данных: " << (unsigned)size << "; "
+//            << std::endl;
   _socket.async_receive_from(asio::buffer((char*)data, size), _endpt,
     boost::bind(&TFtp::Session::HandlerRead, this, 
                 asio::placeholders::error,
@@ -406,6 +410,8 @@ void TFtp::Session::HandlerWrite(const sys::error_code &e,
   if (e) {
     std::cerr << e.message() << std::endl;
   }
+//  std::cout << " ! отправлены данные: " << (unsigned)bytes << "; "
+//            << std::endl;
   AsyncAccept();
 }
 
@@ -415,6 +421,8 @@ void TFtp::Session::HandlerRead(const sys::error_code &e,
     std::cerr << e.message() << std::endl;
     return;
   }
+//  std::cout << " ! получены данные: " << (unsigned)bytes << "; "
+//            << std::endl;
   DetectInputPkt();
 }
 
@@ -470,7 +478,7 @@ void TFtp::Session::Process(const VirDir &dir) {
       VirDir::const_iterator f_it = dir.find(rrq.get_filename());
       if (f_it == dir.end()) {
         // TODO: отправка ошибки!
-        std::cout << "Файл ненайден! "
+        std::cout << "Файл не найден! "
                   << std::endl;
         break;
       }

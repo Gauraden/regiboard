@@ -45,6 +45,7 @@ if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	# Список утилит
 	UTIL_CRC=${BIN_DIR}/regicrc
 	UTIL_PROTECTOR=${BIN_DIR}/regiprotector
+	UTIL_UBOOTPSWD=${BIN_DIR}/regipswd
 fi
 
 _WGET_ARGS="-q -t ${WGET_TRIES} --waitretry=${WGET_WAIT} "

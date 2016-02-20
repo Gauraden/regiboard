@@ -97,8 +97,8 @@ TcCrossRebuildSources() {
 # Build methods for TARGET compile
 TcTargetMakeSources() {
 	DieIfNotDefined "$1" "make sources"
-	local cross_pref="CROSS_COMPILE=${TC_PREFIX}-"
-	local make_cmd="make ARCH=${BOARD_ARCH} ${cross_pref} -C $1 $2"
+	local cross_pref="${3:-CROSS}=${TC_PREFIX}-"
+	local make_cmd="make ARCH=${BOARD_ARCH} ${cross_pref} BUILDDIR=$1 -C $1 $2"
 	LogIt "${make_cmd}" "${TC_TARG_LOG_ERR}" "Target error: ${make_cmd}"
 }
 

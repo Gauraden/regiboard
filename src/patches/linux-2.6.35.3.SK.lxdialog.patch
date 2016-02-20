@@ -1,0 +1,31 @@
+--- ./build/linux-2.6.35.3.SK/scripts/kconfig/lxdialog/check-lxdialog.sh.orig	2010-08-20 22:55:55.000000000 +0400
++++ ./build/linux-2.6.35.3.SK/scripts/kconfig/lxdialog/check-lxdialog.sh	2016-01-26 16:27:38.883276810 +0300
+@@ -4,15 +4,20 @@
+ # What library to link
+ ldflags()
+ {
+-	for ext in so a dylib ; do
+-		for lib in ncursesw ncurses curses ; do
+-			$cc -print-file-name=lib${lib}.${ext} | grep -q /
+-			if [ $? -eq 0 ]; then
+-				echo "-l${lib}"
+-				exit
+-			fi
++	if type -p ncurses5-config &> /dev/null ; then
++		ncurses5-config --libs
++		exit 0
++	else
++		for ext in so a dylib ; do
++			for lib in ncursesw ncurses curses ; do
++				$cc -print-file-name=lib${lib}.${ext} | grep -q /
++				if [ $? -eq 0 ]; then
++					echo "-l${lib}"
++					exit
++				fi
++			done
+ 		done
+-	done
++	fi
+ 	exit 1
+ }
+ 

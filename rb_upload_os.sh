@@ -1,34 +1,83 @@
 #!/bin/bash
 
-TTY_USB=${1:-/dev/ttyUSB0}
-RECIPE=${2:-"RecipeBootOverEth"}
+. ./.config
+
+RECIPE=${1:-"Default"}
+TTY_USB=${2:-/dev/ttyUSB0}
 REGILOADER="bin/regiloader"
-IMG_UBOOT="output/uboot/u-boot.regigraf.imx53.imx"
+IMG_UBOOT="output/uboot/u-boot.regigraf.imx53"
 IMG_KERNEL="output/kernel/uImage.regigraf.imx53.bin"
-IMG_ROOTFS="output/rootfs/rootfs.regigraf.cortex_a8.tar"
+IMG_ROOTFS="output/rootfs/rootfs.regigraf.cortex_a8.tar.gz"
+IMG_MTD_UTILS="tmp/mtd-utils.ipk/data.tar.gz"
+IMG_RBF="cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf"
+IMG_RBF_PATH="tmp/"
+IMG_RBF_URL="ftp://jenny/firmwares/F1772/${IMG_RBF}"
 
 HOST_IP=$(ifconfig | grep -oE "inet 192.([0-9\.]+)")
 HOST_IP=${HOST_IP/inet /}
 
 RUN="$REGILOADER --tty ${TTY_USB} --img ${IMG_UBOOT} --kernel ${IMG_KERNEL} 
---tftp ${HOST_IP} --rootfs ${IMG_ROOTFS}"
+--tftp ${HOST_IP} --rootfs ${IMG_ROOTFS} --utils ${IMG_MTD_UTILS} --conf ./tmp 
+--rbf ${IMG_RBF_PATH}${IMG_RBF} --uboot_pswd ${UBOOT_PSWD}"
 
 function RecipeBootloader() {
-  echo "загружается только UBoot"
-  echo "uboot" | ${RUN}
+  ${RUN} --acts "uboot->enter_uboot"
+}
+
+function RecipeSetupNor() {
+  ${RUN} --acts "uboot->setup_nor"
 }
 
 function RecipeBootOverUart() {
-  echo "загружается UBoot и ядро Linux через UART"
-  echo "uboot->kernel_uart" | ${RUN}
+  ${RUN} --acts "uboot->kernel_uart"
 }
 
 function RecipeBootOverEth() {
-  echo "загружается UBoot и ядро Linux через ethernet"
-  echo "uboot->kernel_eth" | ${RUN}
+  ${RUN} --acts "uboot->kernel_eth"
 }
 
-echo    "Host is  : ${HOST_IP}"
-echo -n "Recipe is: "
+function RecipeBootOverEthAndDebugKernel() {
+  ${RUN} --acts "uboot->kernel_dbg"
+}
 
-${RECIPE}
+function RecipeBootWithSpecTools() {
+  ${RUN} --acts "uboot->kernel_eth->mtd_utils"
+}
+
+function RecipeBootAndInstallKernel() {
+  ${RUN} --acts "uboot->kernel_eth->mtd_utils->install_uboot->install_kernel"
+}
+
+function RecipeBootAndUploadRootFS() {
+  ${RUN} --acts "uboot->kernel_eth->rootfs"
+}
+
+function RecipeBootAndWriteRootFS() {
+  ${RUN} --acts "uboot->kernel_eth->mtd_utils->rootfs->unpack_rootfs"
+}
+
+function RecipeBootAndInstallRegigraf() {
+  ${RUN} --acts "uboot->kernel_eth->install_regigraf"
+}
+
+function RecipeSetupBoardForRegigraf() {
+  ${RUN} --acts "uboot->setup_nor->kernel_eth->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->install_uboot->install_kernel->setup_booting->register"
+}
+
+function RecipeTestRegiboard() {
+  ${RUN} --acts "uboot->kernel_eth->validate_hw->test_hw"
+}
+
+function RecipeDefault() {
+  RecipeBootOverEth
+}
+
+echo "Загрузка нового файла прошивки: "
+rm ${IMG_RBF_PATH}/${IMG_RBF}
+wget -P ${IMG_RBF_PATH} ${IMG_RBF_URL}
+
+echo "Host is: ${HOST_IP}"
+
+RECIPE_FULL_NAME="Recipe${RECIPE}"
+${RECIPE_FULL_NAME}
+

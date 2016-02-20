@@ -83,6 +83,21 @@
   		return ('?' + req + 'x=' + mouse.x + '&y=' + mouse.y + '&s=' + mouse.state);
     }
 
+    function GetDeviceState(handler) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', "http://" + document.domain + ":8080/state.json", true);
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState == 4) {
+           if(xhr.status == 200 && handler !== undefined) {
+             var resp_json = undefined;
+             eval("resp_json = " + xhr.responseText);
+             handler(resp_json);
+           }
+        }
+      };
+      xhr.send(null);
+    }
+
 		function OnLoad() {
 			debug_node   = document.getElementById("debug");
 			canvas_node  = document.getElementById("screen");
@@ -116,10 +131,20 @@
 				frame.src = 'http://' + document.domain + ':8080' + GetReqParams();
 			}
       
+ 		  GetDeviceState(function (dev_state) {
+ 		    if (dev_state.display.orientation == "vertical") {
+	        var w = canvas_node.width;
+	        canvas_node.width  = canvas_node.height;
+	        canvas_node.height = w;
+	      	canvas_ctx.translate(0, w);
+	      	canvas_ctx.rotate(-90 * Math.PI / 180);
+ 		    }
+ 		  });
+      
 		  frame.onload = function() {
-	    	canvas_ctx.save();
-		    canvas_ctx.drawImage(this, 0, 0);
-		    canvas_ctx.restore();
+       	canvas_ctx.save();
+	      canvas_ctx.drawImage(this, 0, 0);
+	      canvas_ctx.restore();
 	      ready        = true;
 		    disconnected = false;
         UpdatePollTimeout();

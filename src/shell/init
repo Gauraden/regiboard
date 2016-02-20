@@ -1,56 +1,63 @@
 #!/bin/sh
 
+CYAN='\033[1;36m'
+MAGENTA='\033[1;35m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+RED='\033[1;31m'
+BLUE='\033[1;34m'
+ESC_RESET='\033[0m'
+
 export PATH='/bin:/sbin:/usr/bin:/usr/sbin'
+export PS1="${GREEN}regiboard (initramfs) # ${ESC_RESET}"
 
-NEW_ROOT='/mnt/root'
-
-PrintAndDie() {
-	echo ""
-	echo "/init failed: $*"
-	echo ""
-	echo "ERROR! Dropping to a shell so you can figure it out"
-	exec /bin/busybox sh
-	exit 0
+Warn() {
+  echo "${YELLOW}${1}${ESC_RESET}"
 }
 
-IsFileExists() {
-	if [ "$(ls -a -d $1 2> /dev/null)" = "" ]; then
-		return 1
-	fi
-	return 0
+Error() {
+  echo "${RED}${1}${ESC_RESET}"
+}
+
+PrintAndDie() {
+  echo ""
+  Error "/init failed: $*"
+  Warn  "Dropping to a shell so you can figure it out"
+	exec /bin/busybox sh
+	exit 0
 }
 
 # Mount the /proc and /sys filesystems.
 mount -t proc none /proc
 mount -t sysfs none /sys
 mount -t devtmpfs devtmpfs /dev
+mount -t tmpfs tmpfs /tmp
 
+NEW_ROOT='/mnt'
 CMD_LINE=$(cat /proc/cmdline)
+ROOT=$(echo "$CMD_LINE" | sed -r 's/(.*)root=([^ ]+)(.*)/\2/')
+ROOT_FS_TYPE=$(echo "$CMD_LINE" | sed -r 's/(.*)rootfstype=([^ ]+)(.*)/\2/')
 # ------------------------------------------------------------------------------
 # Do your stuff here.
 /bin/regisplash /root/vbr_splash.bmp "$(echo ${CMD_LINE} | sed -r 's/(.*)splash=([^ ]+)(.*)/\2/')"
 # ------------------------------------------------------------------------------
 # Mount rootfs
-ROOT=$(echo "$CMD_LINE" | sed -r 's/(.*)root=([^ ]+)(.*)/\2/')
-ROOT_FS_TYPE=$(echo "$CMD_LINE" | sed -r 's/(.*)rootfstype=([^ ]+)(.*)/\2/')
-
-if ! IsFileExists "$NEW_ROOT"; then
+if ! test -d "$NEW_ROOT"; then
 	mkdir "$NEW_ROOT" || PrintAndDie "Failed to create: $NEW_ROOT"
 fi
-
-echo "ROOT: $ROOT"
-echo "ROOT_FS: $ROOT_FS_TYPE"
 
 test "$ROOT" == "/dev/mmcblk0p2" && echo "waiting for SD/MMC..." && sleep 1
 #e2fsck -fy /dev/mmcblk0p2
 
 mount -t $ROOT_FS_TYPE $ROOT $NEW_ROOT || PrintAndDie "Failed to mount: $ROOT"
+test -f "${NEW_ROOT}/sbin/init" || PrintAndDie "Failed to detect 'init': $NEW_ROOT"
 
 # Moving mounted pseudo filesystems
 mount --move /sys $NEW_ROOT/sys
 mount --move /proc $NEW_ROOT/proc
 mount --move /dev $NEW_ROOT/dev
+mount --move /tmp $NEW_ROOT/tmp
 
 # Boot the real thing
-echo "executing linuxrc..."
+echo "Executing linuxrc..."
 exec switch_root $NEW_ROOT /sbin/init

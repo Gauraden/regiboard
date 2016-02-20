@@ -35,35 +35,45 @@ BuildBusyBoxOld() {
 BuildBusyBox() {
   ./rb_build.sh packets busybox
  	PrintNotice "Creating busybox symlinks..."
-# 	local busybox="${IRAMFS_BUILD_DIR}/bin/busybox"
-# 	local symlink="${IRAMFS_BUILD_DIR}/bin/"
  	local busybox="busybox"
  	local symlink=""
  	cd "${IRAMFS_BUILD_DIR}/bin/"
- 	ln -sf $busybox "${symlink}cat"
- 	ln -sf $busybox "${symlink}echo"
- 	ln -sf $busybox "${symlink}ls"
- 	ln -sf $busybox "${symlink}ln"
- 	ln -sf $busybox "${symlink}mkdir"
- 	ln -sf $busybox "${symlink}mount"
- 	ln -sf $busybox "${symlink}sed"
- 	ln -sf $busybox "${symlink}sh"
- 	ln -sf $busybox "${symlink}sleep"
- 	ln -sf $busybox "${symlink}switch_root"
- 	ln -sf $busybox "${symlink}umount"
- 	ln -sf $busybox "${symlink}tftp"
- 	ln -sf $busybox "${symlink}tar"
- 	ln -sf $busybox "${symlink}mknod"
- 	ln -sf $busybox "${symlink}ubidetach"
- 	ln -sf $busybox "${symlink}ubiattach"
- 	ln -sf $busybox "${symlink}ubimkvol"
-# 	ln -sf $busybox "${symlink}fsck"
-# 	ln -sf $busybox "${symlink}fsck.ext2"
+ 	
+ 	MkAlias() {
+   	ln -sf $busybox "${symlink}${1}"
+ 	}
+ 	
+  MkAlias 'sync'
+  MkAlias 'bash'
+  MkAlias 'cat'
+  MkAlias 'dd'
+  MkAlias 'echo'
+  MkAlias 'grep'
+  MkAlias 'hush'
+  MkAlias 'ifconfig'
+  MkAlias 'ls'
+  MkAlias 'mkdir'
+  MkAlias 'mknod'
+  MkAlias 'mount'
+  MkAlias 'umount'
+  MkAlias 'sed'
+  MkAlias 'sh'
+  MkAlias 'sleep'
+  MkAlias 'switch_root'
+  MkAlias 'tar'
+  MkAlias 'gunzip'
+  MkAlias 'test'
+  MkAlias 'tftp'
+  MkAlias 'ubiattach'
+  MkAlias 'ubidetach'
+  MkAlias 'ubimkvol'
+  MkAlias 'udhcpc'
 }
 
 PrepareInitRAMFS() {
+  local use_sudo='sudo'
 	PrintNotice "Clearing init RAM FS structure..."
-	sudo rm -r "${IRAMFS_BUILD_DIR}/*" 2> ${_DEV_NULL}
+	${use_sudo} rm -r "${IRAMFS_BUILD_DIR}/*" 2> ${_DEV_NULL}
 	# TODO: i think it`ll be better to use "mkinitramfs" script
 	# creating of directories structure
 	PrintNotice "Creating directories structure..."
@@ -71,25 +81,26 @@ PrepareInitRAMFS() {
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/dev"
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/etc"
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/lib"
-	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/bin"
+#	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/bin"
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/mnt"
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/proc"
-	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/bin"
+#	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/bin"
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/root"
-	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/bin"
+#	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/bin"
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/sbin"
-	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/bin"
+#	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/bin"
 	CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/sys"
+  CreateDirIfNotExists "${IRAMFS_BUILD_DIR}/tmp"
 	# creating dev nodes
 	PrintNotice "Creating devices..."
-	sudo mknod "${IRAMFS_BUILD_DIR}/dev/console"   c 5   1
-	sudo mknod "${IRAMFS_BUILD_DIR}/dev/fb0"       c 29  0
-	sudo mknod "${IRAMFS_BUILD_DIR}/dev/null"      c 1   3
-	sudo mknod "${IRAMFS_BUILD_DIR}/dev/ttymxc0"   c 207 16
-	sudo mknod "${IRAMFS_BUILD_DIR}/dev/ubi0"      c 247 0
-	sudo mknod "${IRAMFS_BUILD_DIR}/dev/ubi_ctrl"  c 10  61
-	sudo mknod "${IRAMFS_BUILD_DIR}/dev/mmcblk0p1" b 179 1
-	sudo mknod "${IRAMFS_BUILD_DIR}/dev/mmcblk0p2" b 179 2
+	${use_sudo} mknod "${IRAMFS_BUILD_DIR}/dev/console"   c 5   1
+	${use_sudo} mknod "${IRAMFS_BUILD_DIR}/dev/fb0"       c 29  0
+	${use_sudo} mknod "${IRAMFS_BUILD_DIR}/dev/null"      c 1   3
+	${use_sudo} mknod "${IRAMFS_BUILD_DIR}/dev/ttymxc0"   c 207 16
+#	${use_sudo} mknod "${IRAMFS_BUILD_DIR}/dev/ubi0"      c 247 0
+	${use_sudo} mknod "${IRAMFS_BUILD_DIR}/dev/ubi_ctrl"  c 10  61
+	${use_sudo} mknod "${IRAMFS_BUILD_DIR}/dev/mmcblk0p1" b 179 1
+	${use_sudo} mknod "${IRAMFS_BUILD_DIR}/dev/mmcblk0p2" b 179 2
 }
 
 BuildInitRAMFS() {
@@ -101,15 +112,17 @@ BuildInitRAMFS() {
 	     ! IsFileExists "${IRAMFS_BUILD_DIR}/dev"; then
 		PrepareInitRAMFS
 	fi
-	# rebuilding busybox
+	# сборка зависимостей
+  PrintNotice "Building static mtd-utils..."
+	./rb_build.sh packets mtd
+	PrintNotice "Building regisplash..."
+	./rb_build.sh packets regisplash
 	PrintNotice "Building static busybox..."
 	BuildBusyBox
 	# prepare utils and scripts
 	PrintNotice "Installing utils and scripts..."
 	cp "${init_file}" "${IRAMFS_BUILD_DIR}/sbin/"
-	#cp "./bin/ubiformat" "${IRAMFS_BUILD_DIR}/bin/"
 	cd ${IRAMFS_BUILD_DIR}
 	ln -sf sbin/init init
-#	ln -sf "${IRAMFS_BUILD_DIR}/sbin/init" "${IRAMFS_BUILD_DIR}/init"
 	NotifyUser "Building of init RAM FS for \"${TARGET_NAME_PREFIX}\" was finished!"
 }

@@ -3,4 +3,6 @@
 MTD_NUM=4
 
 ubiattach /dev/ubi_ctrl -m $MTD_NUM
+mount -t ubifs ubi1:storage /home
+
 mount -a

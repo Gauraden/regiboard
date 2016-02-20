@@ -3,6 +3,9 @@
 ConfigurateUBoot() {
 	DieIfNotDefined ${BOARD_UBOOT_VER} "u-boot version"
 	DieIfNotDefined ${BOARD_UBOOT_CNF} "u-boot configuration"
+	if ! test ${BOARD_UBOOT_VER}; then
+	  BOARD_UBOOT_VER="${BOARD_UBOOT_BRANCH}"
+	fi
 	UBOOT_IMG="u-boot.${TARGET_NAME_CPU}.bin"
 	UBOOT_DIR="u-boot-${BOARD_UBOOT_VER}"
 	UBOOT_BUILD_DIR="${BUILD_DIR}/${UBOOT_DIR}"
@@ -26,12 +29,20 @@ ConvertBinToImx() {
 }
 
 BuildUBoot() {
+  # пробуем спулить проект
+  if IsFileExists "${UBOOT_BUILD_DIR}/.git"; then
+    pushd ${UBOOT_BUILD_DIR} && git pull origin && popd
+  fi
+  # если не удалось спулить, тогда распаковываем архив
 	if ! IsFileExists ${UBOOT_BUILD_DIR}; then
 		# Downloading
-		# TODO
-		# Unpacking
-		UnpackArchive "${DOWNLOAD_DIR}/${UBOOT_DIR}.tar.bz2" "${BUILD_DIR}"
-		ApplyAllPatchesFor "${UBOOT_DIR}" "${UBOOT_BUILD_DIR}"
+		git clone ${BOARD_UBOOT_GIT} ${UBOOT_BUILD_DIR} && pushd ${UBOOT_BUILD_DIR} && git checkout ${BOARD_UBOOT_BRANCH} && popd
+		# если не удалось скачать исходники из репозитория
+		if ! IsFileExists ${UBOOT_BUILD_DIR}; then
+	  	# Unpacking
+	  	UnpackArchive "${DOWNLOAD_DIR}/${UBOOT_DIR}.tar.bz2" "${BUILD_DIR}"
+  		ApplyAllPatchesFor "${UBOOT_DIR}" "${UBOOT_BUILD_DIR}"
+		fi
 	fi
 	if [ "${SUBPROG_ARG}" = 'mkpatch' ]; then
 		CreatePatch "${UBOOT_BUILD_DIR}"
@@ -46,9 +57,11 @@ BuildUBoot() {
 	PrintNotice "Clearing u-boot sources..."
 	TcTargetDistCleanSources ${UBOOT_BUILD_DIR}
 	PrintNotice "Configurating u-boot: ${BOARD_UBOOT_CNF}"
-	TcTargetMakeSources ${UBOOT_BUILD_DIR} "${BOARD_UBOOT_CNF}_config"
+	TcTargetMakeSources ${UBOOT_BUILD_DIR} "${BOARD_UBOOT_CNF}_config" 'CROSS_COMPILE'
 	PrintNotice "Building u-boot.bin"
-	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'all'
+	local pswd_hash=$(${UTIL_UBOOTPSWD} --pswd="$UBOOT_PSWD" | sed -r 's/(.*)md5(.+): 0x(.+)/\3/')
+	export EXTERN_DEFS="-DCONFIG_PSWD=\\\"$pswd_hash\\\""
+	TcTargetMakeSources ${UBOOT_BUILD_DIR} 'all' 'CROSS_COMPILE'
 	PrintNotice "Moving to output: ${UBOOT_IMG}"
 	mv "${UBOOT_BUILD_DIR}/u-boot.bin" "${UBOOT_IMG_DIR}/${UBOOT_IMG}"
 	ConvertBinToImx ${UBOOT_IMG_DIR}
