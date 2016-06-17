@@ -16,6 +16,8 @@
 #include "boost/scoped_array.hpp"
 #include "boost/shared_array.hpp"
 
+long long GetMSec();
+
 namespace fb {
 
 typedef uint64_t                       TimeVal;

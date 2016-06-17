@@ -3,6 +3,9 @@
 #include <++DFB/++dfb.h>
 #include <directfb.h>
 #include <cairo/cairo-directfb.h>
+#include <librsvg/rsvg.h>
+#include <librsvg/rsvg-cairo.h>
+#include <gdk-pixbuf/gdk-pixbuf.h>
 #include "boost/scoped_array.hpp"
 
 static unsigned kScrWidth  = 640;
@@ -102,6 +105,123 @@ void show_trend(cairo_t *ctx, IDirectFBSurface *prim, IDirectFBSurface *buf) {
 }
 
 static
+void show_svg(IDirectFB         *dfb,
+              cairo_t           *ctx,
+              IDirectFBSurface  *prim,
+              IDirectFBSurface  *buf,
+              const std::string &svg_file) {
+  if (not dfb || not ctx || not prim || not buf) {
+    return;
+  }
+  std::cout << "SVG: " << svg_file << std::endl;
+
+  RsvgDimensionData dim;  
+  RsvgHandle      *handle;
+  cairo_surface_t *cairo_surf;
+  cairo_t         *cr;
+  GError          *error = NULL;
+  boost::scoped_array<uint8_t> buffer;
+  // загрузки пиктограммы
+  handle = rsvg_handle_new_from_file(svg_file.c_str(), &error);
+  rsvg_handle_get_dimensions(handle, &dim);
+  static const unsigned kDepth = 4;
+  static const unsigned kScale = 3;
+  dim.width  *= kScale;
+  dim.height *= kScale;
+  DFBSurfaceDescription dsc;
+  dsc.flags       = (DFBSurfaceDescriptionFlags)(DSDESC_WIDTH |
+                                                 DSDESC_HEIGHT |
+                                                 DSDESC_PIXELFORMAT |
+                                                 DSDESC_CAPS |
+                                                 DSDESC_PREALLOCATED
+                                                 );
+  dsc.caps        = DSCAPS_NONE;
+  dsc.width       = dim.width;
+  dsc.height      = dim.height;
+  dsc.pixelformat = DSPF_ARGB;
+  const uint32_t kBufSize = dim.width * dim.height * kDepth;
+  buffer.reset(new uint8_t[kBufSize]);
+  memset(buffer.get(), 0, kBufSize);
+
+  dsc.preallocated[0].data  = buffer.get();
+  dsc.preallocated[0].pitch = dsc.width * kDepth;
+  dsc.preallocated[1].data  = NULL;
+  dsc.preallocated[1].pitch = 0;
+  IDirectFBSurface dfb_obj;
+  dfb_obj = dfb->CreateSurface(dsc);
+// variant 0
+  int rowstride = dim.width * kDepth;
+  cairo_surf = cairo_image_surface_create_for_data (buffer.get(),
+                                                 CAIRO_FORMAT_ARGB32,
+                                                 dim.width, 
+                                                 dim.height, 
+                                                 rowstride);
+  cr = cairo_create (cairo_surf);
+  cairo_surface_destroy (cairo_surf);
+  cairo_scale(cr, kScale, kScale);
+  rsvg_handle_render_cairo_sub (handle, cr, 0);
+  //rsvg_cairo_to_pixbuf (buffer.get(), rowstride, dim.height);
+  cairo_destroy (cr);
+  //rsvg_cairo_to_pixbuf (pixels, rowstride, dimensions.height);
+// variant 1
+/*
+  cairo_surf = cairo_image_surface_create_for_data(buffer.get(),
+      CAIRO_FORMAT_ARGB32,
+      dim.width,
+      dim.height,
+      cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, dim.width));
+  cr = cairo_create(cairo_surf);
+  cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+  cairo_scale(cr, 3, 3);
+  rsvg_handle_render_cairo(handle, cr);
+  cairo_destroy(cr);
+  cairo_surface_destroy(cairo_surf);
+*/
+// variant 2
+/*
+  GdkPixbuf *pix_buf = rsvg_handle_get_pixbuf(handle);
+  struct Pixel {
+    uint8_t r, g, b, a;
+  };
+  Pixel *src = reinterpret_cast<Pixel*>(gdk_pixbuf_get_pixels(pix_buf));
+  Pixel *dst = reinterpret_cast<Pixel*>(buffer.get());
+  
+  for (size_t offs = 0; offs < (kBufSize / 4); offs++) {
+    dst->r = src->b;
+    dst->g = src->g;
+    dst->b = src->r;
+    dst->a = src->a;
+    src++;
+    dst++;
+  }
+*/  
+  // заливка фона
+ 	cairo_save(ctx);
+  cairo_rectangle(ctx, 10, 10, 400, 400);
+  cairo_set_source_rgb(ctx, (double)94/255, (double)147/255, (double)203/255);
+  cairo_fill(ctx);
+  cairo_restore(ctx);
+  prim->Blit(buf);
+  // вывод пиктограммы
+  DFBRectangle rect;
+  rect.x = 0;
+  rect.y = 0;
+  rect.w = dim.width;
+  rect.h = dim.height;
+  DFBSurfaceBlittingFlags m_flags = DSBLIT_NOFX;
+  DFB_ADD_BLITTING_FLAG(m_flags, DSBLIT_BLEND_ALPHACHANNEL);
+  DFB_ADD_BLITTING_FLAG(m_flags, DSBLIT_DEMULTIPLY);
+  /*
+  if (alpha < 255) {
+    DFB_ADD_BLITTING_FLAG(m_flags, DSBLIT_BLEND_COLORALPHA);
+    surf->SetColor(0, 0, 0, alpha);
+  }
+  */
+  prim->SetBlittingFlags(m_flags);
+  prim->Blit(&dfb_obj, &rect, 20, 20);
+}
+
+static
 bool check_cairo(IDirectFB *dfb, IDirectFBSurface *primary) {
     boost::scoped_array<unsigned char> v_buf(new unsigned char[kScrWidth * kScrHeight * kScrDepth]);
     IDirectFBSurface      dfb_buf;
@@ -122,19 +242,6 @@ bool check_cairo(IDirectFB *dfb, IDirectFBSurface *primary) {
 		dsc.preallocated[1].pitch = 0;
     dfb_buf = dfb->CreateSurface(dsc);
 
-    const Color kRed(0xFF, 0x00, 0x00, 0xFF);
-    const Color kWhite(0xFF, 0xFF, 0xFF, 0xFF);
-/*    DFBRegion region;
-    region.x1 = 10;
-    region.y1 = 0;
-    region.x2 = 700;
-    region.y2 = 10;
-    dfb_buf.SetClip(&region);*/
-    kWhite.ApplyTo(dfb_buf);
-    Line(Point(10, 9), Point(700, 11)).ApplyTo(dfb_buf);
-    primary->Blit(dfb_buf);
-    primary->Flip();
-    
     std::cout << "Creation of cairo surface..." << std::endl;
     cairo_surface_t *cairo_surface = cairo_image_surface_create_for_data(v_buf.get(),
       CAIRO_FORMAT_ARGB32,
@@ -154,131 +261,30 @@ bool check_cairo(IDirectFB *dfb, IDirectFBSurface *primary) {
       return false;
     }
     
-    show_rotated_text(cairo_context, primary, &dfb_buf);
+//    show_rotated_text(cairo_context, primary, &dfb_buf);
 //    show_trend(cairo_context, primary, &dfb_buf);
-/*
-  	cairo_save(cairo_context);
-    cairo_rectangle(cairo_context, 10, 10, 100, 100);
-    cairo_set_source_rgb(cairo_context, 1.0, 0.0, 1.0);
-    cairo_fill(cairo_context);
-    cairo_restore(cairo_context);
-    */
-   	cairo_save(cairo_context);
-  	cairo_set_source_rgb(cairo_context, 1, 1, 1);
-    cairo_move_to (cairo_context, 10, 15);
-    cairo_line_to (cairo_context, 700, 16);
-    cairo_set_line_width (cairo_context, 1.0);
-    cairo_set_line_cap (cairo_context, CAIRO_LINE_CAP_ROUND);
-    cairo_stroke (cairo_context);
-    cairo_restore(cairo_context);
-    /*
-   	cairo_save(cairo_context);
-  	cairo_move_to(cairo_context, 50.0, 50.0);
-  	cairo_set_source_rgb(cairo_context, 1.0, 1.0, 1.0);
-	  cairo_show_text(cairo_context, "Hello World!");
-    cairo_restore(cairo_context);
-    */	  
-    /*
-   	cairo_save(cairo_context);
-	  cairo_set_source_rgb(cairo_context, 0.0, 1.0, 0.0);
-    cairo_set_line_width(cairo_context, 1);
-    cairo_move_to(cairo_context, 300.0, 300.0);
-    cairo_arc(cairo_context, 300, 300, 50, 0, 2*3.14);
-    cairo_stroke(cairo_context);
-    cairo_restore(cairo_context);
-	  
-   	cairo_save(cairo_context);
-	  cairo_set_font_size(cairo_context, 24);
-  	cairo_move_to(cairo_context, 200.0, 200.0);
-  	cairo_set_source_rgb(cairo_context, 0.5, 0.5, 1.0);
-	  cairo_rotate(cairo_context, (45*0.0174) );
-	  cairo_show_text(cairo_context, "WAZZZZAAAAAAP!");
-    cairo_restore(cairo_context);
-	  */
-    primary->Blit(dfb_buf);
+//    primary->Blit(dfb_buf);
+    show_svg(dfb, cairo_context, primary, &dfb_buf, "icon_eth_port_highlight.svg");
+
     primary->Flip();
     
     std::cout << "Waiting for 5 seconds..." << std::endl;
-    sleep(30);
+    sleep(15);
 
     cairo_destroy(cairo_context);
     cairo_surface_destroy(cairo_surface);
     return true;
 }
 
-static
-void CairoMainSurf(IDirectFB *dfb) {
-  DFBSurfaceDescription dsc;
-	int scr_w,
-	    scr_h;
-  IDirectFBScreen screen = dfb->GetScreen(0);
-  screen.GetSize(&scr_w, &scr_h);
-  
-  std::cout << "screen: " << scr_w << "x" << scr_h << std::endl;
-  boost::scoped_array<unsigned char> v_buf(new unsigned char[scr_w * scr_h * kScrDepth]);
-    
-  dsc.flags = (DFBSurfaceDescriptionFlags)(DSDESC_CAPS
-//                                        | DSDESC_WIDTH
-//                                        | DSDESC_HEIGHT
-//                                        | DSDESC_PIXELFORMAT
-//                                          | DSDESC_PREALLOCATED 
-                                          | DBDESC_MEMORY);
-//	dsc.caps        = DSCAPS_NONE;
-	dsc.caps        = DSCAPS_PRIMARY;
-//	dsc.width       = scr_w;
-//	dsc.height      = scr_h;
-//	dsc.pixelformat = DSPF_RGB32;
-	dsc.preallocated[0].data  = v_buf.get();
-	dsc.preallocated[0].pitch = dsc.width * kScrDepth;
-	dsc.preallocated[1].data  = NULL;
-	dsc.preallocated[1].pitch = 0;
-  IDirectFBSurface dfb_buf = dfb->CreateSurface(dsc);
-  
-  cairo_surface_t *cairo_surface = cairo_image_surface_create_for_data(v_buf.get(),
-    CAIRO_FORMAT_ARGB32,
-    scr_w,
-    scr_h,
-    cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, scr_w));
-  if (not cairo_surface) {
-    std::cout << "cairo_surface is NULL" << std::endl;
-    return;
-  }
-  std::cout << "Creation of cairo context..." << std::endl;
-  cairo_t *cairo_context = cairo_create(cairo_surface);
-  if (not cairo_context) {
-    std::cout << "cairo_context is NULL" << std::endl;
-    return;
-  }
-  
- 	cairo_save(cairo_context);
-	cairo_set_source_rgb(cairo_context, 1, 1, 1);
-  cairo_move_to (cairo_context, 10, 15);
-  cairo_line_to (cairo_context, 700, 16);
-  cairo_set_line_width (cairo_context, 1.0);
-  cairo_set_line_cap (cairo_context, CAIRO_LINE_CAP_ROUND);
-  cairo_stroke (cairo_context);
-  cairo_restore(cairo_context);
-  
-  dfb_buf.Flip();
-  const int kSleep = 5;  
-  std::cout << "Waiting for " << kSleep << " seconds..." << std::endl;
-  sleep(kSleep);
-  
-  cairo_destroy(cairo_context);
-  cairo_surface_destroy(cairo_surface);
-}
-
 int main (int argc, char **argv) {
-/*
 	IDirectFBSurface      m_primary;
 	DFBSurfaceDescription dsc;
 	int w, h;
-*/
+	
   DirectFB::Init(/*&argc, &argv*/);
+  g_type_init();
   IDirectFB m_dfb = DirectFB::Create();
-  CairoMainSurf(&m_dfb);
-  return 0;
-/*  
+
   dsc.flags = (DFBSurfaceDescriptionFlags)(DSDESC_CAPS |
 //                                           DSDESC_WIDTH |
 //                                           DSDESC_HEIGHT |
@@ -288,8 +294,6 @@ int main (int argc, char **argv) {
 //	dsc.height      = kScrHeight;
 	dsc.pixelformat = DSPF_RGB24;
   m_primary = m_dfb.CreateSurface(dsc);
-  m_primary.GetSize(&w, &h);
-    
+  m_primary.GetSize(&w, &h);    
   check_cairo(&m_dfb, &m_primary);
-  */
 }

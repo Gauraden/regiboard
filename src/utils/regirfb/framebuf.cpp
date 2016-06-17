@@ -2,6 +2,13 @@
 #include <sstream>
 #include <sys/socket.h>
 //#include <arm_neon.h>
+#include <sys/time.h>
+
+long long GetMSec() {
+  struct timeval tp;
+  gettimeofday(&tp, NULL);
+  return (tp.tv_sec * 1000) + (tp.tv_usec / 1000);
+}
 
 namespace fb {
 
@@ -213,6 +220,7 @@ void Screen::SendUData(int socket) {
       }
       continue;
     }
+    std::cout << "Result: " << (long long)kResult << std::endl;
     sended += kResult;
   }
 }
@@ -328,9 +336,13 @@ bool Screen::Convert32ToPalette(uint8_t *dst, uint8_t *src, uint32_t body_sz) {
 
 bool Screen::SendFrameAsBmp(int socket) {
 	if (not FrameTimeout()) {
+    const long long kSendBeg = GetMSec();
 	 	SendUData(socket);
+		std::cout << "UData cache: " << (GetMSec() - kSendBeg) << " msec;"
+		          << std::endl;
 		return true;
   }
+  const long long kGrabBeg = GetMSec();
 	Header header;
 	Info   info;
 	static const uint32_t kWidth       = _width;
@@ -394,7 +406,12 @@ bool Screen::SendFrameAsBmp(int socket) {
     dst_row += 8;
   }*/
 	_png_udata.offs += kBodySize;
+	std::cout << "Grab: " << (GetMSec() - kGrabBeg) << " msec;"
+	          << std::endl;
+  const long long kSendBeg = GetMSec();
  	SendUData(socket);
+	std::cout << "UData: " << (GetMSec() - kSendBeg) << " msec;"
+	          << std::endl;
 	return true;
 }
 

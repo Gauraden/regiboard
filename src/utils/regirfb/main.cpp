@@ -154,7 +154,10 @@ static void WaitForRequest(int socket, fb::Screen &screen) {
 		sockaddr_in clientAddr;
 		socklen_t   sin_size = sizeof(struct sockaddr_in);
 		int clientSock = accept(socket, (struct sockaddr*)&clientAddr, &sin_size);
+    const long long kRcvBeg = GetMSec();
 		recv(clientSock, request, 512, 0);
+		std::cout << "RECV: " << (GetMSec() - kRcvBeg) << " msec;"
+		          << std::endl;
 		if (std::string(request, kGetCoords.size()) == kGetCoords && GetNumber(request) >= 0) {
       int x = GetNumber(0);
       int y = GetNumber(0);
@@ -169,7 +172,10 @@ static void WaitForRequest(int socket, fb::Screen &screen) {
   		close(clientSock);
   		return;
     }
+    const long long kBmpBeg = GetMSec();
     screen.SendFrameAsBmp(clientSock);
+		std::cout << "BMP: " << (GetMSec() - kBmpBeg) << " msec;"
+		          << std::endl;
 		close(clientSock);
 }
 

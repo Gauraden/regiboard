@@ -116,7 +116,7 @@ InstallOS() {
 		mtd=$(GetMTDFor 'kernel')
 	fi
 	Print "Writing kernel image '$PATH2IMAGE' to: $mtd ..."
-	mtd_debug erase /dev/$mtd 0 0x300000
+	mtd_debug erase /dev/$mtd 0 0x500000
 	nandwrite -p /dev/$mtd "$PATH2IMAGE"
 	unset PATH2IMAGE
 }

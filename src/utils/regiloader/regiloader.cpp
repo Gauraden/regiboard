@@ -128,7 +128,7 @@ struct PeripheralsInfo {
 };
 
 struct SysInfo {
-  SysInfo(): wait_for_reboot(false), upload_fail(false) {}
+  SysInfo(): wait_for_reboot(false), upload_fail(false), boot_from_nand(false) {}
 
   std::string     board;
   std::string     u_boot_build;
@@ -151,6 +151,7 @@ struct SysInfo {
   Packet::List    packets;
   bool            wait_for_reboot;
   bool            upload_fail;
+  bool            boot_from_nand;
 };
 
 static SysInfo g_sys_inf;
@@ -162,7 +163,8 @@ public:
         batch(3),
         device(1),
         lcd_model("G150XGE-L04"),
-        ts_model("ADS7843E") {}
+        ts_model("ADS7843E"),
+        verbose(false) {}
   
   void CheckBatchCapacity() {
     if (device < 256) {
@@ -208,6 +210,7 @@ public:
   uint32_t    device;
   std::string lcd_model;
   std::string ts_model;
+  bool        verbose;
 private:
   std::string _file_path;
 };
@@ -471,10 +474,11 @@ static bool ParseUntil(SerialPort        &port,
   while (not Parse(str, wait_for + "(.*)", 0, 0)) {
     boost::asio::read(port, boost::asio::buffer(resp, 1));
     if (resp[0] == 0x0A) {
-      ShowProcess("\t * Ожидание исполнения команды");
-      // DEBUG --------------------
-      //std::cout << str << std::endl;
-      // --------------------------
+      if (g_sys_state.verbose) {
+        std::cout << str << std::endl;
+      } else {
+        ShowProcess("\t * Ожидание исполнения команды");
+      }
       if (out != 0) {
         FillInSysInfo(str, *out);
       }
@@ -579,9 +583,11 @@ static bool UploadKernelBegin(SerialPort       &port,
   if (inf == 0 || not WaitForWelcomeFromUBoot(port, inf, pswd)) {
     return false;
   }
-  // Убираем имя монтируемого устройства, для блокирования загрузки с nand.
-  // Таким образом загрузка всегда будет останавливаться на initramfs
-  SendToUBoot(port, "setenv nandroot", inf);
+  if (not inf->boot_from_nand) {
+    // Убираем имя монтируемого устройства, для блокирования загрузки с nand.
+    // Таким образом загрузка всегда будет останавливаться на initramfs
+    SendToUBoot(port, "setenv nandroot", inf);
+  }
   SendToUBoot(port, "run conf_hw", inf);
   SendToUBoot(port, "run bootargs_nand", inf);
   std::cout << "Загрузка ядра Linux..." << std::endl;
@@ -642,6 +648,16 @@ static bool UploadKernelAndDebug(SerialPort        &port,
     return false;
   }
   SendToUBoot(port, "setenv dyndbg 'file i2c-imx.c +p'", 0);
+  return UploadKernelOverEth(port, srv, pswd);
+}
+
+static bool UploadKernelWithOldSys(SerialPort        &port,
+                                   TFtp::Server      *srv,
+                                   const std::string &pswd) {
+  if (not WaitForWelcomeFromUBoot(port, &g_sys_inf, pswd)) {
+    return false;
+  }
+  g_sys_inf.boot_from_nand = true;
   return UploadKernelOverEth(port, srv, pswd);
 }
 
@@ -985,7 +1001,9 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
     ("rbf", po::value<std::string>()->default_value(kRbfName),
              "путь к файлу прошивки <*.rbf>. Работает только с флагом --tftp")
     ("uboot_pswd", po::value<std::string>()->default_value(std::string()),
-             "пароль для входа в U-Boot");
+             "пароль для входа в U-Boot")
+    ("verbose", po::value<bool>()->default_value(false)->zero_tokens(),
+             "вывод все хданных, полученных через последовательный порт");
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
 	po::notify(vm);
@@ -1004,6 +1022,7 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
   set.config     = vm["conf"].as<std::string>();
   set.rbf        = vm["rbf"].as<std::string>();
   set.uboot_pswd = vm["uboot_pswd"].as<std::string>();
+  g_sys_state.verbose = vm["verbose"].as<bool>();
 	return true;
 }
 
@@ -1091,6 +1110,7 @@ struct RecipeAct {
     kKernelUart,
     kKernelEth,
     kKernelDebug,
+    kKernelOldSys,
     kRootFs,
     kMtdUtils,
     kInstallKernel,
@@ -1119,6 +1139,7 @@ struct RecipeAct {
     actions.insert(Pair("setup_nor",        MetaData(kSetupNor,        "первичная настройка NOR памяти")));
     actions.insert(Pair("kernel_uart",      MetaData(kKernelUart,      "загрузка ядра Linux через Uart")));
     actions.insert(Pair("kernel_eth",       MetaData(kKernelEth,       "загрузка ядра Linux через Ethernet")));
+    actions.insert(Pair("kernel_old_sys",   MetaData(kKernelOldSys,    "загрузка ядра Linux через Ethernet и запуск старой системы с Nand")));
     actions.insert(Pair("rootfs",           MetaData(kRootFs,          "загрузка образа rootfs")));
     actions.insert(Pair("mtd_utils",        MetaData(kMtdUtils,        "загрузка и установка служебных утилит")));
     actions.insert(Pair("install_kernel",   MetaData(kInstallKernel,   "установка ядра Linux")));
@@ -1193,6 +1214,8 @@ static bool DoAction(const Settings           &set,
       break;
     case RecipeAct::kKernelDebug:
         return UploadKernelAndDebug(*port, srv, set.uboot_pswd);
+    case RecipeAct::kKernelOldSys:
+        return UploadKernelWithOldSys(*port, srv, set.uboot_pswd);
     case RecipeAct::kRootFs:
       if (set.rootfs_img.size() > 0 && set.use_tftp.size() > 0) {
         return UploadRootFsOverEth(set.use_tftp, *port, srv);

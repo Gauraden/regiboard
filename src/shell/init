@@ -8,6 +8,8 @@ RED='\033[1;31m'
 BLUE='\033[1;34m'
 ESC_RESET='\033[0m'
 
+SCR_ROTATE_90=4
+
 export PATH='/bin:/sbin:/usr/bin:/usr/sbin'
 export PS1="${GREEN}regiboard (initramfs) # ${ESC_RESET}"
 
@@ -39,7 +41,11 @@ ROOT=$(echo "$CMD_LINE" | sed -r 's/(.*)root=([^ ]+)(.*)/\2/')
 ROOT_FS_TYPE=$(echo "$CMD_LINE" | sed -r 's/(.*)rootfstype=([^ ]+)(.*)/\2/')
 # ------------------------------------------------------------------------------
 # Do your stuff here.
-/bin/regisplash /root/vbr_splash.bmp "$(echo ${CMD_LINE} | sed -r 's/(.*)splash=([^ ]+)(.*)/\2/')"
+# Checking of screen orientation
+IS_VERTICAL=$(cat /proc/cmdline | grep -Eo 'lcd=\S+' | grep -o 'VERTICAL')
+test $IS_VERTICAL && echo $SCR_ROTATE_90 > /sys/class/graphics/fb0/rotate
+# Showing splash screen
+/bin/regisplash /root/vbr_splash.bmp 
 # ------------------------------------------------------------------------------
 # Mount rootfs
 if ! test -d "$NEW_ROOT"; then

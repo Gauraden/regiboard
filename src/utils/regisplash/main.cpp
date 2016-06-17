@@ -15,12 +15,6 @@
 
 #define ERROR(msg) std::cout << __LINE__ << ": " << __FUNCTION__ << ": " << msg << std::endl
 
-struct Config {
-  bool rotate_scr;
-};
-
-static Config SplashConf;
-
 struct PixelRGB;
 
 struct PixelRGBA {
@@ -126,8 +120,6 @@ void Copy24RowTo32(uint8_t *dst, PixelRGB *src, uint16_t w) {
 }
 
 bool PrintBMP(const char *name, Screen *screen) {
-  if (SplashConf.rotate_scr)
-    return true;
 	const int kBMPFile = open(name, O_RDONLY);
 	if (kBMPFile == -1) {
 		ERROR("Ошибка " << strerror(errno));
@@ -174,9 +166,6 @@ int main(int argc, char *argv[]) {
 	std::string splash_path="/root/vbr_splash.bmp";
 	if (argc > 1) {
     splash_path = argv[1];
-	}
-	if (argc > 2) {
-	  SplashConf.rotate_scr = (strstr("rotate", argv[2]) != 0);
 	}
 	const int kFBDev = open("/dev/fb0", O_RDWR);
 	if (not SetVideoMode(kFBDev, &screen)) {

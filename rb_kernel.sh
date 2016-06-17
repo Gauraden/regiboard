@@ -1,5 +1,9 @@
 #!/bin/sh
 
+GitLastCommitHash() {
+  echo $(git show 2> /dev/null | head -1 | sed -r 's/commit (.+)/\1/')
+}
+
 ConfigurateKernel() {
 	DieIfNotDefined ${BOARD_KERNEL_VER} "kernel version"
 	DieIfNotDefined ${BOARD_KERNEL_CNF} "kernel configuration"

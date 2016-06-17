@@ -18,7 +18,7 @@ HOST_IP=${HOST_IP/inet /}
 
 RUN="$REGILOADER --tty ${TTY_USB} --img ${IMG_UBOOT} --kernel ${IMG_KERNEL} 
 --tftp ${HOST_IP} --rootfs ${IMG_ROOTFS} --utils ${IMG_MTD_UTILS} --conf ./tmp 
---rbf ${IMG_RBF_PATH}${IMG_RBF} --uboot_pswd ${UBOOT_PSWD}"
+--rbf ${IMG_RBF_PATH}${IMG_RBF} --uboot_pswd ${UBOOT_PSWD} ${RBUP_EXT_OPTS}"
 
 function RecipeBootloader() {
   ${RUN} --acts "uboot->enter_uboot"
@@ -38,6 +38,10 @@ function RecipeBootOverEth() {
 
 function RecipeBootOverEthAndDebugKernel() {
   ${RUN} --acts "uboot->kernel_dbg"
+}
+
+function RecipeBootOverEthAndWithOldSys() {
+  ${RUN} --acts "uboot->kernel_old_sys"
 }
 
 function RecipeBootWithSpecTools() {
