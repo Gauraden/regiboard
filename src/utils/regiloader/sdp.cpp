@@ -1,6 +1,8 @@
 #include "sdp.hpp"
 #include <iomanip>
 #include <fstream>
+#include <boost/asio/basic_deadline_timer.hpp>
+#include <boost/bind.hpp>
 
 SdpPacket::SdpPacket(uint8_t cmd, size_t response_sz, size_t request_sz)
     : _resp_size(response_sz), _req_size(request_sz) {
@@ -12,22 +14,64 @@ SdpPacket::SdpPacket(uint8_t cmd, size_t response_sz, size_t request_sz)
 SdpPacket::~SdpPacket() {
 }
 
-void SdpPacket::Print(std::ostream &out) {
-  out << "Отправка запроса: " << std::uppercase << std::setfill('0');
+void SdpPacket::Print(const std::string &pref, std::ostream &out) {
+  out << pref << ": " << std::uppercase << std::setfill('0');
   for (size_t i = 0; i < kPktSize; i++) {
     out << std::hex << std::setw(2) << (unsigned)_packet[i] << "|";
   }
   out << std::endl;
 }
 
+void SdpPacket::HandlerRead(const boost::system::error_code &error,
+                            std::size_t                      bytes_transferred) {
+//  Print("Прочитан ответ", std::cout); // for DEBUG
+  _was_read = (bytes_transferred == _resp_size);
+}
+
+void SdpPacket::HandlerTimeout(const boost::system::error_code &error) {
+  _was_read = false;
+  _timeout  = true;
+}
+
 bool SdpPacket::Send(boost::asio::serial_port &port) {
   memset(_packet, 0, kPktSize);
   if (not Write())
     return false;
+  using namespace std::placeholders;
+  const unsigned kTimeOutSec       = 3;
+  const unsigned kMaxAmountOfTries = 3;
   AddArr(0, _cmd_id.bytes, 2);
-  //Print(std::cout); // for DEBUG
-  boost::asio::write(port, boost::asio::buffer(_packet, _req_size));
-  boost::asio::read (port, boost::asio::buffer(_packet, _resp_size));
+  // ожидание данных с тайм-аутом
+  boost::asio::deadline_timer timer(port.get_io_service());
+  unsigned try_num = 1;
+  for (; try_num <= kMaxAmountOfTries; try_num++) {
+    std::cout << "\r\033[K"
+              << "Попытка отправки команды " << try_num << " ...";
+//    Print("Отправка запроса", std::cout); // for DEBUG
+    boost::asio::write(port, boost::asio::buffer(_packet, _req_size));
+    timer.expires_from_now(boost::posix_time::seconds(kTimeOutSec));
+    _was_read = false;
+    _timeout  = false;
+    timer.async_wait(boost::bind(&SdpPacket::HandlerTimeout,
+        this,
+        boost::asio::placeholders::error));
+    boost::asio::async_read(port, boost::asio::buffer(_packet, _resp_size),
+      boost::bind(&SdpPacket::HandlerRead,
+        this,
+        boost::asio::placeholders::error,
+        boost::asio::placeholders::bytes_transferred));
+    do {
+      port.get_io_service().poll_one();
+    } while (not _was_read && not _timeout);
+    if (_was_read) {
+      break;
+    }
+    port.cancel();
+  }
+  std::cout << "\r\033[K";
+  if (try_num > kMaxAmountOfTries) {
+    return false;  
+  }
   const Transfer kAct = Read();
   if (kAct == kContinue) {
     return Write(port);

@@ -57,11 +57,17 @@ class SdpPacket {
   private:
     void AddArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb = false);
     void GetArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb = false);
-    void Print(std::ostream &out);
+    void Print(const std::string &pref, std::ostream &out);
+    void HandlerTimeout(const boost::system::error_code &error);
+    void HandlerRead(const boost::system::error_code &error,
+                     std::size_t                      bytes_transferred);
+                     
     FieldU16 _cmd_id;
     uint8_t  _packet[kPktSize];
     size_t   _resp_size;
     size_t   _req_size;
+    bool     _was_read;
+    bool     _timeout;
 };
 
 class PktStatus : public SdpPacket {

@@ -156,6 +156,28 @@ struct SysInfo {
 
 static SysInfo g_sys_inf;
 
+enum Color {
+  kReset   = -1,
+	kBlack   = 0,
+	kRed     = 1,
+	kGreen   = 2,
+	kYellow  = 3,
+	kBlue    = 4,
+	kMagenta = 5,
+	kCyan    = 6,
+	kWhite   = 7
+};
+
+static std::string UseColor(int8_t id) {
+  std::stringstream esc;
+  if (id >= 0) {
+    esc << "\033[1;" << (unsigned)(30 + (id % 8)) << "m";
+  } else {
+    esc << "\033[0m";
+  }
+  return esc.str();
+}
+
 class SysState {
 public:
   SysState()
@@ -257,22 +279,31 @@ static void PrintDelimiter(const std::string &pref, const std::string &name, uin
     part0 += " " + name + " ";
   }
   std::cout.fill('-');
-  std::cout << pref << part0 << std::setw(len - part0.size()) << "\n";
+  std::cout << UseColor(kYellow)
+            << pref << part0 << std::setw(len - part0.size())
+            << UseColor(kReset) << "\n";
   std::cout.fill(' ');
 }
 
 static void PrintSysInfo(const SysInfo &inf) {
+  const Color kGroupColor = kYellow;
   std::cout << "Описание:\n"
             << "\t * Плата.....: " << inf.board << "\n"
             << "\t * Процессор.: " << inf.cpu << "\n"
+            << UseColor(kGroupColor)
             << "\t--- UBOOT ---------------------------" << std::endl
+            << UseColor(kReset)
             << "\t * Версия....: " << inf.u_boot_build << "\n"
             << "\t * loadaddr..: " << inf.uboot.loadaddr << "\n"
+            << UseColor(kGroupColor)
             << "\t--- Kernel (Linux) ------------------" << std::endl
+            << UseColor(kReset)
             << "\t * Версия....: " << inf.kernel_build << "\n"
             << "\t * GCC.......: " << inf.gcc_ver << "\n"
             << "\t * Crosstool.: " << inf.ct_ng_ver << "(crosstool-NG)\n"
+            << UseColor(kGroupColor)
             << "\t--- Периферия -----------------------" << std::endl
+            << UseColor(kReset)
             << "\t * ОЗУ.......: " << inf.dram_size << " (" << inf.ddr << ")\n"
             << "\t * ПЗУ (NOR).: " << inf.nor_size << " (" << inf.nor << ")\n"
             << "\t * ПЗУ (NAND): " << inf.nand_size << " (" << inf.nand << ")\n"
@@ -404,7 +435,7 @@ static bool FillInSysInfo(const std::string &str, SysInfo &inf) {
     Parse(str, "(.+)\\(([^\\)]+)\\) pagesize(.+)", 2, &inf.nor_size);
     return true;
   }
-  Parse(str, "(.+)Regiboard TS: (.+)",        2, &inf.kernel.ts);
+  Parse(str, "(.+)input: ([^ ]+) Touchscreen as (.+)", 2, &inf.kernel.ts);
   Parse(str, "(.+)Regiboard LCD setup: (.+)", 2, &inf.kernel.lcd);
   Parse(str, "(.+)rtc-([^:]+): rtc core: registered ([^ ]+) as rtc0", 3, &inf.kernel.rtc);
   std::string t_str;
@@ -471,6 +502,7 @@ static bool ParseUntil(SerialPort        &port,
                        SysInfo           *out) {
   std::string str;
   uint8_t resp[1] = {0};
+  std::cout << "\033[1A";
   while (not Parse(str, wait_for + "(.*)", 0, 0)) {
     boost::asio::read(port, boost::asio::buffer(resp, 1));
     if (resp[0] == 0x0A) {
@@ -566,9 +598,11 @@ static bool SetupNor(SerialPort &port, const std::string &pswd) {
   SendToUBoot(port, "usedefenv", &g_sys_inf);
   SendToUBoot(port, "save", &g_sys_inf);
   if (g_sys_inf.wait_for_reboot) {
-    std::cout << "Требуется ручная перезагрузка платы!" << std::endl
+    std::cout << UseColor(kGreen)
+              << "Требуется ручная перезагрузка платы!" << std::endl
               << "1. Перезагрузите плату (отключите питание и снова включите его)" << std::endl
-              << "2. Нажмите любую клавишу для продолжения работы программы..." 
+              << "2. Нажмите любую клавишу для продолжения работы программы..."
+              << UseColor(kReset)
               << std::endl;
     std::cin.get();
     std::cout << "Повторная загрузка платы" << std::endl;
@@ -584,7 +618,7 @@ static bool UploadKernelBegin(SerialPort       &port,
     return false;
   }
   if (not inf->boot_from_nand) {
-    // Убираем имя монтируемого устройства, для блокирования загрузки с nand.
+    // Убираем имя монтируемого устройства, для предотвращения загрузки с nand.
     // Таким образом загрузка всегда будет останавливаться на initramfs
     SendToUBoot(port, "setenv nandroot", inf);
   }
@@ -874,6 +908,7 @@ static bool LoginToRegiboard(SerialPort &port) {
   std::cout << "Авторизация пользователя: " << kUser << std::endl;
   SwitchShell(kRegigrafPrompt);
   SendToShell(port, kUser, 0);
+  return true;
 }
 
 static bool UploadAndInstallRegigraf(const std::string &tftpd_ip,
@@ -924,6 +959,7 @@ static bool SetupBooting(SerialPort &port) {
   SendCmd(port, "reboot");
   ParseUntil(port, kRegigrafLogin, 0);
   std::cout << "Плата готова к работе!" << std::endl;
+  return true;
 }
 
 static bool RegisterBoard(SerialPort &port) {
@@ -941,11 +977,46 @@ static bool RegisterBoard(SerialPort &port) {
   g_sys_state.device++;
   g_sys_state.CheckBatchCapacity();
   g_sys_state.Save();
+  return true;
+}
+
+template <typename DataType>
+static bool CompareValues(const DataType    &standart,
+                          const DataType    &value,
+                          const std::string &err_comment) {
+  if (standart == value) {
+    return true;
+  }
+  std::cout << "\t * Ошибка: " << err_comment << ": "
+            << UseColor(kRed) << value << UseColor(kReset) 
+            << " вместо "
+            << UseColor(kGreen) << standart << UseColor(kReset)
+            << std::endl;
+  return false;
 }
 
 static bool ValidateHardware(SerialPort &port) {
-  std::cout << "Проверка наличия поддерживаемых переферийных устройств..." << std::endl;
-  // TODO
+  std::cout << "Проверка наличия переферийных устройств..." << std::endl;
+  const bool kCheckRes = 
+    CompareValues<std::string>("Freescale i.MX53 family 2.1V at 800 MHz", g_sys_inf.cpu, "неверная модель процессора")
+    && CompareValues<std::string>("1 GB", g_sys_inf.dram_size, "неверный объём ОЗУ")
+    && CompareValues<std::string>("332800000Hz", g_sys_inf.ddr, "неверная частота ОЗУ")
+    && CompareValues<std::string>("1000 KBytes", g_sys_inf.nor_size, "неверный объём ПЗУ (NOR)")
+    && CompareValues<std::string>("at45db321d",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)")
+    && CompareValues<std::string>("1 GiB",  g_sys_inf.nand_size, "неверный объём ПЗУ (NAND)")
+    && CompareValues<std::string>("MT29F8G08ABABA",  g_sys_inf.nand, "неверная модель ПЗУ (NAND)")
+    && CompareValues<std::string>("FEC0", g_sys_inf.eth, "необнаружен контроллер Ethernet")
+    && CompareValues<std::string>("ADS7843", g_sys_inf.kernel.ts, "необнаружен контроллер сенсорного экрана")
+    && CompareValues<std::string>("ds3231", g_sys_inf.kernel.rtc, "необнаружены часы реального времени")
+    
+    && CompareValues<unsigned>(3, g_sys_inf.kernel.spi.size(), "неверное количество SPI шин")
+    && CompareValues<unsigned>(5, g_sys_inf.kernel.uarts.size(), "неверное количество шин UART")
+    && CompareValues<unsigned>(12, g_sys_inf.kernel.usb_uart.size(), "неверное количество интерфейсов USB-UART")
+    && CompareValues<unsigned>(5, g_sys_inf.kernel.partitions.size(), "неверное количество разделов (NAND)");
+  if (kCheckRes) {
+    std::cout << "\t * Все устройства обнаружены!"
+              << std::endl;
+  }
   return true;
 }
  
@@ -1032,15 +1103,16 @@ void ShowPercentage(const std::string &msg, uint8_t percent) {
   }
   std::cout << "\r\033[K"
             << msg << ": "
-            << (unsigned)percent << " %"
-            << std::flush;
+            << (unsigned)percent << " %";
 }
 
 void ShowProcess(const std::string &msg) {
   static const uint8_t kMaxNum = 10;
   static uint8_t num = 1;
   std::cout.fill('.');
-  std::cout << "\r\033[K" << msg << std::setw(num) << " " << std::flush;
+  std::cout << "\r\033[K" << UseColor(kBlue)
+            << msg << std::setw(num) << " "
+            << UseColor(kReset);
   std::cout.fill(' ');
   num++;
   if (num > kMaxNum) {
@@ -1149,8 +1221,8 @@ struct RecipeAct {
     actions.insert(Pair("unpack_rootfs",    MetaData(kUnpackRootFs,    "подготовка разделов и распаковка образа rootfs")));
     actions.insert(Pair("setup_booting",    MetaData(kSetupBooting,    "настройка загрузки с NOR памяти")));
     actions.insert(Pair("register",         MetaData(kRegisterBoard,   "регистрация платы")));
-    actions.insert(Pair("validate_hw",      MetaData(kValidateHW,      "проверка наличия переферийных устройств")));
-    actions.insert(Pair("test_hw",          MetaData(kTestHW,          "тестирование переферийных устройств")));
+    actions.insert(Pair("validate_hw",      MetaData(kValidateHW,      "проверка наличия периферийных устройств")));
+    actions.insert(Pair("test_hw",          MetaData(kTestHW,          "тестирование периферийных устройств")));
     actions.insert(Pair("kernel_dbg",       MetaData(kKernelDebug,     "загрузка ядра, и вывод отладочных сообщений")));
   }
   
@@ -1329,9 +1401,11 @@ int main(int argc, char **argv) {
     }
     found += 2;
   } while (1);
-  PrintDelimiter("\n", "Приготовление рецепта", 80);
-  std::cout << "1. Подайте напряжение на плату" << std::endl
+  PrintDelimiter("\n", "Для выполнения рецепта", 80);
+  std::cout << UseColor(kGreen)
+            << "1. Подайте напряжение на плату" << std::endl
             << "2. Нажмите любую клавишу для начала загрузки..." 
+            << UseColor(kReset)
             << std::endl;
   std::cin.get();
   // инициализация сервера TFTP
@@ -1349,11 +1423,23 @@ int main(int argc, char **argv) {
   InitUart(set, &port);
   // приготовление рецепта
   Recipe::iterator act_it = recipe.begin();
+  bool recipe_fail = false;
+  // включение режима автоматической синхронизации данных выходного потока
+  std::cout << std::unitbuf;
   for (; act_it != recipe.end(); act_it++) {
-    DoAction(set, *act_it, &srv, &port);    
+    if (not DoAction(set, *act_it, &srv, &port)) {
+      std::cout << UseColor(kRed)
+                << "Невозможно продолжить исполнение рецепта!"
+                << UseColor(kReset)
+                << std::endl;
+      recipe_fail = true;
+      break;
+    }
   }
   port.close();
   // вывод общей информации
-  PrintSysInfo(g_sys_inf);
+  if (not recipe_fail) {
+    PrintSysInfo(g_sys_inf);
+  }
   return 0;
 }
