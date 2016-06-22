@@ -879,7 +879,7 @@ static bool UploadAndInstallUBoot(const std::string &tftpd_ip,
   cmd << "flashcp -v " << kPath << " /dev/mtd" << (unsigned)part->mtd_id;
   SendToShell(port, cmd.str(), 0);
   cmd.str("");
-  std::cout << "Запись данных о переферии..." << std::endl;
+  std::cout << "Запись данных о периферии..." << std::endl;
   cmd << "uboot_conf --if=/dev/mtd1 --of=/tmp/uboot.conf "
       << "--lcd=" << g_sys_state.lcd_model << " "
       << "--ts=" << g_sys_state.ts_model << " ";
@@ -1018,7 +1018,7 @@ static bool CompareValues(const DataType    &standart,
 }
 
 static bool ValidateHardware(SerialPort &port) {
-  std::cout << "Проверка наличия переферийных устройств..." << std::endl;
+  std::cout << "Проверка наличия периферийных устройств..." << std::endl;
   bool check_res = CompareValues<std::string>("Freescale i.MX53 family 2.1V at 800 MHz", g_sys_inf.cpu, "неверная модель процессора");
   check_res &= CompareValues<std::string>("1 GB", g_sys_inf.dram_size, "неверный объём ОЗУ");
   check_res &= CompareValues<std::string>("332800000Hz", g_sys_inf.ddr, "неверная частота ОЗУ");
@@ -1042,7 +1042,7 @@ static bool ValidateHardware(SerialPort &port) {
 }
  
 static bool TestHardware(SerialPort &port) {
-  std::cout << "Тестирование работоспособности переферийных устройств..." << std::endl;
+  std::cout << "Тестирование работоспособности периферийных устройств..." << std::endl;
   // TODO
   std::cout << "\t ..." << std::endl;
   // TODO
