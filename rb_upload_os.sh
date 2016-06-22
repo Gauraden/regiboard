@@ -76,12 +76,20 @@ function RecipeDefault() {
   RecipeBootOverEth
 }
 
-#echo "Загрузка нового файла прошивки: "
-#rm ${IMG_RBF_PATH}/${IMG_RBF}
-#wget -P ${IMG_RBF_PATH} ${IMG_RBF_URL}
+UpdateFirmwareImage() {
+  local rbf=${IMG_RBF_PATH}/${IMG_RBF}
+  local mtime1=$(date +'%D')
+  local mtime2=$(date --date=@$(stat --printf=%Y ./tmp/cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf) +'%D')
 
-echo "Host is: ${HOST_IP}"
+  if [ "$mtime1" != "$mtime2" ]; then
+    echo "Загрузка нового файла прошивки: "
+    rm ${IMG_RBF_PATH}/${IMG_RBF}
+    wget -P ${IMG_RBF_PATH} ${IMG_RBF_URL}
+  fi
+}
 
+#echo "Host is: ${HOST_IP}"
+UpdateFirmwareImage
 RECIPE_FULL_NAME="Recipe${RECIPE}"
 ${RECIPE_FULL_NAME}
 
