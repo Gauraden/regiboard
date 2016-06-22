@@ -1481,6 +1481,7 @@ int main(int argc, char **argv) {
   // приготовление рецепта
   while (ExecuteRecipe(recipe, set, &srv, &port)) {
     port.close();
+    g_sys_inf = SysInfo();
     PrintDelimiter("\n", "Подготовка к работе со следующей платой", 80);
     std::cout << UseColor(kGreen)
               << "\t 1. Отключите питание\n"
