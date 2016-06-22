@@ -16,3 +16,6 @@ output
 tmp
 
 bin/regiloader
+bin/regipswd
+bin/regiprotector
+bin/ubiformat
