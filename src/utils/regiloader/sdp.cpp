@@ -41,6 +41,7 @@ bool SdpPacket::Send(boost::asio::serial_port &port) {
   using namespace std::placeholders;
   const unsigned kTimeOutSec       = 1;
   const unsigned kMaxAmountOfTries = 3;
+  AddArr(0, _cmd_id.bytes, 2);
   // ожидание данных с тайм-аутом
   boost::asio::deadline_timer timer(port.get_io_service());
   unsigned try_num = 1;
@@ -48,8 +49,6 @@ bool SdpPacket::Send(boost::asio::serial_port &port) {
     std::cout << "\r\033[K"
               << "Попытка отправки команды " << try_num << " ...";
 //    Print("Отправка запроса", std::cout); // for DEBUG
-    memset(_packet, 0, kPktSize);
-    AddArr(0, _cmd_id.bytes, 2);
     boost::asio::write(port, boost::asio::buffer(_packet, _req_size));
     timer.expires_from_now(boost::posix_time::seconds(kTimeOutSec));
     _was_read = false;
@@ -57,7 +56,6 @@ bool SdpPacket::Send(boost::asio::serial_port &port) {
     timer.async_wait(boost::bind(&SdpPacket::HandlerTimeout,
         this,
         boost::asio::placeholders::error));
-    memset(_packet, 0, kPktSize);
     boost::asio::async_read(port, boost::asio::buffer(_packet, _resp_size),
       boost::bind(&SdpPacket::HandlerRead,
         this,
