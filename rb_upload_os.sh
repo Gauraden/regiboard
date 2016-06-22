@@ -13,8 +13,8 @@ IMG_RBF="cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf"
 IMG_RBF_PATH="tmp/"
 IMG_RBF_URL="ftp://jenny/firmwares/F1772/${IMG_RBF}"
 
-HOST_IP=$(ifconfig | grep -oE "inet 192.([0-9\.]+)")
-HOST_IP=${HOST_IP/inet /}
+HOST_IP=$(ifconfig | grep -oE "inet([^0-9]+)192.([0-9\.]+)")
+HOST_IP=$(echo $HOST_IP | grep -oE "([0-9\.]+)")
 
 RUN="$REGILOADER --tty ${TTY_USB} --img ${IMG_UBOOT} --kernel ${IMG_KERNEL} 
 --tftp ${HOST_IP} --rootfs ${IMG_ROOTFS} --utils ${IMG_MTD_UTILS} --conf ./tmp 
@@ -88,7 +88,7 @@ UpdateFirmwareImage() {
   fi
 }
 
-#echo "Host is: ${HOST_IP}"
+echo "Host is: ${HOST_IP}"
 UpdateFirmwareImage
 RECIPE_FULL_NAME="Recipe${RECIPE}"
 ${RECIPE_FULL_NAME}
