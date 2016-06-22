@@ -609,6 +609,7 @@ static bool WaitForWelcomeFromUBoot(SerialPort        &port,
   if (inf->wait_for_reboot) {
     SendToUBoot(port, "save", &g_sys_inf);
   }
+  already_has_been = false;
   return true;
 }
 
