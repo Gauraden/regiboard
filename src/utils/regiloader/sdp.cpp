@@ -62,7 +62,8 @@ bool SdpPacket::Send(boost::asio::serial_port &port) {
         boost::asio::placeholders::error,
         boost::asio::placeholders::bytes_transferred));
     do {
-      port.get_io_service().poll_one();
+      port.get_io_service().reset();
+      port.get_io_service().poll();
     } while (not _was_read && not _timeout);
     if (_was_read) {
       break;
