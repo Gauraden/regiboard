@@ -1022,8 +1022,8 @@ static bool ValidateHardware(SerialPort &port) {
   bool check_res = CompareValues<std::string>("Freescale i.MX53 family 2.1V at 800 MHz", g_sys_inf.cpu, "неверная модель процессора");
   check_res &= CompareValues<std::string>("1 GB", g_sys_inf.dram_size, "неверный объём ОЗУ");
   check_res &= CompareValues<std::string>("332800000Hz", g_sys_inf.ddr, "неверная частота ОЗУ");
-  check_res &= CompareValues<std::string>("1000 KBytes", g_sys_inf.nor_size, "неверный объём ПЗУ (NOR)");
-  check_res &= CompareValues<std::string>("at45db321d",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)");
+  check_res &= CompareValues<std::string>("1080 KBytes", g_sys_inf.nor_size, "неверный объём ПЗУ (NOR)");
+  check_res &= CompareValues<std::string>("AT45DB321x",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)");
   check_res &= CompareValues<std::string>("1 GiB",  g_sys_inf.nand_size, "неверный объём ПЗУ (NAND)");
   check_res &= CompareValues<std::string>("MT29F8G08ABABA",  g_sys_inf.nand, "неверная модель ПЗУ (NAND)");
   check_res &= CompareValues<std::string>("FEC0", g_sys_inf.eth, "необнаружен контроллер Ethernet");
@@ -1480,6 +1480,7 @@ int main(int argc, char **argv) {
   InitUart(set, &port);
   // приготовление рецепта
   while (ExecuteRecipe(recipe, set, &srv, &port)) {
+    port.close();
     PrintDelimiter("\n", "Подготовка к работе со следующей платой", 80);
     std::cout << UseColor(kGreen)
               << "\t 1. Отключите питание\n"
@@ -1487,6 +1488,7 @@ int main(int argc, char **argv) {
               << "\t 3. Установите перемычку (джампер) \"on/off\"\n"
               << "\t 4. Подключите провод к разъёму \"debug_uart\"\n"
               << UseColor(kReset);
+    InitUart(set, &port);
   }
   port.close();
   return 0;
