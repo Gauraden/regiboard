@@ -14,6 +14,8 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
 
+typedef std::list<std::string> Recipe;
+
 static const std::string kConfName("regiloader.json");
 static const std::string kTtyDev("ttyUSB0");
 static const std::string kUBootImg("u-boot");
@@ -225,6 +227,25 @@ public:
     lcd_model = pt.get<std::string>("lcd_model");
     ts_model  = pt.get<std::string>("ts_model");
     return true;
+  }
+  
+  std::string GetDeviceId() const {
+    std::stringstream buf;
+      buf << (unsigned)stand  << "."
+          << (unsigned)batch  << "."
+          << (unsigned)device << " ";
+    return buf.str();
+  }
+  
+  void Print() const {
+    std::cout << "Конфигурация: \n"
+              << "\t - Стэнд  : " << (unsigned)stand  << "\n"
+              << "\t - Партия : " << (unsigned)batch  << "\n"
+              << "\t - Плата  : " << (unsigned)device << "\n"
+              << "\t - Дисплей: " << lcd_model << "\n"
+              << "\t - Сенсор : " << ts_model << "\n"
+              << "\t - Идентификатор: " << GetDeviceId() << "\n"
+              << std::endl;
   }
   
   uint32_t    stand;
@@ -601,7 +622,7 @@ static bool SetupNor(SerialPort &port, const std::string &pswd) {
     std::cout << UseColor(kGreen)
               << "Требуется ручная перезагрузка платы!" << std::endl
               << "1. Перезагрузите плату (отключите питание и снова включите его)" << std::endl
-              << "2. Нажмите любую клавишу для продолжения работы программы..."
+              << "2. Нажмите [Enter] для продолжения работы программы..."
               << UseColor(kReset)
               << std::endl;
     std::cin.get();
@@ -967,9 +988,7 @@ static bool RegisterBoard(SerialPort &port) {
   std::cout << "Запись идентификатора платы..." << std::endl;
   std::stringstream cmd;
   cmd << "uboot_conf --if=/dev/mtd1 --of=/tmp/uboot.conf "
-      << "--board=" << (unsigned)g_sys_state.stand  << "."
-                    << (unsigned)g_sys_state.batch  << "."
-                    << (unsigned)g_sys_state.device << " ";
+      << "--board=" << g_sys_state.GetDeviceId();
   SendToShell(port, cmd.str(), 0);
   SendToShell(port, "uboot_conf --of=/dev/mtd1 --if=/tmp/uboot.conf --do=w", 0);
   std::cout << "Регистрация платы" << std::endl;  
@@ -987,7 +1006,10 @@ static bool CompareValues(const DataType    &standart,
   if (standart == value) {
     return true;
   }
-  std::cout << "\t * Ошибка: " << err_comment << ": "
+  std::cout << UseColor(kRed)
+            << "\t * Ошибка: "
+            << UseColor(kReset)
+            << err_comment << ": "
             << UseColor(kRed) << value << UseColor(kReset) 
             << " вместо "
             << UseColor(kGreen) << standart << UseColor(kReset)
@@ -997,23 +1019,22 @@ static bool CompareValues(const DataType    &standart,
 
 static bool ValidateHardware(SerialPort &port) {
   std::cout << "Проверка наличия переферийных устройств..." << std::endl;
-  const bool kCheckRes = 
-    CompareValues<std::string>("Freescale i.MX53 family 2.1V at 800 MHz", g_sys_inf.cpu, "неверная модель процессора")
-    && CompareValues<std::string>("1 GB", g_sys_inf.dram_size, "неверный объём ОЗУ")
-    && CompareValues<std::string>("332800000Hz", g_sys_inf.ddr, "неверная частота ОЗУ")
-    && CompareValues<std::string>("1000 KBytes", g_sys_inf.nor_size, "неверный объём ПЗУ (NOR)")
-    && CompareValues<std::string>("at45db321d",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)")
-    && CompareValues<std::string>("1 GiB",  g_sys_inf.nand_size, "неверный объём ПЗУ (NAND)")
-    && CompareValues<std::string>("MT29F8G08ABABA",  g_sys_inf.nand, "неверная модель ПЗУ (NAND)")
-    && CompareValues<std::string>("FEC0", g_sys_inf.eth, "необнаружен контроллер Ethernet")
-    && CompareValues<std::string>("ADS7843", g_sys_inf.kernel.ts, "необнаружен контроллер сенсорного экрана")
-    && CompareValues<std::string>("ds3231", g_sys_inf.kernel.rtc, "необнаружены часы реального времени")
+  bool check_res = CompareValues<std::string>("Freescale i.MX53 family 2.1V at 800 MHz", g_sys_inf.cpu, "неверная модель процессора");
+  check_res &= CompareValues<std::string>("1 GB", g_sys_inf.dram_size, "неверный объём ОЗУ");
+  check_res &= CompareValues<std::string>("332800000Hz", g_sys_inf.ddr, "неверная частота ОЗУ");
+  check_res &= CompareValues<std::string>("1000 KBytes", g_sys_inf.nor_size, "неверный объём ПЗУ (NOR)");
+  check_res &= CompareValues<std::string>("at45db321d",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)");
+  check_res &= CompareValues<std::string>("1 GiB",  g_sys_inf.nand_size, "неверный объём ПЗУ (NAND)");
+  check_res &= CompareValues<std::string>("MT29F8G08ABABA",  g_sys_inf.nand, "неверная модель ПЗУ (NAND)");
+  check_res &= CompareValues<std::string>("FEC0", g_sys_inf.eth, "необнаружен контроллер Ethernet");
+  check_res &= CompareValues<std::string>("ADS7843", g_sys_inf.kernel.ts, "необнаружен контроллер сенсорного экрана");
+  check_res &= CompareValues<std::string>("ds3231", g_sys_inf.kernel.rtc, "необнаружены часы реального времени");
     
-    && CompareValues<unsigned>(3, g_sys_inf.kernel.spi.size(), "неверное количество SPI шин")
-    && CompareValues<unsigned>(5, g_sys_inf.kernel.uarts.size(), "неверное количество шин UART")
-    && CompareValues<unsigned>(12, g_sys_inf.kernel.usb_uart.size(), "неверное количество интерфейсов USB-UART")
-    && CompareValues<unsigned>(5, g_sys_inf.kernel.partitions.size(), "неверное количество разделов (NAND)");
-  if (kCheckRes) {
+  check_res &= CompareValues<unsigned>(3, g_sys_inf.kernel.spi.size(), "неверное количество SPI шин");
+  check_res &= CompareValues<unsigned>(5, g_sys_inf.kernel.uarts.size(), "неверное количество шин UART");
+  check_res &= CompareValues<unsigned>(12, g_sys_inf.kernel.usb_uart.size(), "неверное количество интерфейсов USB-UART");
+  check_res &= CompareValues<unsigned>(5, g_sys_inf.kernel.partitions.size(), "неверное количество разделов (NAND)");
+  if (check_res) {
     std::cout << "\t * Все устройства обнаружены!"
               << std::endl;
   }
@@ -1022,6 +1043,8 @@ static bool ValidateHardware(SerialPort &port) {
  
 static bool TestHardware(SerialPort &port) {
   std::cout << "Тестирование работоспособности переферийных устройств..." << std::endl;
+  // TODO
+  std::cout << "\t ..." << std::endl;
   // TODO
   return true;
 }
@@ -1365,6 +1388,55 @@ static void PublishRegigrafLicense(const RegigrafLicense &license,
   srv->PublishFile(kRegigrafLicense, kPath);
 }
 
+static bool ExecuteRecipe(const Recipe             &recipe,
+                          const Settings           &set,
+                          TFtp::Server             *srv,
+                          boost::asio::serial_port *port) {
+  if (srv == 0 || port == 0) {
+    return false;
+  }
+  // включение режима автоматической синхронизации данных выходного потока
+  std::cout << std::unitbuf;
+  PrintDelimiter("\n", "Для выполнения рецепта", 80);
+  std::cout << UseColor(kGreen)
+              << "\t 1. Подайте напряжение на плату\n"
+            << "\t 2. Нажмите [Enter] для начала загрузки..." 
+            << UseColor(kReset)
+            << std::endl;
+  std::cin.get();
+  // вывод конфигурации
+  g_sys_state.Print();
+  // приготовление рецепта
+  Recipe::const_iterator act_it = recipe.begin();
+  bool recipe_fail = false;
+  for (; act_it != recipe.end(); act_it++) {
+    if (not DoAction(set, *act_it, srv, port)) {
+      std::cout << UseColor(kRed)
+                << "Невозможно продолжить исполнение рецепта!"
+                << UseColor(kReset)
+                << std::endl;
+      recipe_fail = true;
+      break;
+    }
+  }
+  // вывод общей информации
+  if (not recipe_fail) {
+    PrintSysInfo(g_sys_inf);
+  }
+  std::cout << UseColor(kGreen)
+            << "Продолжить работу с данным рецептом? (Д/н) + [Enter]: "
+            << UseColor(kReset);
+  std::string answer;
+  std::cin >> answer;
+  std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  std::cin.clear();
+  // если ответ - нет
+  if (answer != "д" && answer != "Д" && answer != "l" && answer != "L") {
+    return false; 
+  }
+  return true;
+}
+
 int main(int argc, char **argv) {
   Settings set;
   if (not ParseArgs(argc, argv, set)) {
@@ -1375,17 +1447,9 @@ int main(int argc, char **argv) {
     std::cout << "Неудалось прочитать конфигурацию из <" << kConfName << ">!" << std::endl;
     return 0;
   }
-  std::cout << "Конфигурация: \n"
-            << "\t - Стэнд  : " << (unsigned)g_sys_state.stand  << "\n"
-            << "\t - Партия : " << (unsigned)g_sys_state.batch  << "\n"
-            << "\t - Плата  : " << (unsigned)g_sys_state.device << "\n"
-            << "\t - Дисплей: " << g_sys_state.lcd_model << "\n"
-            << "\t - Сенсор : " << g_sys_state.ts_model << "\n"
-            << std::endl;
   // подготовка лицензии
   RegigrafLicense license;
   // разбор рецепта
-  typedef std::list<std::string> Recipe;
   Recipe recipe;
   const std::string kDelimiter("->");
   std::size_t found = 0;
@@ -1401,13 +1465,6 @@ int main(int argc, char **argv) {
     }
     found += 2;
   } while (1);
-  PrintDelimiter("\n", "Для выполнения рецепта", 80);
-  std::cout << UseColor(kGreen)
-            << "1. Подайте напряжение на плату" << std::endl
-            << "2. Нажмите любую клавишу для начала загрузки..." 
-            << UseColor(kReset)
-            << std::endl;
-  std::cin.get();
   // инициализация сервера TFTP
   TFtp::Server srv(set.use_tftp);
   srv.PublishFile(kUBootImg + ".bin", set.imx_img + ".bin");
@@ -1422,24 +1479,15 @@ int main(int argc, char **argv) {
   boost::asio::serial_port port(io_service, set.tty_dev);
   InitUart(set, &port);
   // приготовление рецепта
-  Recipe::iterator act_it = recipe.begin();
-  bool recipe_fail = false;
-  // включение режима автоматической синхронизации данных выходного потока
-  std::cout << std::unitbuf;
-  for (; act_it != recipe.end(); act_it++) {
-    if (not DoAction(set, *act_it, &srv, &port)) {
-      std::cout << UseColor(kRed)
-                << "Невозможно продолжить исполнение рецепта!"
-                << UseColor(kReset)
-                << std::endl;
-      recipe_fail = true;
-      break;
-    }
+  while (ExecuteRecipe(recipe, set, &srv, &port)) {
+    PrintDelimiter("\n", "Подготовка к работе со следующей платой", 80);
+    std::cout << UseColor(kGreen)
+              << "\t 1. Отключите питание\n"
+              << "\t 2. Замените процессорную плату\n"
+              << "\t 3. Установите перемычку (джампер) \"on/off\"\n"
+              << "\t 4. Подключите провод к разъёму \"debug_uart\"\n"
+              << UseColor(kReset);
   }
   port.close();
-  // вывод общей информации
-  if (not recipe_fail) {
-    PrintSysInfo(g_sys_inf);
-  }
   return 0;
 }
