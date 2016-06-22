@@ -69,7 +69,8 @@ function RecipeSetupBoardForRegigraf() {
 }
 
 function RecipeTestRegiboard() {
-  ${RUN} --acts "uboot->kernel_eth->validate_hw->test_hw"
+#  ${RUN} --acts "uboot->kernel_eth->validate_hw->test_hw"
+  ${RUN} --acts "uboot->kernel_eth->validate_hw"
 }
 
 function RecipeDefault() {
