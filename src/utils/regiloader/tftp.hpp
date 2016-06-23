@@ -223,7 +223,7 @@ class TFtp {
     
     class Server {
       public:
-        static const int kPort = 69;
+        static const int kPort = 6969;
         
         Server(const std::string &ip);
         ~Server();

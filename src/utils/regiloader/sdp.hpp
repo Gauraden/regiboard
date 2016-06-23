@@ -18,6 +18,10 @@ class SdpPacket {
     SdpPacket(uint8_t cmd, size_t response_sz, size_t request_sz = kPktSize);
     virtual ~SdpPacket();
     bool Send(boost::asio::serial_port &port);
+    bool Send(boost::asio::serial_port &port,
+              unsigned                  tries,
+              const std::string        &msg);
+    void ClearSerialInputBuffer(boost::asio::serial_port &port);
   protected:
     static const size_t kPktSize = 16;
 
@@ -61,6 +65,9 @@ class SdpPacket {
     void HandlerTimeout(const boost::system::error_code &error);
     void HandlerRead(const boost::system::error_code &error,
                      std::size_t                      bytes_transferred);
+    bool ReadArray(boost::asio::serial_port &port,
+                   size_t                    size,
+                   uint8_t                  *out);
                      
     FieldU16 _cmd_id;
     uint8_t  _packet[kPktSize];

@@ -569,7 +569,9 @@ static void UpdateListOfPartitions(SerialPort &port) {
 }
 
 static bool UploadUBoot(SerialPort &port, const std::string &file) {
-  if (not PktStatus().Send(port)) {
+  static const unsigned kMaxTries = 3;
+  PktStatus().ClearSerialInputBuffer(port);
+  if (not PktStatus().Send(port, kMaxTries, "Запрос состояния микропроцессора")) {
     return false;
   }
   ImxFirmware firm;
@@ -579,11 +581,11 @@ static bool UploadUBoot(SerialPort &port, const std::string &file) {
   std::cout << "Инициализация памяти..." << std::endl;
   UploadDCD(port, firm);
   std::cout << "Загрузка программы..." << std::endl;
-  if (not PktWriteF(&firm).Send(port)) {
+  if (not PktWriteF(&firm).Send(port, kMaxTries, "Загрузка исполняемой программы")) {
     return false;
   }
   std::cout << "Запуск программы..." << std::endl;
-  PktStatus().Send(port);
+  PktStatus().Send(port, kMaxTries, "Запуск программы");
   return true;
 }
 
@@ -686,6 +688,9 @@ static bool UploadKernelOverEth(SerialPort        &port,
     if (not UploadKernelBegin(port, &g_sys_inf, pswd)) {
       return false;
     }
+    std::stringstream args;
+    args << (unsigned)TFtp::Server::kPort;
+    SendCmd(port, "setenv tftpdstp " + args.str());
     SendCmd(port, "dhcp ${loadaddr} " + srv->get_ip() + ":" + kKernelImg + 
             BootM(g_sys_inf));
     srv->Run();
@@ -1127,16 +1132,19 @@ void ShowPercentage(const std::string &msg, uint8_t percent) {
   }
   std::cout << "\r\033[K"
             << msg << ": "
-            << (unsigned)percent << " %";
+            << (unsigned)percent << " %"
+            << std::flush;
 }
 
 void ShowProcess(const std::string &msg) {
   static const uint8_t kMaxNum = 10;
   static uint8_t num = 1;
   std::cout.fill('.');
-  std::cout << "\r\033[K" << UseColor(kBlue)
+  std::cout << "\r\033[K"
+            << UseColor(kBlue)
             << msg << std::setw(num) << " "
-            << UseColor(kReset);
+            << UseColor(kReset)
+            << std::flush;
   std::cout.fill(' ');
   num++;
   if (num > kMaxNum) {
@@ -1284,6 +1292,8 @@ static bool DoAction(const Settings           &set,
   if (srv == 0 || port == 0) {
     return false;
   }
+  std::stringstream tftp_args;
+  tftp_args << set.use_tftp << ":" << (unsigned)TFtp::Server::kPort;
   switch (kActions.Identify(act).id) {
     case RecipeAct::kUBoot:
       return UploadUBoot(*port, set.imx_img + ".imx");
@@ -1313,29 +1323,29 @@ static bool DoAction(const Settings           &set,
     case RecipeAct::kKernelOldSys:
         return UploadKernelWithOldSys(*port, srv, set.uboot_pswd);
     case RecipeAct::kRootFs:
-      if (set.rootfs_img.size() > 0 && set.use_tftp.size() > 0) {
-        return UploadRootFsOverEth(set.use_tftp, *port, srv);
+      if (set.rootfs_img.size() > 0 && tftp_args.str().size() > 0) {
+        return UploadRootFsOverEth(tftp_args.str(), *port, srv);
       }
       break;
     case RecipeAct::kMtdUtils:
-      if (set.mtd_utils.size() > 0 && set.use_tftp.size() > 0) {
-        return UploadAndInstallTools(set.use_tftp, *port, srv);
+      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
+        return UploadAndInstallTools(tftp_args.str(), *port, srv);
       }
     case RecipeAct::kInstallKernel:
-      if (set.mtd_utils.size() > 0 && set.use_tftp.size() > 0) {
-        return UploadAndInstallKernel(set.use_tftp, *port, srv);
+      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
+        return UploadAndInstallKernel(tftp_args.str(), *port, srv);
       }
     case RecipeAct::kInstallUBoot:
-      if (set.mtd_utils.size() > 0 && set.use_tftp.size() > 0) {
-        return UploadAndInstallUBoot(set.use_tftp, *port, srv);
+      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
+        return UploadAndInstallUBoot(tftp_args.str(), *port, srv);
       }
     case RecipeAct::kInstallRegigraf:
-      if (set.use_tftp.size() > 0) {
-        return UploadAndInstallRegigraf(set.use_tftp, *port, srv);
+      if (tftp_args.str().size() > 0) {
+        return UploadAndInstallRegigraf(tftp_args.str(), *port, srv);
       }
     case RecipeAct::kInstallFirmware:
-      if (set.use_tftp.size() > 0) {
-        return UploadAndInstallFirmware(set.use_tftp, *port, srv);
+      if (tftp_args.str().size() > 0) {
+        return UploadAndInstallFirmware(tftp_args.str(), *port, srv);
       }      
     case RecipeAct::kUnpackRootFs:
       if (set.rootfs_img.size() > 0) {
@@ -1397,10 +1407,10 @@ static bool ExecuteRecipe(const Recipe             &recipe,
     return false;
   }
   // включение режима автоматической синхронизации данных выходного потока
-  std::cout << std::unitbuf;
+  //std::cout << std::unitbuf;
   PrintDelimiter("\n", "Для выполнения рецепта", 80);
   std::cout << UseColor(kGreen)
-              << "\t 1. Подайте напряжение на плату\n"
+            << "\t 1. Подайте напряжение на плату\n"
             << "\t 2. Нажмите [Enter] для начала загрузки..." 
             << UseColor(kReset)
             << std::endl;
@@ -1425,14 +1435,13 @@ static bool ExecuteRecipe(const Recipe             &recipe,
     PrintSysInfo(g_sys_inf);
   }
   std::cout << UseColor(kGreen)
-            << "Продолжить работу с данным рецептом? (Д/н) + [Enter]: "
-            << UseColor(kReset);
-  std::string answer;
-  std::cin >> answer;
-  std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-  std::cin.clear();
+            << "Продолжить работу с данным рецептом? (Y/n) + [Enter]: "
+            << UseColor(kReset)
+            << std::flush;
+  char answer = 0;
+  std::cin.get(answer);
   // если ответ - нет
-  if (answer != "д" && answer != "Д" && answer != "l" && answer != "L") {
+  if (answer != 10 && answer != 'y' && answer != 'Y') {
     return false; 
   }
   return true;
@@ -1481,15 +1490,16 @@ int main(int argc, char **argv) {
   InitUart(set, &port);
   // приготовление рецепта
   while (ExecuteRecipe(recipe, set, &srv, &port)) {
-    port.close();
     g_sys_inf = SysInfo();
     PrintDelimiter("\n", "Подготовка к работе со следующей платой", 80);
     std::cout << UseColor(kGreen)
               << "\t 1. Отключите питание\n"
               << "\t 2. Замените процессорную плату\n"
               << "\t 3. Установите перемычку (джампер) \"on/off\"\n"
-              << "\t 4. Подключите провод к разъёму \"debug_uart\"\n"
-              << UseColor(kReset);
+              << "\t 4. Подключите провод к разъёму \"debug_uart\""
+              << UseColor(kReset)
+              << std::endl;
+    port.close();
     InitUart(set, &port);
   }
   port.close();

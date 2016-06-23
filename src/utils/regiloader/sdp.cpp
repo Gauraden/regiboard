@@ -33,42 +33,75 @@ void SdpPacket::HandlerTimeout(const boost::system::error_code &error) {
   _timeout  = true;
 }
 
+bool SdpPacket::ReadArray(boost::asio::serial_port &port,
+                          size_t                    size,
+                          uint8_t                  *out) {
+  if (out == 0 || size == 0) {
+    return false;
+  }
+  memset(out, 0, size);
+  const unsigned kTimeOutSec = 1;
+  boost::asio::deadline_timer timer(port.get_io_service());
+  timer.expires_from_now(boost::posix_time::seconds(kTimeOutSec));
+  timer.async_wait(
+    boost::bind(&SdpPacket::HandlerTimeout,
+      this,
+      boost::asio::placeholders::error));
+  boost::asio::async_read(port, boost::asio::buffer(out, size),
+    boost::bind(&SdpPacket::HandlerRead,
+      this,
+      boost::asio::placeholders::error,
+      boost::asio::placeholders::bytes_transferred));
+  _was_read = false;
+  _timeout  = false;
+  do {
+    port.get_io_service().run_one();
+    port.get_io_service().reset();
+  } while (not _was_read && not _timeout);
+  if (_timeout) {
+    port.cancel();
+  }
+  return (_was_read && not _timeout);
+}
+
+void SdpPacket::ClearSerialInputBuffer(boost::asio::serial_port &port) {
+  uint8_t garbage[kPktSize];
+  while (ReadArray(port, kPktSize, garbage)) {
+    /*
+    std::cout << "garbage: ";
+    for (unsigned i = 0; i < kPktSize; i++) {
+      std::cout << std::hex << std::setw(2) << (unsigned)garbage[i] << "|" << std::dec;  
+    }
+    std::cout << std::endl;
+    */
+  };
+}
+
 bool SdpPacket::Send(boost::asio::serial_port &port) {
   memset(_packet, 0, kPktSize);
   if (not Write()) {
     return false;
   }
-  using namespace std::placeholders;
-  const unsigned kTimeOutSec       = 1;
-  const unsigned kMaxAmountOfTries = 3;
   AddArr(0, _cmd_id.bytes, 2);
   // ожидание данных с тайм-аутом
-  boost::asio::deadline_timer timer(port.get_io_service());
+  const unsigned kMaxAmountOfTries = 3;
   unsigned try_num = 1;
   for (; try_num <= kMaxAmountOfTries; try_num++) {
     std::cout << "\r\033[K"
-              << "Попытка отправки команды " << try_num << " ...";
-//    Print("Отправка запроса", std::cout); // for DEBUG
+              << "Попытка отправки команды " << try_num << " ..." << std::flush;
     boost::asio::write(port, boost::asio::buffer(_packet, _req_size));
-    timer.expires_from_now(boost::posix_time::seconds(kTimeOutSec));
-    _was_read = false;
-    _timeout  = false;
-    timer.async_wait(boost::bind(&SdpPacket::HandlerTimeout,
-        this,
-        boost::asio::placeholders::error));
-    boost::asio::async_read(port, boost::asio::buffer(_packet, _resp_size),
-      boost::bind(&SdpPacket::HandlerRead,
-        this,
-        boost::asio::placeholders::error,
-        boost::asio::placeholders::bytes_transferred));
-    do {
-      port.get_io_service().reset();
-      port.get_io_service().poll();
-    } while (not _was_read && not _timeout);
-    if (_was_read) {
+    uint8_t rcv_packet[kPktSize];
+    if (ReadArray(port, _resp_size, rcv_packet)) {
+      memcpy(_packet, rcv_packet, kPktSize);
+      /*
+      std::cout << "READ: ";
+      for (unsigned i = 0; i < _resp_size; i++) {
+        std::cout << std::hex << std::setw(2) << (unsigned)rcv_packet[i] << "|" << std::dec;  
+      }
+      std::cout << std::endl;
+      */
       break;
     }
-    port.cancel();
   }
   std::cout << "\r\033[K";
   if (try_num > kMaxAmountOfTries) {
@@ -81,12 +114,25 @@ bool SdpPacket::Send(boost::asio::serial_port &port) {
   return (kAct == kStop);
 }
 
+bool SdpPacket::Send(boost::asio::serial_port &port,
+                     unsigned                  tries,
+                     const std::string        &msg) {
+  const unsigned kMaxTries = tries;
+  while (tries > 0 && not Send(port)) {
+    tries--;
+    std::cout << msg << ", попытка № " << (kMaxTries - tries + 1) << std::endl;
+  }
+  return (tries > 0);
+}
+
 std::string SdpPacket::GetAckName(FieldU32 val) {
   if (val.value == kClosedSecurityConf)
     return "closed security configuration";
   if (val.value == kOtherwise)
     return "otherwise";
-  return "???";
+  std::stringstream ack;
+  ack << std::hex << (unsigned)val.value << std::dec;
+  return "??? [" + ack.str() + "]";
 }
 
 void SdpPacket::AddVal(uint8_t offs, FieldU32 &val) {
@@ -125,7 +171,9 @@ void SdpPacket::AddArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb) {
       dst -= src;
     else
       dst += src;
-    _packet[dst] = arr[src];
+    if (dst < kPktSize) {
+      _packet[dst] = arr[src];
+    }
   }
 }
 
@@ -136,10 +184,13 @@ void SdpPacket::GetArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb) {
   if (kDst >= _req_size)
     return;
   for (uint8_t src = 0; src < sz; src++) {
-    if (msb)
-      arr[src] = _packet[kDst - src];
-    else
-      arr[src] = _packet[kDst + src];
+    uint8_t src_off = kDst + src;
+    if (msb) {
+      src_off = kDst - src;
+    }
+    if (src_off < kPktSize) {
+      arr[src] = _packet[src_off];
+    }
   }
 }
 // class PktStatus

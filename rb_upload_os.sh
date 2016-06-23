@@ -16,8 +16,8 @@ IMG_RBF_URL="ftp://jenny/firmwares/F1772/${IMG_RBF}"
 HOST_IP=$(ifconfig | grep -oE "inet([^0-9]+)192.([0-9\.]+)")
 HOST_IP=$(echo $HOST_IP | grep -oE "([0-9\.]+)")
 
-RUN="$REGILOADER --tty ${TTY_USB} --img ${IMG_UBOOT} --kernel ${IMG_KERNEL} 
---tftp ${HOST_IP} --rootfs ${IMG_ROOTFS} --utils ${IMG_MTD_UTILS} --conf ./tmp 
+RUN="$REGILOADER --tty ${TTY_USB} --img ${IMG_UBOOT} --kernel ${IMG_KERNEL}
+--tftp ${HOST_IP} --rootfs ${IMG_ROOTFS} --utils ${IMG_MTD_UTILS} --conf ./tmp
 --rbf ${IMG_RBF_PATH}${IMG_RBF} --uboot_pswd ${UBOOT_PSWD} ${RBUP_EXT_OPTS}"
 
 function RecipeBootloader() {
