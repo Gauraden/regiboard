@@ -1307,7 +1307,7 @@ static bool DoAction(const Settings           &set,
           std::cout << "попытка загрузиться..." << std::endl;
         }
       }
-      break;
+      return true;
     case RecipeAct::kKernelUart:
       if (set.kernel_img.size() > 0) {
         return UploadKernelOverUart(*port, set.kernel_img, set.uboot_pswd);
@@ -1319,9 +1319,9 @@ static bool DoAction(const Settings           &set,
       }
       break;
     case RecipeAct::kKernelDebug:
-        return UploadKernelAndDebug(*port, srv, set.uboot_pswd);
+      return UploadKernelAndDebug(*port, srv, set.uboot_pswd);
     case RecipeAct::kKernelOldSys:
-        return UploadKernelWithOldSys(*port, srv, set.uboot_pswd);
+      return UploadKernelWithOldSys(*port, srv, set.uboot_pswd);
     case RecipeAct::kRootFs:
       if (set.rootfs_img.size() > 0 && tftp_args.str().size() > 0) {
         return UploadRootFsOverEth(tftp_args.str(), *port, srv);
