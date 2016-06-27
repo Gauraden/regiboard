@@ -1,0 +1,1126 @@
+diff -Nua ./regiloader.old/CMakeLists.txt ./regiloader/CMakeLists.txt
+--- ./regiloader.old/CMakeLists.txt	2016-06-27 15:01:17.000000000 +0300
++++ ./regiloader/CMakeLists.txt	2016-06-27 15:01:43.843876140 +0300
+@@ -12,6 +12,7 @@
+ 	sdp.cpp
+ 	ymodem.cpp
+ 	tftp.cpp
++	debug_backtrace.cpp
+ )
+ 
+ target_link_libraries(regiloader
+diff -Nua ./regiloader.old/debug_backtrace.cpp ./regiloader/debug_backtrace.cpp
+--- ./regiloader.old/debug_backtrace.cpp	1970-01-01 03:00:00.000000000 +0300
++++ ./regiloader/debug_backtrace.cpp	2016-06-27 15:01:43.843876140 +0300
+@@ -0,0 +1,63 @@
++/*
++ * debug_backtrace.cpp
++ *
++ *  Created on: 11.11.2015
++ *      Author: denis
++ */
++#include "debug_backtrace.hpp"
++#include <execinfo.h>
++#include <sstream>
++#include <cstdlib>
++
++namespace debug {
++Backtrace::Backtrace() {
++}
++
++Backtrace::~Backtrace() {
++}
++
++bool Backtrace::KeepStack() {
++  return ReadStackTo(&_stack);
++}
++
++bool Backtrace::PrintStackTo(std::ostream *out) {
++  if (out == 0) {
++    return false;
++  }
++  (*out) << _stack;
++  return true;
++}
++
++bool Backtrace::ReadStack(std::string *out) {
++  return ReadStackTo(out);
++}
++
++bool Backtrace::ReadStackTo(std::string *out) {
++  if (out == 0) {
++    return false;
++  }
++  static const unsigned kStackBufSz = 100;
++  int    i,
++         nptrs;
++  void  *buf[kStackBufSz];
++  char **strings;
++  nptrs   = backtrace(buf, kStackBufSz);
++  strings = backtrace_symbols(buf, nptrs);
++  std::stringstream stack_log;
++  if (strings != NULL) {
++    for (i = 0; i < nptrs; i++) {
++      stack_log << strings[i] << std::endl;
++    }
++    free(strings);
++  } else {
++    stack_log << "no symbols";
++  }
++  out->assign(stack_log.str());
++  return true;
++}
++
++void Backtrace::Clear() {
++  _stack.assign("");
++}
++
++} // namespace debug
+diff -Nua ./regiloader.old/debug_backtrace.hpp ./regiloader/debug_backtrace.hpp
+--- ./regiloader.old/debug_backtrace.hpp	1970-01-01 03:00:00.000000000 +0300
++++ ./regiloader/debug_backtrace.hpp	2016-06-27 15:01:43.843876140 +0300
+@@ -0,0 +1,47 @@
++/*
++ * debug_backtrace.hpp
++ *
++ *  Created on: 11.11.2015
++ *      Author: denis
++ */
++
++#ifndef DEBUG_BACKTRACE_HPP
++#define DEBUG_BACKTRACE_HPP
++
++#include <string>
++#include <ostream>
++
++namespace debug {
++
++class Backtrace {
++  public:
++    Backtrace();
++    ~Backtrace();
++    /**
++     * Метод чтения и сохранения стэка
++     * @return true если удалось прочитать
++     */
++    bool KeepStack();
++    /**
++     * Метод вывода сохраненного стэка в поток выходных данных.
++     * Вывод производится в текстовом режиме.
++     * @param out указатель на поток для вывода
++     */
++    bool PrintStackTo(std::ostream *out);
++    /**
++     * Метод чтения стэка и передачи его в заданную строку.
++     * @param out указатель на строку для записи прочитанного стэка.
++     * @return true если удалось прочитать и записать результат
++     */
++    bool ReadStack(std::string *out);
++    /// Метод удаления запомненного стэка
++    void Clear();
++  private:
++    bool ReadStackTo(std::string *out);
++
++    std::string _stack;
++}; // class Backtrace
++
++} // namespace debug
++
++#endif /* DEBUG_BACKTRACE_HPP */
+diff -Nua ./regiloader.old/regiloader.cpp ./regiloader/regiloader.cpp
+--- ./regiloader.old/regiloader.cpp	2016-06-27 15:01:17.000000000 +0300
++++ ./regiloader/regiloader.cpp	2016-06-27 15:01:43.843876140 +0300
+@@ -2,6 +2,7 @@
+ #include "sdp.hpp"
+ #include "ymodem.hpp"
+ #include "tftp.hpp"
++#include "debug_backtrace.hpp"
+ #include <iostream>
+ #include <sstream>
+ #include <list>
+@@ -14,6 +15,8 @@
+ #include <boost/property_tree/json_parser.hpp>
+ #include <boost/date_time/local_time/local_time.hpp>
+ 
++typedef std::list<std::string> Recipe;
++
+ static const std::string kConfName("regiloader.json");
+ static const std::string kTtyDev("ttyUSB0");
+ static const std::string kUBootImg("u-boot");
+@@ -47,14 +50,14 @@
+         r_pkt.Send(port);
+         const uint32_t kRegVal = r_pkt.GetValue();
+         if ((kRegVal & pair_it->val_mask) != pair_it->val_mask) {
+-          
++          /*
+           std::cout << "Ошибка записи в регистр [" << (unsigned)try_num << "]:\n"
+                     << std::hex 
+                     << "\t адрес    : 0x" << (unsigned)pair_it->addr << ";\n"
+                     << "\t значение : 0x" << (unsigned)pair_it->val_mask << ";\n"
+                     << "\t результат: 0x" << (unsigned)kRegVal << "; "
+                     << std::endl;
+-          
++          */
+           continue;
+         }
+         break;
+@@ -128,7 +131,7 @@
+ };
+ 
+ struct SysInfo {
+-  SysInfo(): wait_for_reboot(false), upload_fail(false) {}
++  SysInfo(): wait_for_reboot(false), upload_fail(false), boot_from_nand(false) {}
+ 
+   std::string     board;
+   std::string     u_boot_build;
+@@ -151,10 +154,33 @@
+   Packet::List    packets;
+   bool            wait_for_reboot;
+   bool            upload_fail;
++  bool            boot_from_nand;
+ };
+ 
+ static SysInfo g_sys_inf;
+ 
++enum Color {
++  kReset   = -1,
++	kBlack   = 0,
++	kRed     = 1,
++	kGreen   = 2,
++	kYellow  = 3,
++	kBlue    = 4,
++	kMagenta = 5,
++	kCyan    = 6,
++	kWhite   = 7
++};
++
++static std::string UseColor(int8_t id) {
++  std::stringstream esc;
++  if (id >= 0) {
++    esc << "\033[1;" << (unsigned)(30 + (id % 8)) << "m";
++  } else {
++    esc << "\033[0m";
++  }
++  return esc.str();
++}
++
+ class SysState {
+ public:
+   SysState()
+@@ -162,7 +188,8 @@
+         batch(3),
+         device(1),
+         lcd_model("G150XGE-L04"),
+-        ts_model("ADS7843E") {}
++        ts_model("ADS7843E"),
++        verbose(false) {}
+   
+   void CheckBatchCapacity() {
+     if (device < 256) {
+@@ -203,11 +230,31 @@
+     return true;
+   }
+   
++  std::string GetDeviceId() const {
++    std::stringstream buf;
++      buf << (unsigned)stand  << "."
++          << (unsigned)batch  << "."
++          << (unsigned)device << " ";
++    return buf.str();
++  }
++  
++  void Print() const {
++    std::cout << "Конфигурация: \n"
++              << "\t - Стэнд  : " << (unsigned)stand  << "\n"
++              << "\t - Партия : " << (unsigned)batch  << "\n"
++              << "\t - Плата  : " << (unsigned)device << "\n"
++              << "\t - Дисплей: " << lcd_model << "\n"
++              << "\t - Сенсор : " << ts_model << "\n"
++              << "\t - Идентификатор: " << GetDeviceId() << "\n"
++              << std::endl;
++  }
++  
+   uint32_t    stand;
+   uint32_t    batch;
+   uint32_t    device;
+   std::string lcd_model;
+   std::string ts_model;
++  bool        verbose;
+ private:
+   std::string _file_path;
+ };
+@@ -254,22 +301,31 @@
+     part0 += " " + name + " ";
+   }
+   std::cout.fill('-');
+-  std::cout << pref << part0 << std::setw(len - part0.size()) << "\n";
++  std::cout << UseColor(kYellow)
++            << pref << part0 << std::setw(len - part0.size())
++            << UseColor(kReset) << "\n";
+   std::cout.fill(' ');
+ }
+ 
+ static void PrintSysInfo(const SysInfo &inf) {
++  const Color kGroupColor = kYellow;
+   std::cout << "Описание:\n"
+             << "\t * Плата.....: " << inf.board << "\n"
+             << "\t * Процессор.: " << inf.cpu << "\n"
++            << UseColor(kGroupColor)
+             << "\t--- UBOOT ---------------------------" << std::endl
++            << UseColor(kReset)
+             << "\t * Версия....: " << inf.u_boot_build << "\n"
+             << "\t * loadaddr..: " << inf.uboot.loadaddr << "\n"
++            << UseColor(kGroupColor)
+             << "\t--- Kernel (Linux) ------------------" << std::endl
++            << UseColor(kReset)
+             << "\t * Версия....: " << inf.kernel_build << "\n"
+             << "\t * GCC.......: " << inf.gcc_ver << "\n"
+             << "\t * Crosstool.: " << inf.ct_ng_ver << "(crosstool-NG)\n"
++            << UseColor(kGroupColor)
+             << "\t--- Периферия -----------------------" << std::endl
++            << UseColor(kReset)
+             << "\t * ОЗУ.......: " << inf.dram_size << " (" << inf.ddr << ")\n"
+             << "\t * ПЗУ (NOR).: " << inf.nor_size << " (" << inf.nor << ")\n"
+             << "\t * ПЗУ (NAND): " << inf.nand_size << " (" << inf.nand << ")\n"
+@@ -401,7 +457,7 @@
+     Parse(str, "(.+)\\(([^\\)]+)\\) pagesize(.+)", 2, &inf.nor_size);
+     return true;
+   }
+-  Parse(str, "(.+)Regiboard TS: (.+)",        2, &inf.kernel.ts);
++  Parse(str, "(.+)input: ([^ ]+) Touchscreen as (.+)", 2, &inf.kernel.ts);
+   Parse(str, "(.+)Regiboard LCD setup: (.+)", 2, &inf.kernel.lcd);
+   Parse(str, "(.+)rtc-([^:]+): rtc core: registered ([^ ]+) as rtc0", 3, &inf.kernel.rtc);
+   std::string t_str;
+@@ -468,13 +524,15 @@
+                        SysInfo           *out) {
+   std::string str;
+   uint8_t resp[1] = {0};
++  std::cout << "\033[1A";
+   while (not Parse(str, wait_for + "(.*)", 0, 0)) {
+     boost::asio::read(port, boost::asio::buffer(resp, 1));
+     if (resp[0] == 0x0A) {
+-      ShowProcess("\t * Ожидание исполнения команды");
+-      // DEBUG --------------------
+-      //std::cout << str << std::endl;
+-      // --------------------------
++      if (g_sys_state.verbose) {
++        std::cout << str << std::endl;
++      } else {
++        ShowProcess("\t * Ожидание исполнения команды");
++      }
+       if (out != 0) {
+         FillInSysInfo(str, *out);
+       }
+@@ -512,7 +570,9 @@
+ }
+ 
+ static bool UploadUBoot(SerialPort &port, const std::string &file) {
+-  if (not PktStatus().Send(port)) {
++  static const unsigned kMaxTries = 3;
++  PktStatus().ClearSerialInputBuffer(port);
++  if (not PktStatus().Send(port, kMaxTries, "Запрос состояния микропроцессора")) {
+     return false;
+   }
+   ImxFirmware firm;
+@@ -522,12 +582,12 @@
+   std::cout << "Инициализация памяти..." << std::endl;
+   UploadDCD(port, firm);
+   std::cout << "Загрузка программы..." << std::endl;
+-  if (not PktWriteF(&firm).Send(port)) {
++  if (not PktWriteF(&firm).Send(port, kMaxTries, "Загрузка исполняемой программы")) {
+     return false;
+   }
+   std::cout << "Запуск программы..." << std::endl;
+-  PktStatus().Send(port);
+-  return true;
++  return PktComplete().Send(port, kMaxTries, "Запуск программы");
++//  return PktStatus().Send(port, kMaxTries, "Запуск программы");
+ }
+ 
+ static bool WaitForWelcomeFromUBoot(SerialPort        &port,
+@@ -552,6 +612,7 @@
+   if (inf->wait_for_reboot) {
+     SendToUBoot(port, "save", &g_sys_inf);
+   }
++  already_has_been = false;
+   return true;
+ }
+ 
+@@ -562,9 +623,11 @@
+   SendToUBoot(port, "usedefenv", &g_sys_inf);
+   SendToUBoot(port, "save", &g_sys_inf);
+   if (g_sys_inf.wait_for_reboot) {
+-    std::cout << "Требуется ручная перезагрузка платы!" << std::endl
++    std::cout << UseColor(kGreen)
++              << "Требуется ручная перезагрузка платы!" << std::endl
+               << "1. Перезагрузите плату (отключите питание и снова включите его)" << std::endl
+-              << "2. Нажмите любую клавишу для продолжения работы программы..." 
++              << "2. Нажмите [Enter] для продолжения работы программы..."
++              << UseColor(kReset)
+               << std::endl;
+     std::cin.get();
+     std::cout << "Повторная загрузка платы" << std::endl;
+@@ -579,9 +642,11 @@
+   if (inf == 0 || not WaitForWelcomeFromUBoot(port, inf, pswd)) {
+     return false;
+   }
+-  // Убираем имя монтируемого устройства, для блокирования загрузки с nand.
+-  // Таким образом загрузка всегда будет останавливаться на initramfs
+-  SendToUBoot(port, "setenv nandroot", inf);
++  if (not inf->boot_from_nand) {
++    // Убираем имя монтируемого устройства, для предотвращения загрузки с nand.
++    // Таким образом загрузка всегда будет останавливаться на initramfs
++    SendToUBoot(port, "setenv nandroot", inf);
++  }
+   SendToUBoot(port, "run conf_hw", inf);
+   SendToUBoot(port, "run bootargs_nand", inf);
+   std::cout << "Загрузка ядра Linux..." << std::endl;
+@@ -624,6 +689,9 @@
+     if (not UploadKernelBegin(port, &g_sys_inf, pswd)) {
+       return false;
+     }
++    std::stringstream args;
++    args << (unsigned)TFtp::Server::kPort;
++    SendCmd(port, "setenv tftpdstp " + args.str());
+     SendCmd(port, "dhcp ${loadaddr} " + srv->get_ip() + ":" + kKernelImg + 
+             BootM(g_sys_inf));
+     srv->Run();
+@@ -645,6 +713,16 @@
+   return UploadKernelOverEth(port, srv, pswd);
+ }
+ 
++static bool UploadKernelWithOldSys(SerialPort        &port,
++                                   TFtp::Server      *srv,
++                                   const std::string &pswd) {
++  if (not WaitForWelcomeFromUBoot(port, &g_sys_inf, pswd)) {
++    return false;
++  }
++  g_sys_inf.boot_from_nand = true;
++  return UploadKernelOverEth(port, srv, pswd);
++}
++
+ static bool DownloadFromTFtp(const std::string &tftpd_ip,
+                              const std::string &request,
+                              const std::string &path,
+@@ -808,7 +886,7 @@
+   cmd << "flashcp -v " << kPath << " /dev/mtd" << (unsigned)part->mtd_id;
+   SendToShell(port, cmd.str(), 0);
+   cmd.str("");
+-  std::cout << "Запись данных о переферии..." << std::endl;
++  std::cout << "Запись данных о периферии..." << std::endl;
+   cmd << "uboot_conf --if=/dev/mtd1 --of=/tmp/uboot.conf "
+       << "--lcd=" << g_sys_state.lcd_model << " "
+       << "--ts=" << g_sys_state.ts_model << " ";
+@@ -858,6 +936,7 @@
+   std::cout << "Авторизация пользователя: " << kUser << std::endl;
+   SwitchShell(kRegigrafPrompt);
+   SendToShell(port, kUser, 0);
++  return true;
+ }
+ 
+ static bool UploadAndInstallRegigraf(const std::string &tftpd_ip,
+@@ -908,6 +987,7 @@
+   SendCmd(port, "reboot");
+   ParseUntil(port, kRegigrafLogin, 0);
+   std::cout << "Плата готова к работе!" << std::endl;
++  return true;
+ }
+ 
+ static bool RegisterBoard(SerialPort &port) {
+@@ -915,9 +995,7 @@
+   std::cout << "Запись идентификатора платы..." << std::endl;
+   std::stringstream cmd;
+   cmd << "uboot_conf --if=/dev/mtd1 --of=/tmp/uboot.conf "
+-      << "--board=" << (unsigned)g_sys_state.stand  << "."
+-                    << (unsigned)g_sys_state.batch  << "."
+-                    << (unsigned)g_sys_state.device << " ";
++      << "--board=" << g_sys_state.GetDeviceId();
+   SendToShell(port, cmd.str(), 0);
+   SendToShell(port, "uboot_conf --of=/dev/mtd1 --if=/tmp/uboot.conf --do=w", 0);
+   std::cout << "Регистрация платы" << std::endl;  
+@@ -925,16 +1003,55 @@
+   g_sys_state.device++;
+   g_sys_state.CheckBatchCapacity();
+   g_sys_state.Save();
++  return true;
++}
++
++template <typename DataType>
++static bool CompareValues(const DataType    &standart,
++                          const DataType    &value,
++                          const std::string &err_comment) {
++  if (standart == value) {
++    return true;
++  }
++  std::cout << UseColor(kRed)
++            << "\t * Ошибка: "
++            << UseColor(kReset)
++            << err_comment << ": "
++            << UseColor(kRed) << value << UseColor(kReset) 
++            << " вместо "
++            << UseColor(kGreen) << standart << UseColor(kReset)
++            << std::endl;
++  return false;
+ }
+ 
+ static bool ValidateHardware(SerialPort &port) {
+-  std::cout << "Проверка наличия поддерживаемых переферийных устройств..." << std::endl;
+-  // TODO
++  std::cout << "Проверка наличия периферийных устройств..." << std::endl;
++  bool check_res = CompareValues<std::string>("Freescale i.MX53 family 2.1V at 800 MHz", g_sys_inf.cpu, "неверная модель процессора");
++  check_res &= CompareValues<std::string>("1 GB", g_sys_inf.dram_size, "неверный объём ОЗУ");
++  check_res &= CompareValues<std::string>("332800000Hz", g_sys_inf.ddr, "неверная частота ОЗУ");
++  check_res &= CompareValues<std::string>("1080 KBytes", g_sys_inf.nor_size, "неверный объём ПЗУ (NOR)");
++  check_res &= CompareValues<std::string>("AT45DB321x",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)");
++  check_res &= CompareValues<std::string>("1 GiB",  g_sys_inf.nand_size, "неверный объём ПЗУ (NAND)");
++  check_res &= CompareValues<std::string>("MT29F8G08ABABA",  g_sys_inf.nand, "неверная модель ПЗУ (NAND)");
++  check_res &= CompareValues<std::string>("FEC0", g_sys_inf.eth, "необнаружен контроллер Ethernet");
++  check_res &= CompareValues<std::string>("ADS7843", g_sys_inf.kernel.ts, "необнаружен контроллер сенсорного экрана");
++  check_res &= CompareValues<std::string>("ds3231", g_sys_inf.kernel.rtc, "необнаружены часы реального времени");
++    
++  check_res &= CompareValues<unsigned>(3, g_sys_inf.kernel.spi.size(), "неверное количество SPI шин");
++  check_res &= CompareValues<unsigned>(5, g_sys_inf.kernel.uarts.size(), "неверное количество шин UART");
++  check_res &= CompareValues<unsigned>(12, g_sys_inf.kernel.usb_uart.size(), "неверное количество интерфейсов USB-UART");
++  check_res &= CompareValues<unsigned>(5, g_sys_inf.kernel.partitions.size(), "неверное количество разделов (NAND)");
++  if (check_res) {
++    std::cout << "\t * Все устройства обнаружены!"
++              << std::endl;
++  }
+   return true;
+ }
+  
+ static bool TestHardware(SerialPort &port) {
+-  std::cout << "Тестирование работоспособности переферийных устройств..." << std::endl;
++  std::cout << "Тестирование работоспособности периферийных устройств..." << std::endl;
++  // TODO
++  std::cout << "\t ..." << std::endl;
+   // TODO
+   return true;
+ }
+@@ -985,7 +1102,9 @@
+     ("rbf", po::value<std::string>()->default_value(kRbfName),
+              "путь к файлу прошивки <*.rbf>. Работает только с флагом --tftp")
+     ("uboot_pswd", po::value<std::string>()->default_value(std::string()),
+-             "пароль для входа в U-Boot");
++             "пароль для входа в U-Boot")
++    ("verbose", po::value<bool>()->default_value(false)->zero_tokens(),
++             "вывод все хданных, полученных через последовательный порт");
+ 	po::variables_map vm;
+ 	po::store(po::parse_command_line(argc, argv, desc), vm);
+ 	po::notify(vm);
+@@ -1004,6 +1123,7 @@
+   set.config     = vm["conf"].as<std::string>();
+   set.rbf        = vm["rbf"].as<std::string>();
+   set.uboot_pswd = vm["uboot_pswd"].as<std::string>();
++  g_sys_state.verbose = vm["verbose"].as<bool>();
+ 	return true;
+ }
+ 
+@@ -1021,7 +1141,11 @@
+   static const uint8_t kMaxNum = 10;
+   static uint8_t num = 1;
+   std::cout.fill('.');
+-  std::cout << "\r\033[K" << msg << std::setw(num) << " " << std::flush;
++  std::cout << "\r\033[K"
++            << UseColor(kBlue)
++            << msg << std::setw(num) << " "
++            << UseColor(kReset)
++            << std::flush;
+   std::cout.fill(' ');
+   num++;
+   if (num > kMaxNum) {
+@@ -1091,6 +1215,7 @@
+     kKernelUart,
+     kKernelEth,
+     kKernelDebug,
++    kKernelOldSys,
+     kRootFs,
+     kMtdUtils,
+     kInstallKernel,
+@@ -1119,6 +1244,7 @@
+     actions.insert(Pair("setup_nor",        MetaData(kSetupNor,        "первичная настройка NOR памяти")));
+     actions.insert(Pair("kernel_uart",      MetaData(kKernelUart,      "загрузка ядра Linux через Uart")));
+     actions.insert(Pair("kernel_eth",       MetaData(kKernelEth,       "загрузка ядра Linux через Ethernet")));
++    actions.insert(Pair("kernel_old_sys",   MetaData(kKernelOldSys,    "загрузка ядра Linux через Ethernet и запуск старой системы с Nand")));
+     actions.insert(Pair("rootfs",           MetaData(kRootFs,          "загрузка образа rootfs")));
+     actions.insert(Pair("mtd_utils",        MetaData(kMtdUtils,        "загрузка и установка служебных утилит")));
+     actions.insert(Pair("install_kernel",   MetaData(kInstallKernel,   "установка ядра Linux")));
+@@ -1128,8 +1254,8 @@
+     actions.insert(Pair("unpack_rootfs",    MetaData(kUnpackRootFs,    "подготовка разделов и распаковка образа rootfs")));
+     actions.insert(Pair("setup_booting",    MetaData(kSetupBooting,    "настройка загрузки с NOR памяти")));
+     actions.insert(Pair("register",         MetaData(kRegisterBoard,   "регистрация платы")));
+-    actions.insert(Pair("validate_hw",      MetaData(kValidateHW,      "проверка наличия переферийных устройств")));
+-    actions.insert(Pair("test_hw",          MetaData(kTestHW,          "тестирование переферийных устройств")));
++    actions.insert(Pair("validate_hw",      MetaData(kValidateHW,      "проверка наличия периферийных устройств")));
++    actions.insert(Pair("test_hw",          MetaData(kTestHW,          "тестирование периферийных устройств")));
+     actions.insert(Pair("kernel_dbg",       MetaData(kKernelDebug,     "загрузка ядра, и вывод отладочных сообщений")));
+   }
+   
+@@ -1167,6 +1293,8 @@
+   if (srv == 0 || port == 0) {
+     return false;
+   }
++  std::stringstream tftp_args;
++  tftp_args << set.use_tftp << ":" << (unsigned)TFtp::Server::kPort;
+   switch (kActions.Identify(act).id) {
+     case RecipeAct::kUBoot:
+       return UploadUBoot(*port, set.imx_img + ".imx");
+@@ -1193,30 +1321,32 @@
+       break;
+     case RecipeAct::kKernelDebug:
+         return UploadKernelAndDebug(*port, srv, set.uboot_pswd);
++    case RecipeAct::kKernelOldSys:
++        return UploadKernelWithOldSys(*port, srv, set.uboot_pswd);
+     case RecipeAct::kRootFs:
+-      if (set.rootfs_img.size() > 0 && set.use_tftp.size() > 0) {
+-        return UploadRootFsOverEth(set.use_tftp, *port, srv);
++      if (set.rootfs_img.size() > 0 && tftp_args.str().size() > 0) {
++        return UploadRootFsOverEth(tftp_args.str(), *port, srv);
+       }
+       break;
+     case RecipeAct::kMtdUtils:
+-      if (set.mtd_utils.size() > 0 && set.use_tftp.size() > 0) {
+-        return UploadAndInstallTools(set.use_tftp, *port, srv);
++      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
++        return UploadAndInstallTools(tftp_args.str(), *port, srv);
+       }
+     case RecipeAct::kInstallKernel:
+-      if (set.mtd_utils.size() > 0 && set.use_tftp.size() > 0) {
+-        return UploadAndInstallKernel(set.use_tftp, *port, srv);
++      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
++        return UploadAndInstallKernel(tftp_args.str(), *port, srv);
+       }
+     case RecipeAct::kInstallUBoot:
+-      if (set.mtd_utils.size() > 0 && set.use_tftp.size() > 0) {
+-        return UploadAndInstallUBoot(set.use_tftp, *port, srv);
++      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
++        return UploadAndInstallUBoot(tftp_args.str(), *port, srv);
+       }
+     case RecipeAct::kInstallRegigraf:
+-      if (set.use_tftp.size() > 0) {
+-        return UploadAndInstallRegigraf(set.use_tftp, *port, srv);
++      if (tftp_args.str().size() > 0) {
++        return UploadAndInstallRegigraf(tftp_args.str(), *port, srv);
+       }
+     case RecipeAct::kInstallFirmware:
+-      if (set.use_tftp.size() > 0) {
+-        return UploadAndInstallFirmware(set.use_tftp, *port, srv);
++      if (tftp_args.str().size() > 0) {
++        return UploadAndInstallFirmware(tftp_args.str(), *port, srv);
+       }      
+     case RecipeAct::kUnpackRootFs:
+       if (set.rootfs_img.size() > 0) {
+@@ -1270,8 +1400,69 @@
+   srv->PublishFile(kRegigrafLicense, kPath);
+ }
+ 
++static bool ExecuteRecipe(const Recipe             &recipe,
++                          const Settings           &set,
++                          TFtp::Server             *srv,
++                          boost::asio::serial_port *port) {
++  if (srv == 0 || port == 0) {
++    return false;
++  }
++  PrintDelimiter("\n", "Для выполнения рецепта", 80);
++  std::cout << UseColor(kGreen)
++            << "\t 1. Подайте напряжение на плату\n"
++            << "\t 2. Нажмите [Enter] для начала загрузки..." 
++            << UseColor(kReset)
++            << std::endl;
++  std::cin.get();
++  // вывод конфигурации
++  g_sys_state.Print();
++  // приготовление рецепта
++  Recipe::const_iterator act_it = recipe.begin();
++  bool recipe_fail = false;
++  for (; act_it != recipe.end(); act_it++) {
++    if (not DoAction(set, *act_it, srv, port)) {
++      std::cout << UseColor(kRed)
++                << "Невозможно продолжить исполнение рецепта!"
++                << UseColor(kReset)
++                << std::endl;
++      recipe_fail = true;
++      break;
++    }
++  }
++  // вывод общей информации
++  if (not recipe_fail) {
++    PrintSysInfo(g_sys_inf);
++  }
++  std::cout << UseColor(kGreen)
++            << "Продолжить работу с данным рецептом? (Y/n) + [Enter]: "
++            << UseColor(kReset);
++//            << std::flush;
++  char answer = 0;
++  std::cin.get(answer);
++  // если ответ - нет
++  if (answer != 10 && answer != 'y' && answer != 'Y') {
++    return false; 
++  }
++  return true;
++}
++
++static void KernelSignalCatcher(int sig_num) {
++  switch (sig_num) {
++    case SIGSEGV: {
++      //debug::Backtrace bt;
++      //bt.KeepStack();
++      //bt.PrintStackTo(&std::cout);
++      break;
++    }
++    default:
++      std::cout << "Получен неизвестный сигнал: " << sig_num << std::endl;
++      break;
++  };
++}
++
+ int main(int argc, char **argv) {
+   Settings set;
++  signal(SIGSEGV, KernelSignalCatcher);
+   if (not ParseArgs(argc, argv, set)) {
+     return 0;
+   }
+@@ -1280,17 +1471,9 @@
+     std::cout << "Неудалось прочитать конфигурацию из <" << kConfName << ">!" << std::endl;
+     return 0;
+   }
+-  std::cout << "Конфигурация: \n"
+-            << "\t - Стэнд  : " << (unsigned)g_sys_state.stand  << "\n"
+-            << "\t - Партия : " << (unsigned)g_sys_state.batch  << "\n"
+-            << "\t - Плата  : " << (unsigned)g_sys_state.device << "\n"
+-            << "\t - Дисплей: " << g_sys_state.lcd_model << "\n"
+-            << "\t - Сенсор : " << g_sys_state.ts_model << "\n"
+-            << std::endl;
+   // подготовка лицензии
+   RegigrafLicense license;
+   // разбор рецепта
+-  typedef std::list<std::string> Recipe;
+   Recipe recipe;
+   const std::string kDelimiter("->");
+   std::size_t found = 0;
+@@ -1306,11 +1489,6 @@
+     }
+     found += 2;
+   } while (1);
+-  PrintDelimiter("\n", "Приготовление рецепта", 80);
+-  std::cout << "1. Подайте напряжение на плату" << std::endl
+-            << "2. Нажмите любую клавишу для начала загрузки..." 
+-            << std::endl;
+-  std::cin.get();
+   // инициализация сервера TFTP
+   TFtp::Server srv(set.use_tftp);
+   srv.PublishFile(kUBootImg + ".bin", set.imx_img + ".bin");
+@@ -1325,12 +1503,17 @@
+   boost::asio::serial_port port(io_service, set.tty_dev);
+   InitUart(set, &port);
+   // приготовление рецепта
+-  Recipe::iterator act_it = recipe.begin();
+-  for (; act_it != recipe.end(); act_it++) {
+-    DoAction(set, *act_it, &srv, &port);    
++  while (ExecuteRecipe(recipe, set, &srv, &port)) {
++    g_sys_inf = SysInfo();
++    PrintDelimiter("\n", "Подготовка к работе со следующей платой", 80);
++    std::cout << UseColor(kGreen)
++              << "\t 1. Отключите питание\n"
++              << "\t 2. Замените процессорную плату\n"
++              << "\t 3. Установите перемычку (джампер) \"on/off\"\n"
++              << "\t 4. Подключите провод к разъёму \"debug_uart\""
++              << UseColor(kReset)
++              << std::endl;
+   }
+   port.close();
+-  // вывод общей информации
+-  PrintSysInfo(g_sys_inf);
+   return 0;
+ }
+diff -Nua ./regiloader.old/sdp.cpp ./regiloader/sdp.cpp
+--- ./regiloader.old/sdp.cpp	2016-06-27 15:01:17.000000000 +0300
++++ ./regiloader/sdp.cpp	2016-06-27 15:01:43.843876140 +0300
+@@ -1,9 +1,20 @@
+ #include "sdp.hpp"
+ #include <iomanip>
+ #include <fstream>
++#include <boost/asio/basic_deadline_timer.hpp>
++#include <boost/bind.hpp>
++
++SdpPacket::Session::Session(boost::asio::serial_port &_port,
++                            uint8_t                  *_out,
++                            size_t                    _out_size)
++    : port(_port),
++      out(_out),
++      out_size(_out_size) {
++}
+ 
+ SdpPacket::SdpPacket(uint8_t cmd, size_t response_sz, size_t request_sz)
+-    : _resp_size(response_sz), _req_size(request_sz) {
++    : _resp_size(response_sz),
++      _req_size(11) {
+   _cmd_id.value = (uint16_t)((cmd << 8) | cmd);
+   if (_resp_size > kPktSize)
+     _resp_size = kPktSize;
+@@ -12,27 +23,185 @@
+ SdpPacket::~SdpPacket() {
+ }
+ 
+-void SdpPacket::Print(std::ostream &out) {
+-  out << "Отправка запроса: " << std::uppercase << std::setfill('0');
++void SdpPacket::Print(const std::string &pref, std::ostream &out) {
++  out << pref << ": " << std::uppercase << std::setfill('0');
+   for (size_t i = 0; i < kPktSize; i++) {
+     out << std::hex << std::setw(2) << (unsigned)_packet[i] << "|";
+   }
+   out << std::endl;
+ }
+ 
++void SdpPacket::HandlerRead(const boost::system::error_code &error,
++                            std::size_t                      bytes_transferred) {
++  _was_read = (bytes_transferred == _resp_size);
++  if (_was_read && _timer) {
++    _timer->cancel();
++  }
++}
++
++void SdpPacket::HandlerWrite(const boost::system::error_code &error,
++                             std::size_t                      bytes_transferred) {
++  if (not _session || error) {
++    _timer->cancel();
++    _timeout = true;
++    return;
++  }
++  if (not ReadArray(_session->port, _session->out_size, _session->out)) {
++    _timer->cancel();
++    _timeout = true;
++  }
++}
++
++void SdpPacket::HandlerTimeout(const boost::system::error_code &error) {
++  const bool exp = _timer->expires_at() <= boost::asio::deadline_timer::traits_type::now();
++//  std::cout << "Timeout handler: " << exp << std::endl;
++  if (not error && exp) {
++    _timeout = true;
++    if (_session) {
++      std::cout << "TIMEOUT" << std::endl;
++      _session->port.cancel();
++    }
++  }
++}
++
++void SdpPacket::CreateTimer(boost::asio::io_service &io) {
++  const unsigned kTimeOutMSec = 100;
++  if (not _timer) {
++    _timer.reset(new Timer(io));
++  }
++  _timer->expires_from_now(boost::posix_time::milliseconds(kTimeOutMSec));
++  _timer->async_wait(
++    boost::bind(&SdpPacket::HandlerTimeout,
++      this,
++      boost::asio::placeholders::error));
++}
++
++void SdpPacket::CreateSession(boost::asio::serial_port &port,
++                   uint8_t                  *out,
++                   size_t                    out_size) {
++  _session.reset(new Session(port, out, out_size));
++}
++
++void SdpPacket::DestroySession() {
++  _session.reset(0);
++}
++
++bool SdpPacket::TransferData(boost::asio::serial_port &port) {
++  boost::asio::io_service &io = port.get_io_service();
++  _was_read = false;
++  _timeout  = false;
++  do {
++    io.run();
++    io.reset();
++  } while (not _was_read && not _timeout);
++
++  if (_was_read && _session) {
++    std::cout << "READ: ";
++    for (unsigned i = 0; i < _session->out_size; i++) {
++      std::cout << std::hex << std::setw(2) << (unsigned)_session->out[i] << "|" << std::dec;  
++    }
++    std::cout << std::endl;
++  }
++  
++  return (_was_read && not _timeout);
++}
++
++bool SdpPacket::ReadArray(boost::asio::serial_port &port,
++                          size_t                    size,
++                          uint8_t                  *out) {
++  if (out == 0 || size == 0) {
++    return false;
++  }
++  if (size > kPktSize) {
++    size = kPktSize;
++  }
++  memset(out, 0, size);
++  port.async_read_some(boost::asio::buffer(out, size),
++    boost::bind(&SdpPacket::HandlerRead,
++      this,
++      boost::asio::placeholders::error,
++      boost::asio::placeholders::bytes_transferred));
++  CreateTimer(port.get_io_service());
++  return true;
++}
++
++void SdpPacket::ClearSerialInputBuffer(boost::asio::serial_port &port) {
++/*
++  uint8_t garbage[kPktSize];
++  CreateSession(port, garbage, kPktSize);
++  while (ReadArray(port, kPktSize, garbage) && TransferData(port));
++  */
++}
++
+ bool SdpPacket::Send(boost::asio::serial_port &port) {
+   memset(_packet, 0, kPktSize);
+-  if (not Write())
++  if (not Write()) {
+     return false;
++  }
+   AddArr(0, _cmd_id.bytes, 2);
+-  //Print(std::cout); // for DEBUG
++//  Print("SEND: ", std::cout); // for DEBUG
+   boost::asio::write(port, boost::asio::buffer(_packet, _req_size));
+   boost::asio::read (port, boost::asio::buffer(_packet, _resp_size));
++//  Print("RECV: ", std::cout); // for DEBUG
++  const Transfer kAct = Read();
++  if (kAct == kContinue) {
++    return Write(port);
++  }
++  return (kAct == kStop);
++  /*
++  if (not port.is_open()) {
++    std::cout << "Невозможно осуществить передачу данных, т.к. порт закрыт!" << std::endl;
++    return false;
++  }
++  memset(_packet, 0, kPktSize);
++  if (not Write()) {
++    return false;
++  }
++  AddArr(0, _cmd_id.bytes, 2);
++  // ожидание данных с тайм-аутом
++  uint8_t rcv_packet[kPktSize];
++  CreateSession(port, rcv_packet, _resp_size);
++  const unsigned kMaxAmountOfTries = 4;
++  unsigned try_num = 1;
++  for (; try_num <= kMaxAmountOfTries; try_num++) {
++//   std::cout << "\r\033[K"
++//             << "Попытка отправки команды " << try_num << " ..." << std::flush;    
++    port.async_write_some(boost::asio::buffer(_packet, _req_size), 
++      boost::bind(&SdpPacket::HandlerWrite,
++        this,
++        boost::asio::placeholders::error,
++        boost::asio::placeholders::bytes_transferred));
++    //CreateTimer(port.get_io_service());
++    memset(rcv_packet, 0, kPktSize);
++    if (TransferData(port)) {
++      memcpy(_packet, rcv_packet, kPktSize);
++      break;    
++    }
++  }
++  DestroySession();
++  //std::cout << "\r\033[K";
++  if (try_num > kMaxAmountOfTries) {
++    return false;  
++  }
+   const Transfer kAct = Read();
+   if (kAct == kContinue) {
+     return Write(port);
+   }
+   return (kAct == kStop);
++  */
++}
++
++bool SdpPacket::Send(boost::asio::serial_port &port,
++                     unsigned                  tries,
++                     const std::string        &msg) {
++  const unsigned kMaxTries = tries;
++  while (tries > 0 && not Send(port)) {
++    tries--;
++    if (tries > 0) {
++      std::cout << msg << ", попытка № " << (kMaxTries - tries + 1) << std::endl;
++    }
++  }
++  return (tries > 0);
+ }
+ 
+ std::string SdpPacket::GetAckName(FieldU32 val) {
+@@ -40,7 +209,9 @@
+     return "closed security configuration";
+   if (val.value == kOtherwise)
+     return "otherwise";
+-  return "???";
++  std::stringstream ack;
++  ack << std::hex << (unsigned)val.value << std::dec;
++  return "??? [" + ack.str() + "]";
+ }
+ 
+ void SdpPacket::AddVal(uint8_t offs, FieldU32 &val) {
+@@ -79,7 +250,9 @@
+       dst -= src;
+     else
+       dst += src;
+-    _packet[dst] = arr[src];
++    if (dst < kPktSize) {
++      _packet[dst] = arr[src];
++    }
+   }
+ }
+ 
+@@ -90,14 +263,17 @@
+   if (kDst >= _req_size)
+     return;
+   for (uint8_t src = 0; src < sz; src++) {
+-    if (msb)
+-      arr[src] = _packet[kDst - src];
+-    else
+-      arr[src] = _packet[kDst + src];
++    uint8_t src_off = kDst + src;
++    if (msb) {
++      src_off = kDst - src;
++    }
++    if (src_off < kPktSize) {
++      arr[src] = _packet[src_off];
++    }
+   }
+ }
+ // class PktStatus
+-PktStatus::PktStatus(): SdpPacket(0x05, 4) {
++PktStatus::PktStatus(): SdpPacket(0x05, 4, 11) {
+ }
+ 
+ PktStatus::~PktStatus() {
+@@ -117,7 +293,7 @@
+   return (resp.value == 0xF0F0F0F0 ? kStop : kError);
+ }
+ // class PktComplete
+-PktComplete::PktComplete(): SdpPacket(0x00, 4) {
++PktComplete::PktComplete(): SdpPacket(0x00, 4, 11) {
+ }
+ 
+ PktComplete::~PktComplete() {
+@@ -154,7 +330,7 @@
+ }
+ 
+ PktWriteMem::PktWriteMem(uint32_t addr, uint32_t data)
+-    : SdpPacket(0x02, 8),
++    : SdpPacket(0x02, 8, 16),
+       _addr(addr),
+       _data(data) {
+ }
+@@ -186,7 +362,7 @@
+ }
+ // class PktReadMem
+ PktReadMem::PktReadMem(uint32_t addr, DataSize size)
+-    : SdpPacket(0x01, 4 + PktWriteMem::GetSizeFor(size)),
++    : SdpPacket(0x01, 4 + PktWriteMem::GetSizeFor(size), 16),
+       _addr(addr),
+       _size(size),
+       _value(0) {
+@@ -223,7 +399,7 @@
+   return (ack.value == kOtherwise ? kStop : kError);
+ }
+ // class PktWriteF
+-PktWriteF::PktWriteF(ImxFirmware *firm): SdpPacket(0x04, 4), _firm(firm) {
++PktWriteF::PktWriteF(ImxFirmware *firm): SdpPacket(0x04, 4, 16), _firm(firm) {
+ }
+ 
+ PktWriteF::~PktWriteF() {
+@@ -268,7 +444,7 @@
+   FieldU32 ack;
+   GetVal(0, ack);
+   std::cout << "\t * Режим загрузки : " << GetAckName(ack) << std::endl;
+-  return (ack.value == kOtherwise ? kContinue : kStop);
++  return (ack.value == kOtherwise ? kContinue : kError);
+ }
+ 
+ bool PktWriteF::Write(boost::asio::serial_port &port) {
+diff -Nua ./regiloader.old/sdp.hpp ./regiloader/sdp.hpp
+--- ./regiloader.old/sdp.hpp	2016-06-27 15:01:17.000000000 +0300
++++ ./regiloader/sdp.hpp	2016-06-27 15:01:43.843876140 +0300
+@@ -5,6 +5,7 @@
+ #include <string>
+ #include <list>
+ #include <boost/asio.hpp>
++#include <boost/scoped_ptr.hpp>
+ #include <boost/scoped_array.hpp>
+ 
+ /**
+@@ -18,6 +19,10 @@
+     SdpPacket(uint8_t cmd, size_t response_sz, size_t request_sz = kPktSize);
+     virtual ~SdpPacket();
+     bool Send(boost::asio::serial_port &port);
++    bool Send(boost::asio::serial_port &port,
++              unsigned                  tries,
++              const std::string        &msg);
++    void ClearSerialInputBuffer(boost::asio::serial_port &port);
+   protected:
+     static const size_t kPktSize = 16;
+ 
+@@ -55,13 +60,45 @@
+     void GetMsbVal(uint8_t offs, FieldU32 &val);
+     void GetVal(uint8_t offs, uint8_t &val);
+   private:
++    typedef boost::asio::deadline_timer Timer;
++    typedef boost::scoped_ptr<Timer>    TimerPtr;
++    
++    struct Session {
++      typedef boost::scoped_ptr<Session> Ptr;
++      
++      Session(boost::asio::serial_port &_port, uint8_t *_out, size_t _out_size);
++      
++      boost::asio::serial_port &port;
++      uint8_t                  *out;
++      size_t                    out_size;
++    };
++  
+     void AddArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb = false);
+     void GetArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb = false);
+-    void Print(std::ostream &out);
+-    FieldU16 _cmd_id;
+-    uint8_t  _packet[kPktSize];
+-    size_t   _resp_size;
+-    size_t   _req_size;
++    void Print(const std::string &pref, std::ostream &out);
++    void HandlerTimeout(const boost::system::error_code &error);
++    void HandlerRead(const boost::system::error_code &error,
++                     std::size_t                      bytes_transferred);
++    void HandlerWrite(const boost::system::error_code &error,
++                      std::size_t                      bytes_transferred);
++    bool ReadArray(boost::asio::serial_port &port,
++                   size_t                    size,
++                   uint8_t                  *out);
++    bool TransferData(boost::asio::serial_port &port);
++    void CreateTimer(boost::asio::io_service &io);
++    void CreateSession(boost::asio::serial_port &port,
++                       uint8_t                  *out,
++                       size_t                    out_size);
++    void DestroySession();
++  
++    Session::Ptr _session;
++    TimerPtr     _timer;
++    FieldU16     _cmd_id;
++    uint8_t      _packet[kPktSize];
++    size_t       _resp_size;
++    size_t       _req_size;
++    bool         _was_read;
++    bool         _timeout;
+ };
+ 
+ class PktStatus : public SdpPacket {
+Общие подкаталоги: ./regiloader.old/.settings и ./regiloader/.settings
+diff -Nua ./regiloader.old/tftp.hpp ./regiloader/tftp.hpp
+--- ./regiloader.old/tftp.hpp	2016-06-27 15:01:17.000000000 +0300
++++ ./regiloader/tftp.hpp	2016-06-27 15:01:43.843876140 +0300
+@@ -223,7 +223,7 @@
+     
+     class Server {
+       public:
+-        static const int kPort = 69;
++        static const int kPort = 6969;
+         
+         Server(const std::string &ip);
+         ~Server();

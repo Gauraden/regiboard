@@ -57,7 +57,7 @@ static bool UploadDCD(boost::asio::serial_port &port, ImxFirmware &firm) {
                     << "\t значение : 0x" << (unsigned)pair_it->val_mask << ";\n"
                     << "\t результат: 0x" << (unsigned)kRegVal << "; "
                     << std::endl;
-          */
+                    */
           continue;
         }
         break;
@@ -571,7 +571,6 @@ static void UpdateListOfPartitions(SerialPort &port) {
 
 static bool UploadUBoot(SerialPort &port, const std::string &file) {
   static const unsigned kMaxTries = 3;
-  PktStatus().ClearSerialInputBuffer(port);
   if (not PktStatus().Send(port, kMaxTries, "Запрос состояния микропроцессора")) {
     return false;
   }
@@ -587,7 +586,6 @@ static bool UploadUBoot(SerialPort &port, const std::string &file) {
   }
   std::cout << "Запуск программы..." << std::endl;
   return PktComplete().Send(port, kMaxTries, "Запуск программы");
-//  return PktStatus().Send(port, kMaxTries, "Запуск программы");
 }
 
 static bool WaitForWelcomeFromUBoot(SerialPort        &port,
@@ -1435,8 +1433,8 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   }
   std::cout << UseColor(kGreen)
             << "Продолжить работу с данным рецептом? (Y/n) + [Enter]: "
-            << UseColor(kReset);
-//            << std::flush;
+            << UseColor(kReset)
+            << std::flush;
   char answer = 0;
   std::cin.get(answer);
   // если ответ - нет
@@ -1501,7 +1499,6 @@ int main(int argc, char **argv) {
   // инициализация COM порта
   boost::asio::io_service io_service;
   boost::asio::serial_port port(io_service, set.tty_dev);
-  InitUart(set, &port);
   // приготовление рецепта
   while (ExecuteRecipe(recipe, set, &srv, &port)) {
     g_sys_inf = SysInfo();
@@ -1513,6 +1510,8 @@ int main(int argc, char **argv) {
               << "\t 4. Подключите провод к разъёму \"debug_uart\""
               << UseColor(kReset)
               << std::endl;
+    port.close();
+    InitUart(set, &port);
   }
   port.close();
   return 0;

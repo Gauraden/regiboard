@@ -22,7 +22,6 @@ class SdpPacket {
     bool Send(boost::asio::serial_port &port,
               unsigned                  tries,
               const std::string        &msg);
-    void ClearSerialInputBuffer(boost::asio::serial_port &port);
   protected:
     static const size_t kPktSize = 16;
 
