@@ -12,6 +12,7 @@ add_executable(regiloader
 	sdp.cpp
 	ymodem.cpp
 	tftp.cpp
+	debug_backtrace.cpp
 )
 
 target_link_libraries(regiloader

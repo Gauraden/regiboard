@@ -5,6 +5,7 @@
 #include <string>
 #include <list>
 #include <boost/asio.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/scoped_array.hpp>
 
 /**
@@ -59,22 +60,45 @@ class SdpPacket {
     void GetMsbVal(uint8_t offs, FieldU32 &val);
     void GetVal(uint8_t offs, uint8_t &val);
   private:
+    typedef boost::asio::deadline_timer Timer;
+    typedef boost::scoped_ptr<Timer>    TimerPtr;
+    
+    struct Session {
+      typedef boost::scoped_ptr<Session> Ptr;
+      
+      Session(boost::asio::serial_port &_port, uint8_t *_out, size_t _out_size);
+      
+      boost::asio::serial_port &port;
+      uint8_t                  *out;
+      size_t                    out_size;
+    };
+  
     void AddArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb = false);
     void GetArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb = false);
     void Print(const std::string &pref, std::ostream &out);
     void HandlerTimeout(const boost::system::error_code &error);
     void HandlerRead(const boost::system::error_code &error,
                      std::size_t                      bytes_transferred);
+    void HandlerWrite(const boost::system::error_code &error,
+                      std::size_t                      bytes_transferred);
     bool ReadArray(boost::asio::serial_port &port,
                    size_t                    size,
                    uint8_t                  *out);
-                     
-    FieldU16 _cmd_id;
-    uint8_t  _packet[kPktSize];
-    size_t   _resp_size;
-    size_t   _req_size;
-    bool     _was_read;
-    bool     _timeout;
+    bool TransferData(boost::asio::serial_port &port);
+    void CreateTimer(boost::asio::io_service &io);
+    void CreateSession(boost::asio::serial_port &port,
+                       uint8_t                  *out,
+                       size_t                    out_size);
+    void DestroySession();
+  
+    Session::Ptr _session;
+    TimerPtr     _timer;
+    FieldU16     _cmd_id;
+    uint8_t      _packet[kPktSize];
+    size_t       _resp_size;
+    size_t       _req_size;
+    bool         _was_read;
+    bool         _timeout;
 };
 
 class PktStatus : public SdpPacket {

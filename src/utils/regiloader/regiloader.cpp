@@ -2,6 +2,7 @@
 #include "sdp.hpp"
 #include "ymodem.hpp"
 #include "tftp.hpp"
+#include "debug_backtrace.hpp"
 #include <iostream>
 #include <sstream>
 #include <list>
@@ -585,8 +586,8 @@ static bool UploadUBoot(SerialPort &port, const std::string &file) {
     return false;
   }
   std::cout << "Запуск программы..." << std::endl;
-  PktStatus().Send(port, kMaxTries, "Запуск программы");
-  return true;
+  return PktComplete().Send(port, kMaxTries, "Запуск программы");
+//  return PktStatus().Send(port, kMaxTries, "Запуск программы");
 }
 
 static bool WaitForWelcomeFromUBoot(SerialPort        &port,
@@ -1406,8 +1407,6 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   if (srv == 0 || port == 0) {
     return false;
   }
-  // включение режима автоматической синхронизации данных выходного потока
-  //std::cout << std::unitbuf;
   PrintDelimiter("\n", "Для выполнения рецепта", 80);
   std::cout << UseColor(kGreen)
             << "\t 1. Подайте напряжение на плату\n"
@@ -1447,8 +1446,23 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   return true;
 }
 
+static void KernelSignalCatcher(int sig_num) {
+  switch (sig_num) {
+    case SIGSEGV: {
+      //debug::Backtrace bt;
+      //bt.KeepStack();
+      //bt.PrintStackTo(&std::cout);
+      break;
+    }
+    default:
+      std::cout << "Получен неизвестный сигнал: " << sig_num << std::endl;
+      break;
+  };
+}
+
 int main(int argc, char **argv) {
   Settings set;
+  signal(SIGSEGV, KernelSignalCatcher);
   if (not ParseArgs(argc, argv, set)) {
     return 0;
   }
@@ -1499,8 +1513,6 @@ int main(int argc, char **argv) {
               << "\t 4. Подключите провод к разъёму \"debug_uart\""
               << UseColor(kReset)
               << std::endl;
-    port.close();
-    InitUart(set, &port);
   }
   port.close();
   return 0;

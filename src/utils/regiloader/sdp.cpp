@@ -4,8 +4,17 @@
 #include <boost/asio/basic_deadline_timer.hpp>
 #include <boost/bind.hpp>
 
+SdpPacket::Session::Session(boost::asio::serial_port &_port,
+                            uint8_t                  *_out,
+                            size_t                    _out_size)
+    : port(_port),
+      out(_out),
+      out_size(_out_size) {
+}
+
 SdpPacket::SdpPacket(uint8_t cmd, size_t response_sz, size_t request_sz)
-    : _resp_size(response_sz), _req_size(request_sz) {
+    : _resp_size(response_sz),
+      _req_size(11) {
   _cmd_id.value = (uint16_t)((cmd << 8) | cmd);
   if (_resp_size > kPktSize)
     _resp_size = kPktSize;
@@ -24,13 +33,77 @@ void SdpPacket::Print(const std::string &pref, std::ostream &out) {
 
 void SdpPacket::HandlerRead(const boost::system::error_code &error,
                             std::size_t                      bytes_transferred) {
-//  Print("Прочитан ответ", std::cout); // for DEBUG
   _was_read = (bytes_transferred == _resp_size);
+  if (_was_read && _timer) {
+    _timer->cancel();
+  }
+}
+
+void SdpPacket::HandlerWrite(const boost::system::error_code &error,
+                             std::size_t                      bytes_transferred) {
+  if (not _session || error) {
+    _timer->cancel();
+    _timeout = true;
+    return;
+  }
+  if (not ReadArray(_session->port, _session->out_size, _session->out)) {
+    _timer->cancel();
+    _timeout = true;
+  }
 }
 
 void SdpPacket::HandlerTimeout(const boost::system::error_code &error) {
+  const bool exp = _timer->expires_at() <= boost::asio::deadline_timer::traits_type::now();
+//  std::cout << "Timeout handler: " << exp << std::endl;
+  if (not error && exp) {
+    _timeout = true;
+    if (_session) {
+      std::cout << "TIMEOUT" << std::endl;
+      _session->port.cancel();
+    }
+  }
+}
+
+void SdpPacket::CreateTimer(boost::asio::io_service &io) {
+  const unsigned kTimeOutMSec = 100;
+  if (not _timer) {
+    _timer.reset(new Timer(io));
+  }
+  _timer->expires_from_now(boost::posix_time::milliseconds(kTimeOutMSec));
+  _timer->async_wait(
+    boost::bind(&SdpPacket::HandlerTimeout,
+      this,
+      boost::asio::placeholders::error));
+}
+
+void SdpPacket::CreateSession(boost::asio::serial_port &port,
+                   uint8_t                  *out,
+                   size_t                    out_size) {
+  _session.reset(new Session(port, out, out_size));
+}
+
+void SdpPacket::DestroySession() {
+  _session.reset(0);
+}
+
+bool SdpPacket::TransferData(boost::asio::serial_port &port) {
+  boost::asio::io_service &io = port.get_io_service();
   _was_read = false;
-  _timeout  = true;
+  _timeout  = false;
+  do {
+    io.run();
+    io.reset();
+  } while (not _was_read && not _timeout);
+
+  if (_was_read && _session) {
+    std::cout << "READ: ";
+    for (unsigned i = 0; i < _session->out_size; i++) {
+      std::cout << std::hex << std::setw(2) << (unsigned)_session->out[i] << "|" << std::dec;  
+    }
+    std::cout << std::endl;
+  }
+  
+  return (_was_read && not _timeout);
 }
 
 bool SdpPacket::ReadArray(boost::asio::serial_port &port,
@@ -39,71 +112,75 @@ bool SdpPacket::ReadArray(boost::asio::serial_port &port,
   if (out == 0 || size == 0) {
     return false;
   }
+  if (size > kPktSize) {
+    size = kPktSize;
+  }
   memset(out, 0, size);
-  const unsigned kTimeOutSec = 1;
-  boost::asio::deadline_timer timer(port.get_io_service());
-  timer.expires_from_now(boost::posix_time::seconds(kTimeOutSec));
-  timer.async_wait(
-    boost::bind(&SdpPacket::HandlerTimeout,
-      this,
-      boost::asio::placeholders::error));
-  boost::asio::async_read(port, boost::asio::buffer(out, size),
+  port.async_read_some(boost::asio::buffer(out, size),
     boost::bind(&SdpPacket::HandlerRead,
       this,
       boost::asio::placeholders::error,
       boost::asio::placeholders::bytes_transferred));
-  _was_read = false;
-  _timeout  = false;
-  do {
-    port.get_io_service().run_one();
-    port.get_io_service().reset();
-  } while (not _was_read && not _timeout);
-  if (_timeout) {
-    port.cancel();
-  }
-  return (_was_read && not _timeout);
+  CreateTimer(port.get_io_service());
+  return true;
 }
 
 void SdpPacket::ClearSerialInputBuffer(boost::asio::serial_port &port) {
+/*
   uint8_t garbage[kPktSize];
-  while (ReadArray(port, kPktSize, garbage)) {
-    /*
-    std::cout << "garbage: ";
-    for (unsigned i = 0; i < kPktSize; i++) {
-      std::cout << std::hex << std::setw(2) << (unsigned)garbage[i] << "|" << std::dec;  
-    }
-    std::cout << std::endl;
-    */
-  };
+  CreateSession(port, garbage, kPktSize);
+  while (ReadArray(port, kPktSize, garbage) && TransferData(port));
+  */
 }
 
 bool SdpPacket::Send(boost::asio::serial_port &port) {
+/*
+  memset(_packet, 0, kPktSize);
+  if (not Write()) {
+    return false;
+  }
+  AddArr(0, _cmd_id.bytes, 2);
+  Print("SEND: ", std::cout); // for DEBUG
+  boost::asio::write(port, boost::asio::buffer(_packet, _req_size));
+  boost::asio::read (port, boost::asio::buffer(_packet, _resp_size));
+  Print("RECV: ", std::cout); // for DEBUG
+  const Transfer kAct = Read();
+  if (kAct == kContinue) {
+    return Write(port);
+  }
+  return (kAct == kStop);
+  */
+  if (not port.is_open()) {
+    std::cout << "Невозможно осуществить передачу данных, т.к. порт закрыт!" << std::endl;
+    return false;
+  }
   memset(_packet, 0, kPktSize);
   if (not Write()) {
     return false;
   }
   AddArr(0, _cmd_id.bytes, 2);
   // ожидание данных с тайм-аутом
-  const unsigned kMaxAmountOfTries = 3;
+  uint8_t rcv_packet[kPktSize];
+  CreateSession(port, rcv_packet, _resp_size);
+  const unsigned kMaxAmountOfTries = 4;
   unsigned try_num = 1;
   for (; try_num <= kMaxAmountOfTries; try_num++) {
-    std::cout << "\r\033[K"
-              << "Попытка отправки команды " << try_num << " ..." << std::flush;
-    boost::asio::write(port, boost::asio::buffer(_packet, _req_size));
-    uint8_t rcv_packet[kPktSize];
-    if (ReadArray(port, _resp_size, rcv_packet)) {
+//   std::cout << "\r\033[K"
+//             << "Попытка отправки команды " << try_num << " ..." << std::flush;    
+    port.async_write_some(boost::asio::buffer(_packet, _req_size), 
+      boost::bind(&SdpPacket::HandlerWrite,
+        this,
+        boost::asio::placeholders::error,
+        boost::asio::placeholders::bytes_transferred));
+    //CreateTimer(port.get_io_service());
+    memset(rcv_packet, 0, kPktSize);
+    if (TransferData(port)) {
       memcpy(_packet, rcv_packet, kPktSize);
-      /*
-      std::cout << "READ: ";
-      for (unsigned i = 0; i < _resp_size; i++) {
-        std::cout << std::hex << std::setw(2) << (unsigned)rcv_packet[i] << "|" << std::dec;  
-      }
-      std::cout << std::endl;
-      */
-      break;
+      break;    
     }
   }
-  std::cout << "\r\033[K";
+  DestroySession();
+  //std::cout << "\r\033[K";
   if (try_num > kMaxAmountOfTries) {
     return false;  
   }
@@ -120,7 +197,9 @@ bool SdpPacket::Send(boost::asio::serial_port &port,
   const unsigned kMaxTries = tries;
   while (tries > 0 && not Send(port)) {
     tries--;
-    std::cout << msg << ", попытка № " << (kMaxTries - tries + 1) << std::endl;
+    if (tries > 0) {
+      std::cout << msg << ", попытка № " << (kMaxTries - tries + 1) << std::endl;
+    }
   }
   return (tries > 0);
 }
@@ -194,7 +273,7 @@ void SdpPacket::GetArr(uint8_t offs, uint8_t *arr, size_t sz, bool msb) {
   }
 }
 // class PktStatus
-PktStatus::PktStatus(): SdpPacket(0x05, 4) {
+PktStatus::PktStatus(): SdpPacket(0x05, 4, 11) {
 }
 
 PktStatus::~PktStatus() {
@@ -214,7 +293,7 @@ SdpPacket::Transfer PktStatus::Read() {
   return (resp.value == 0xF0F0F0F0 ? kStop : kError);
 }
 // class PktComplete
-PktComplete::PktComplete(): SdpPacket(0x00, 4) {
+PktComplete::PktComplete(): SdpPacket(0x00, 4, 11) {
 }
 
 PktComplete::~PktComplete() {
@@ -251,7 +330,7 @@ size_t PktWriteMem::GetSizeFor(DataSize sz_id) {
 }
 
 PktWriteMem::PktWriteMem(uint32_t addr, uint32_t data)
-    : SdpPacket(0x02, 8),
+    : SdpPacket(0x02, 8, 16),
       _addr(addr),
       _data(data) {
 }
@@ -283,7 +362,7 @@ SdpPacket::Transfer PktWriteMem::Read() {
 }
 // class PktReadMem
 PktReadMem::PktReadMem(uint32_t addr, DataSize size)
-    : SdpPacket(0x01, 4 + PktWriteMem::GetSizeFor(size)),
+    : SdpPacket(0x01, 4 + PktWriteMem::GetSizeFor(size), 16),
       _addr(addr),
       _size(size),
       _value(0) {
@@ -320,7 +399,7 @@ SdpPacket::Transfer PktReadMem::Read() {
   return (ack.value == kOtherwise ? kStop : kError);
 }
 // class PktWriteF
-PktWriteF::PktWriteF(ImxFirmware *firm): SdpPacket(0x04, 4), _firm(firm) {
+PktWriteF::PktWriteF(ImxFirmware *firm): SdpPacket(0x04, 4, 16), _firm(firm) {
 }
 
 PktWriteF::~PktWriteF() {
