@@ -134,22 +134,21 @@ void SdpPacket::ClearSerialInputBuffer(boost::asio::serial_port &port) {
 }
 
 bool SdpPacket::Send(boost::asio::serial_port &port) {
-/*
   memset(_packet, 0, kPktSize);
   if (not Write()) {
     return false;
   }
   AddArr(0, _cmd_id.bytes, 2);
-  Print("SEND: ", std::cout); // for DEBUG
+//  Print("SEND: ", std::cout); // for DEBUG
   boost::asio::write(port, boost::asio::buffer(_packet, _req_size));
   boost::asio::read (port, boost::asio::buffer(_packet, _resp_size));
-  Print("RECV: ", std::cout); // for DEBUG
+//  Print("RECV: ", std::cout); // for DEBUG
   const Transfer kAct = Read();
   if (kAct == kContinue) {
     return Write(port);
   }
   return (kAct == kStop);
-  */
+  /*
   if (not port.is_open()) {
     std::cout << "Невозможно осуществить передачу данных, т.к. порт закрыт!" << std::endl;
     return false;
@@ -189,6 +188,7 @@ bool SdpPacket::Send(boost::asio::serial_port &port) {
     return Write(port);
   }
   return (kAct == kStop);
+  */
 }
 
 bool SdpPacket::Send(boost::asio::serial_port &port,

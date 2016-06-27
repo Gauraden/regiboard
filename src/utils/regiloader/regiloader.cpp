@@ -1435,8 +1435,8 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   }
   std::cout << UseColor(kGreen)
             << "Продолжить работу с данным рецептом? (Y/n) + [Enter]: "
-            << UseColor(kReset)
-            << std::flush;
+            << UseColor(kReset);
+//            << std::flush;
   char answer = 0;
   std::cin.get(answer);
   // если ответ - нет
