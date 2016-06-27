@@ -588,12 +588,12 @@ static bool UploadUBoot(SerialPort &port, const std::string &file) {
   return PktComplete().Send(port, kMaxTries, "Запуск программы");
 }
 
+static bool already_has_been = false;
+
 static bool WaitForWelcomeFromUBoot(SerialPort        &port,
                                     SysInfo           *inf,
                                     const std::string &pswd) {
-  static bool already_has_been = false;
   if (already_has_been && not inf->wait_for_reboot) {
-    already_has_been = false;
     return true;
   }
   const bool kHasGot = ParseUntil(port, "Hit any key to stop autoboot", inf);
@@ -640,6 +640,7 @@ static bool UploadKernelBegin(SerialPort       &port,
   if (inf == 0 || not WaitForWelcomeFromUBoot(port, inf, pswd)) {
     return false;
   }
+  already_has_been = false;
   if (not inf->boot_from_nand) {
     // Убираем имя монтируемого устройства, для предотвращения загрузки с nand.
     // Таким образом загрузка всегда будет останавливаться на initramfs
