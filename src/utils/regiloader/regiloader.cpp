@@ -131,7 +131,9 @@ struct PeripheralsInfo {
 };
 
 struct SysInfo {
-  SysInfo(): wait_for_reboot(false), upload_fail(false), boot_from_nand(false) {}
+  SysInfo(): wait_for_reboot(false),
+             upload_fail(false),
+             boot_from_nand(false) {}
 
   std::string     board;
   std::string     u_boot_build;
@@ -260,6 +262,26 @@ private:
 };
 
 static SysState g_sys_state;
+
+struct Settings {
+  struct Network {
+    std::string ip;
+    std::string mask;
+    std::string port;
+  };
+
+  std::string tty_dev;
+  std::string imx_img;
+  std::string kernel_img;
+  std::string rootfs_img;
+  std::string mtd_utils;
+  std::string acts;
+  std::string packets;
+  std::string config;
+  std::string rbf;
+  std::string uboot_pswd;
+  Network     use_tftp;
+};
 
 static std::string GetTime() {
   namespace pt = boost::posix_time;
@@ -722,12 +744,12 @@ static bool UploadKernelWithOldSys(SerialPort        &port,
   return UploadKernelOverEth(port, srv, pswd);
 }
 
-static bool DownloadFromTFtp(const std::string &tftpd_ip,
-                             const std::string &request,
-                             const std::string &path,
-                             SerialPort        &port,
-                             TFtp::Server      *srv) {
-  if (srv == 0 || tftpd_ip.size() == 0 || request.size() == 0 ||
+static bool DownloadFromTFtp(const Settings::Network &tftpd,
+                             const std::string       &request,
+                             const std::string       &path,
+                             SerialPort              &port,
+                             TFtp::Server            *srv) {
+  if (srv == 0 || tftpd.ip.size() == 0 || request.size() == 0 ||
       path.size() == 0) {
     return false;
   }
@@ -738,23 +760,24 @@ static bool DownloadFromTFtp(const std::string &tftpd_ip,
     SendToShell(port, "udhcpc", &g_sys_inf);
     std::cout << "\t HW: " << kHwAddr            << std::endl
               << "\t IP: " << g_sys_inf.board_ip << std::endl;
-    SendToShell(port, "ifconfig eth0 " + g_sys_inf.board_ip, 0);
+    const std::string kMask(tftpd.mask.size() > 0 ? "netmask " + tftpd.mask : "");
+    SendToShell(port, "ifconfig eth0 " + g_sys_inf.board_ip + kMask, 0);
     eth_is_ready = true;
   }
-  SendCmd(port, "tftp -l " + path + " -g -r " + request + " " + tftpd_ip);
+  SendCmd(port, "tftp -l " + path + " -g -r " + request + " " + tftpd.ip + ":" + tftpd.port);
   const bool kRunRes = srv->Run();
   ParseUntil(port, g_shell_prompt, 0);
   return kRunRes;
 }
 
-static bool UploadRootFsOverEth(const std::string &tftpd_ip,
-                                SerialPort        &port,
-                                TFtp::Server      *srv) {
+static bool UploadRootFsOverEth(const Settings::Network &tftpd,
+                                SerialPort              &port,
+                                TFtp::Server            *srv) {
   if (srv == 0) {
     return false;
   }
   std::cout << "Загрузка архива rootfs..." << std::endl;
-  return DownloadFromTFtp(tftpd_ip, kRootFsImg, kRootFsTar, port, srv);
+  return DownloadFromTFtp(tftpd, kRootFsImg, kRootFsTar, port, srv);
 }
 
 static bool MkUbiFsPartition(SerialPort        &port,
@@ -816,15 +839,15 @@ static bool UnpackRootFs(SerialPort &port) {
   return true;
 }
 
-static bool UploadAndInstallTools(const std::string &tftpd_ip,
-                                  SerialPort        &port,
-                                  TFtp::Server      *srv) {
-  if (srv == 0 || tftpd_ip.size() == 0) {
+static bool UploadAndInstallTools(const Settings::Network &tftpd,
+                                  SerialPort              &port,
+                                  TFtp::Server            *srv) {
+  if (srv == 0 || tftpd.ip.size() == 0) {
     return false;
   }
   static const std::string kPathGz("/tmp/" + kMtdUtils);
   std::cout << "Загрузка специальных утилит..." << std::endl;
-  if (not DownloadFromTFtp(tftpd_ip, kMtdUtils, kPathGz, port, srv)) {
+  if (not DownloadFromTFtp(tftpd, kMtdUtils, kPathGz, port, srv)) {
     return false;
   }
   std::cout << "Установка специальных утилит..." << std::endl;
@@ -834,15 +857,15 @@ static bool UploadAndInstallTools(const std::string &tftpd_ip,
   return true;
 }
 
-static bool UploadAndInstallKernel(const std::string &tftpd_ip,
-                                   SerialPort        &port,
-                                   TFtp::Server      *srv) {
-  if (srv == 0 || tftpd_ip.size() == 0) {
+static bool UploadAndInstallKernel(const Settings::Network &tftpd,
+                                   SerialPort              &port,
+                                   TFtp::Server            *srv) {
+  if (srv == 0 || tftpd.ip.size() == 0) {
     return false;
   }
   static const std::string kPath("/tmp/" + kKernelImg);
   std::cout << "Загрузка ядра Linux..." << std::endl;
-  if (not DownloadFromTFtp(tftpd_ip, kKernelImg, kPath, port, srv)) {
+  if (not DownloadFromTFtp(tftpd, kKernelImg, kPath, port, srv)) {
     return false;
   }
   std::cout << "Установка ядра Linux..." << std::endl;
@@ -864,15 +887,15 @@ static bool UploadAndInstallKernel(const std::string &tftpd_ip,
   return true;
 }
 
-static bool UploadAndInstallUBoot(const std::string &tftpd_ip,
-                                  SerialPort        &port,
-                                  TFtp::Server      *srv) {
-  if (srv == 0 || tftpd_ip.size() == 0) {
+static bool UploadAndInstallUBoot(const Settings::Network &tftpd,
+                                  SerialPort              &port,
+                                  TFtp::Server            *srv) {
+  if (srv == 0 || tftpd.ip.size() == 0) {
     return false;
   }
   static const std::string kPath("/tmp/" + kUBootImg + ".bin");
   std::cout << "Загрузка U-Boot..." << std::endl;
-  if (not DownloadFromTFtp(tftpd_ip, kUBootImg + ".bin", kPath, port, srv)) {
+  if (not DownloadFromTFtp(tftpd, kUBootImg + ".bin", kPath, port, srv)) {
     return false;
   }
   std::cout << "Установка U-Boot..." << std::endl;
@@ -898,13 +921,13 @@ static bool UploadAndInstallUBoot(const std::string &tftpd_ip,
   return true;
 }
 
-static bool UploadAndInstallPacket(const std::string &tftpd_ip,
-                                   const std::string &ipk_name,
-                                   SerialPort        &port,
-                                   TFtp::Server      *srv) {
+static bool UploadAndInstallPacket(const Settings::Network &tftpd,
+                                   const std::string       &ipk_name,
+                                   SerialPort              &port,
+                                   TFtp::Server            *srv) {
   const std::string kPath("/tmp/" + ipk_name);
   std::cout << "Загрузка пакета <" << ipk_name << ">..." << std::endl;
-  if (not DownloadFromTFtp(tftpd_ip, ipk_name, kPath, port, srv)) {
+  if (not DownloadFromTFtp(tftpd, ipk_name, kPath, port, srv)) {
     return false;
   }
   std::cout << "Установка пакета <" << ipk_name << ">..." << std::endl;
@@ -912,12 +935,12 @@ static bool UploadAndInstallPacket(const std::string &tftpd_ip,
   return true;
 }
 
-static bool SetupRegigrafLicense(const std::string &tftpd_ip,
-                                 const std::string &path,
-                                 SerialPort        &port,
-                                 TFtp::Server      *srv) {
+static bool SetupRegigrafLicense(const Settings::Network &tftpd,
+                                 const std::string       &path,
+                                 SerialPort              &port,
+                                 TFtp::Server            *srv) {
   std::cout << "Загрузка лицензии..." << std::endl;
-  if (not DownloadFromTFtp(tftpd_ip, kRegigrafLicense, path + kRegigrafLicense, 
+  if (not DownloadFromTFtp(tftpd, kRegigrafLicense, path + kRegigrafLicense, 
       port, srv)) {
     return false;
   }
@@ -938,9 +961,9 @@ static bool LoginToRegiboard(SerialPort &port) {
   return true;
 }
 
-static bool UploadAndInstallRegigraf(const std::string &tftpd_ip,
-                                     SerialPort        &port,
-                                     TFtp::Server      *srv) {
+static bool UploadAndInstallRegigraf(const Settings::Network &tftpd,
+                                     SerialPort              &port,
+                                     TFtp::Server            *srv) {
   std::cout << "Смена корневого раздела" << std::endl;
   SendToShell(port, "mount -t ubifs ubi0:rootfs /mnt", 0);
   SendToShell(port, "mount --move /sys  /mnt/sys",  0);
@@ -953,21 +976,21 @@ static bool UploadAndInstallRegigraf(const std::string &tftpd_ip,
   LoginToRegiboard(port);
   std::cout << "Установка пакетов" << std::endl;
   SendToShell(port, "mount -t ubifs ubi1:storage /home", 0);
-  UploadAndInstallPacket(tftpd_ip, "++DFB.ipk",     port, srv);
-  UploadAndInstallPacket(tftpd_ip, "regirfb.ipk",   port, srv);
-  UploadAndInstallPacket(tftpd_ip, "regisetup.ipk", port, srv);
-  UploadAndInstallPacket(tftpd_ip, kRegigrafIpk,    port, srv);
+  UploadAndInstallPacket(tftpd, "++DFB.ipk",     port, srv);
+  UploadAndInstallPacket(tftpd, "regirfb.ipk",   port, srv);
+  UploadAndInstallPacket(tftpd, "regisetup.ipk", port, srv);
+  UploadAndInstallPacket(tftpd, kRegigrafIpk,    port, srv);
   UpdateListOfPackets(port);
   // установка лицензии
-  return SetupRegigrafLicense(tftpd_ip, "/home/regigraf/", port, srv);
+  return SetupRegigrafLicense(tftpd, "/home/regigraf/", port, srv);
 }
 
-static bool UploadAndInstallFirmware(const std::string &tftpd_ip,
-                                     SerialPort        &port,
-                                     TFtp::Server      *srv) {
+static bool UploadAndInstallFirmware(const Settings::Network &tftpd,
+                                     SerialPort              &port,
+                                     TFtp::Server            *srv) {
   std::cout << "Загрузка файла прошивки" << std::endl;
   const std::string kPath("/tmp/" + kRbfName);
-  if (not DownloadFromTFtp(tftpd_ip, kRbfName, kPath, port, srv)) {
+  if (not DownloadFromTFtp(tftpd, kRbfName, kPath, port, srv)) {
     return false;
   }
   std::cout << "Установка прошивки" << std::endl;
@@ -1002,6 +1025,7 @@ static bool RegisterBoard(SerialPort &port) {
   g_sys_state.device++;
   g_sys_state.CheckBatchCapacity();
   g_sys_state.Save();
+  
   return true;
 }
 
@@ -1032,9 +1056,9 @@ static bool ValidateHardware(SerialPort &port) {
   check_res &= CompareValues<std::string>("AT45DB321x",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)");
   check_res &= CompareValues<std::string>("1 GiB",  g_sys_inf.nand_size, "неверный объём ПЗУ (NAND)");
   check_res &= CompareValues<std::string>("MT29F8G08ABABA",  g_sys_inf.nand, "неверная модель ПЗУ (NAND)");
-  check_res &= CompareValues<std::string>("FEC0", g_sys_inf.eth, "необнаружен контроллер Ethernet");
-  check_res &= CompareValues<std::string>("ADS7843", g_sys_inf.kernel.ts, "необнаружен контроллер сенсорного экрана");
-  check_res &= CompareValues<std::string>("ds3231", g_sys_inf.kernel.rtc, "необнаружены часы реального времени");
+  check_res &= CompareValues<std::string>("FEC0", g_sys_inf.eth, "не обнаружен контроллер Ethernet");
+  check_res &= CompareValues<std::string>("ADS7843", g_sys_inf.kernel.ts, "не обнаружен контроллер сенсорного экрана");
+  check_res &= CompareValues<std::string>("ds3231", g_sys_inf.kernel.rtc, "не обнаружены часы реального времени");
     
   check_res &= CompareValues<unsigned>(3, g_sys_inf.kernel.spi.size(), "неверное количество SPI шин");
   check_res &= CompareValues<unsigned>(5, g_sys_inf.kernel.uarts.size(), "неверное количество шин UART");
@@ -1044,7 +1068,7 @@ static bool ValidateHardware(SerialPort &port) {
     std::cout << "\t * Все устройства обнаружены!"
               << std::endl;
   }
-  return true;
+  return check_res;
 }
  
 static bool TestHardware(SerialPort &port) {
@@ -1055,27 +1079,13 @@ static bool TestHardware(SerialPort &port) {
   return true;
 }
 
-struct Settings {
-  std::string tty_dev;
-  std::string imx_img;
-  std::string kernel_img;
-  std::string rootfs_img;
-  std::string mtd_utils;
-  std::string use_tftp;
-  std::string acts;
-  std::string packets;
-  std::string config;
-  std::string rbf;
-  std::string uboot_pswd;
-};
-
 static bool ParseArgs(int argc, char **argv, Settings &set) {
   namespace po = boost::program_options;
   po::options_description desc("Программа загрузки плат Regiboard через COM/Ethernet порты.");
 	desc.add_options()
 		("help", "описание аргументов.")
 		("tty",  po::value<std::string>()->default_value("/dev/" + kTtyDev),
-             "путь к устройству COM.")
+             "путь к устройству последовательного порта (COM).")
 		("img",  po::value<std::string>()->default_value(kUBootImg),
              "путь к образу загрузчика u-boot. Указывать необходимо путь + имя "
              "файла, но без разширения! В указанном месте должны располагаться "
@@ -1111,18 +1121,26 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
 	  std::cout << desc << std::endl;
 	  return false;
 	}
+  g_sys_state.verbose = vm["verbose"].as<bool>();
 	set.tty_dev    = vm["tty"].as<std::string>();
 	set.imx_img    = vm["img"].as<std::string>();
   set.kernel_img = vm["kernel"].as<std::string>();
   set.rootfs_img = vm["rootfs"].as<std::string>();
-  set.use_tftp   = vm["tftp"].as<std::string>();
   set.mtd_utils  = vm["utils"].as<std::string>();
   set.acts       = vm["acts"].as<std::string>();
   set.packets    = vm["packets"].as<std::string>();
   set.config     = vm["conf"].as<std::string>();
   set.rbf        = vm["rbf"].as<std::string>();
   set.uboot_pswd = vm["uboot_pswd"].as<std::string>();
-  g_sys_state.verbose = vm["verbose"].as<bool>();
+  
+  const std::string kTFtpArg  = vm["tftp"].as<std::string>();
+  const size_t      kDelimOff = kTFtpArg.find_first_of("/");
+  std::stringstream tftp_port;
+  tftp_port << (unsigned)TFtp::Server::kPort;
+  
+  set.use_tftp.ip   = kTFtpArg.substr(0, kDelimOff);
+  set.use_tftp.mask = kTFtpArg.substr(kDelimOff);
+  set.use_tftp.port = tftp_port.str();
 	return true;
 }
 
@@ -1292,8 +1310,6 @@ static bool DoAction(const Settings           &set,
   if (srv == 0 || port == 0) {
     return false;
   }
-  std::stringstream tftp_args;
-  tftp_args << set.use_tftp << ":" << (unsigned)TFtp::Server::kPort;
   switch (kActions.Identify(act).id) {
     case RecipeAct::kUBoot:
       return UploadUBoot(*port, set.imx_img + ".imx");
@@ -1314,7 +1330,7 @@ static bool DoAction(const Settings           &set,
       }
       break;
     case RecipeAct::kKernelEth:
-      if (set.kernel_img.size() > 0 && set.use_tftp.size() > 0) {
+      if (set.kernel_img.size() > 0 && set.use_tftp.ip.size() > 0) {
         return UploadKernelOverEth(*port, srv, set.uboot_pswd);
       }
       break;
@@ -1323,29 +1339,29 @@ static bool DoAction(const Settings           &set,
     case RecipeAct::kKernelOldSys:
       return UploadKernelWithOldSys(*port, srv, set.uboot_pswd);
     case RecipeAct::kRootFs:
-      if (set.rootfs_img.size() > 0 && tftp_args.str().size() > 0) {
-        return UploadRootFsOverEth(tftp_args.str(), *port, srv);
+      if (set.rootfs_img.size() > 0 && set.use_tftp.ip.size() > 0) {
+        return UploadRootFsOverEth(set.use_tftp, *port, srv);
       }
       break;
     case RecipeAct::kMtdUtils:
-      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
-        return UploadAndInstallTools(tftp_args.str(), *port, srv);
+      if (set.mtd_utils.size() > 0 && set.use_tftp.ip.size() > 0) {
+        return UploadAndInstallTools(set.use_tftp, *port, srv);
       }
     case RecipeAct::kInstallKernel:
-      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
-        return UploadAndInstallKernel(tftp_args.str(), *port, srv);
+      if (set.mtd_utils.size() > 0 && set.use_tftp.ip.size() > 0) {
+        return UploadAndInstallKernel(set.use_tftp, *port, srv);
       }
     case RecipeAct::kInstallUBoot:
-      if (set.mtd_utils.size() > 0 && tftp_args.str().size() > 0) {
-        return UploadAndInstallUBoot(tftp_args.str(), *port, srv);
+      if (set.mtd_utils.size() > 0 && set.use_tftp.ip.size() > 0) {
+        return UploadAndInstallUBoot(set.use_tftp, *port, srv);
       }
     case RecipeAct::kInstallRegigraf:
-      if (tftp_args.str().size() > 0) {
-        return UploadAndInstallRegigraf(tftp_args.str(), *port, srv);
+      if (set.use_tftp.ip.size() > 0) {
+        return UploadAndInstallRegigraf(set.use_tftp, *port, srv);
       }
     case RecipeAct::kInstallFirmware:
-      if (tftp_args.str().size() > 0) {
-        return UploadAndInstallFirmware(tftp_args.str(), *port, srv);
+      if (set.use_tftp.ip.size() > 0) {
+        return UploadAndInstallFirmware(set.use_tftp, *port, srv);
       }      
     case RecipeAct::kUnpackRootFs:
       if (set.rootfs_img.size() > 0) {
@@ -1431,6 +1447,9 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   // вывод общей информации
   if (not recipe_fail) {
     PrintSysInfo(g_sys_inf);
+    std::cout << "Для контроля работоспособности ПО Regigraf, воспользуйтесь ссылкой: "
+              << "http://" << g_sys_inf.board_ip
+              << std::endl;
   }
   std::cout << UseColor(kGreen)
             << "Продолжить работу с данным рецептом? (Y/n) + [Enter]: "
@@ -1489,7 +1508,7 @@ int main(int argc, char **argv) {
     found += 2;
   } while (1);
   // инициализация сервера TFTP
-  TFtp::Server srv(set.use_tftp);
+  TFtp::Server srv(set.use_tftp.ip);
   srv.PublishFile(kUBootImg + ".bin", set.imx_img + ".bin");
   srv.PublishFile(kKernelImg, set.kernel_img);
   srv.PublishFile(kRootFsImg, set.rootfs_img);

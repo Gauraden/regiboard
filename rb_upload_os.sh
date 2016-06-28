@@ -2,7 +2,7 @@
 
 . ./.config
 
-RECIPE=${1:-"Default"}
+RECIPE=${1:-"Help"}
 TTY_USB=${2:-/dev/ttyUSB0}
 REGILOADER="bin/regiloader"
 IMG_UBOOT="output/uboot/u-boot.regigraf.imx53"
@@ -13,75 +13,92 @@ IMG_RBF="cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf"
 IMG_RBF_PATH="tmp/"
 IMG_RBF_URL="ftp://jenny/firmwares/F1772/${IMG_RBF}"
 
-HOST_IP=$(ifconfig | grep -oE "inet([^0-9]+)192.([0-9\.]+)")
-HOST_IP=$(echo $HOST_IP | grep -oE "([0-9\.]+)")
+HOST_IP=$(ifconfig | grep -oE "(inet |inet addr:)192.([0-9\.]+)(.+)(netmask |Mask:)([0-9\.]+)")
+HOST_MASK=$(echo $HOST_IP | grep -oE "(netmask |Mask:)([0-9\.]+)" | grep -oE "([0-9\.]+)")
+HOST_IP=$(echo $HOST_IP | grep -oE "(inet |inet addr:)([0-9\.]+)" | grep -oE "([0-9\.]+)")
 
 RUN="$REGILOADER --tty ${TTY_USB} --img ${IMG_UBOOT} --kernel ${IMG_KERNEL}
---tftp ${HOST_IP} --rootfs ${IMG_ROOTFS} --utils ${IMG_MTD_UTILS} --conf ./tmp
+--tftp ${HOST_IP}/${HOST_MASK} --rootfs ${IMG_ROOTFS} --utils ${IMG_MTD_UTILS} --conf ./tmp
 --rbf ${IMG_RBF_PATH}${IMG_RBF} --uboot_pswd ${UBOOT_PSWD} ${RBUP_EXT_OPTS}"
 
-function RecipeBootloader() {
+function RecipeBootloader() { # загрузка, запуск и вход в UBoot
   ${RUN} --acts "uboot->enter_uboot"
 }
 
-function RecipeSetupNor() {
+function RecipeSetupNor() { # загрузка UBoot и подготовка NOR
   ${RUN} --acts "uboot->setup_nor"
 }
 
-function RecipeBootOverUart() {
+function RecipeBootOverUart() { # загрузка ядра Linux через UART
   ${RUN} --acts "uboot->kernel_uart"
 }
 
-function RecipeBootOverEth() {
+function RecipeBootOverEth() { # загрузка ядра Linux через Ethernet
   ${RUN} --acts "uboot->kernel_eth"
 }
 
-function RecipeBootOverEthAndDebugKernel() {
+function RecipeBootOverEthAndDebugKernel() { # загрузка ядра Linux в отладочном режиме
   ${RUN} --acts "uboot->kernel_dbg"
 }
 
-function RecipeBootOverEthAndWithOldSys() {
+function RecipeBootOverEthAndWithOldSys() { # загрузка нового ядра Linux в старом окружении
   ${RUN} --acts "uboot->kernel_old_sys"
 }
 
-function RecipeBootWithSpecTools() {
+function RecipeBootWithSpecTools() { # загрузка ядра Linux и установка служебных утилит
   ${RUN} --acts "uboot->kernel_eth->mtd_utils"
 }
 
-function RecipeBootAndInstallKernel() {
+function RecipeBootAndInstallKernel() { # прошивка загрузчика UBoot и ядра Linux
   ${RUN} --acts "uboot->kernel_eth->mtd_utils->install_uboot->install_kernel"
 }
 
-function RecipeBootAndUploadRootFS() {
+function RecipeBootAndUploadRootFS() { # загрузка ядра Linux и образа rootfs
   ${RUN} --acts "uboot->kernel_eth->rootfs"
 }
 
-function RecipeBootAndWriteRootFS() {
+function RecipeBootAndWriteRootFS() { # загрузка ядра Linux и прошивка rootfs
   ${RUN} --acts "uboot->kernel_eth->mtd_utils->rootfs->unpack_rootfs"
 }
 
-function RecipeBootAndInstallRegigraf() {
+function RecipeBootAndInstallRegigraf() { # загрузка ядра Linux и установка ПО Regigraf
   ${RUN} --acts "uboot->kernel_eth->install_regigraf"
 }
 
-function RecipeSetupBoardForRegigraf() {
-  ${RUN} --acts "uboot->setup_nor->kernel_eth->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->install_uboot->install_kernel->setup_booting->register"
+function RecipeSetupBoardForRegigraf() { # загрузка, прошивка и установка всего необходимого ПО для Regigraf
+  ${RUN} --acts "uboot->setup_nor->kernel_eth->validate_hw->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->install_uboot->install_kernel->setup_booting->register"
 }
 
-function RecipeTestRegiboard() {
+function RecipeTestRegiboard() { # проверка конфигурации периферии и её тестирование
 #  ${RUN} --acts "uboot->kernel_eth->validate_hw->test_hw"
   ${RUN} --acts "uboot->kernel_eth->validate_hw"
 }
 
-function RecipeDefault() {
+function RecipeDefault() { # действие по умолчанию, загрузка ядра Linux
   RecipeBootOverEth
+}
+
+function RecipeGetListOfSupportedLCD() { # вывод списка поддерживаемых дисплеев
+  kernel_src='./build/linux-2.6.35.3.SK/arch/arm/mach-mx5/mx53_regigraf.c'
+  echo "LCD:"
+  while read line           
+  do           
+    echo "$line" | grep -oE "\.mode_str(.+)\= \"(.+)" | sed -r "s/(.+)\= \"([^\"]+)\"(.+)/\t * \2/"
+  done < $kernel_src 
+}
+
+function RecipeHelp() { # вывод помощи
+  local BLUE='\033[1;34m'
+  local RESET='\033[0m'
+  echo "Список функций:"
+  local funcs_list=$(grep "^function" $0 | sed -r "s/function Recipe(.+)\(\)(.+)\{ \# (.+)/\t * \\$BLUE\1\\$RESET: \n\t   \3/")
+  echo -e "$funcs_list"
 }
 
 UpdateFirmwareImage() {
   local rbf=${IMG_RBF_PATH}/${IMG_RBF}
   local mtime1=$(date +'%D')
   local mtime2=$(date --date=@$(stat --printf=%Y ./tmp/cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf) +'%D')
-
   if [ "$mtime1" != "$mtime2" ]; then
     echo "Загрузка нового файла прошивки: "
     rm ${IMG_RBF_PATH}/${IMG_RBF}
@@ -89,7 +106,7 @@ UpdateFirmwareImage() {
   fi
 }
 
-echo "Host is: ${HOST_IP}"
+echo "Хост: ${HOST_IP}"
 UpdateFirmwareImage
 RECIPE_FULL_NAME="Recipe${RECIPE}"
 ${RECIPE_FULL_NAME}
