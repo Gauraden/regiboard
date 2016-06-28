@@ -1002,9 +1002,11 @@ static bool UploadAndInstallFirmware(const Settings::Network &tftpd,
   return true;
 }
 
-static bool SetupBooting(SerialPort &port) {
+static bool SetupBooting(SerialPort &port, const std::string &pswd) {
   std::cout << "Прошивка FUSE памяти" << std::endl;
   SendToShell(port, "rb_fuses_imx53v2_spi_flash.sh", 0);
+  std::cout << "Установка пароля" << std::endl;
+  SendToShell(port, "passwd root -d " + pswd, 0);
   std::cout << "Проверка загрузки платы. Перезагрузка..." << std::endl;
   SendCmd(port, "reboot");
   ParseUntil(port, kRegigrafLogin, 0);
@@ -1052,8 +1054,8 @@ static bool ValidateHardware(SerialPort &port) {
   bool check_res = CompareValues<std::string>("Freescale i.MX53 family 2.1V at 800 MHz", g_sys_inf.cpu, "неверная модель процессора");
   check_res &= CompareValues<std::string>("1 GB", g_sys_inf.dram_size, "неверный объём ОЗУ");
   check_res &= CompareValues<std::string>("332800000Hz", g_sys_inf.ddr, "неверная частота ОЗУ");
-  check_res &= CompareValues<std::string>("1080 KBytes", g_sys_inf.nor_size, "неверный объём ПЗУ (NOR)");
-  check_res &= CompareValues<std::string>("AT45DB321x",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)");
+  check_res &= CompareValues<std::string>("1000 KBytes", g_sys_inf.nor_size, "неверный объём ПЗУ (NOR)");
+  check_res &= CompareValues<std::string>("at45db321d",  g_sys_inf.nor, "неверная модель ПЗУ (NOR)");
   check_res &= CompareValues<std::string>("1 GiB",  g_sys_inf.nand_size, "неверный объём ПЗУ (NAND)");
   check_res &= CompareValues<std::string>("MT29F8G08ABABA",  g_sys_inf.nand, "неверная модель ПЗУ (NAND)");
   check_res &= CompareValues<std::string>("FEC0", g_sys_inf.eth, "не обнаружен контроллер Ethernet");
@@ -1369,7 +1371,7 @@ static bool DoAction(const Settings           &set,
       }
       break;
     case RecipeAct::kSetupBooting:
-      return SetupBooting(*port);
+      return SetupBooting(*port, set.uboot_pswd);
     case RecipeAct::kRegisterBoard:
       return RegisterBoard(*port);
     case RecipeAct::kValidateHW:
