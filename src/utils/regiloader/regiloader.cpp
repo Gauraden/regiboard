@@ -761,7 +761,7 @@ static bool DownloadFromTFtp(const Settings::Network &tftpd,
     std::cout << "\t HW: " << kHwAddr            << std::endl
               << "\t IP: " << g_sys_inf.board_ip << std::endl;
     const std::string kMask(tftpd.mask.size() > 0 ? "netmask " + tftpd.mask : "");
-    SendToShell(port, "ifconfig eth0 " + g_sys_inf.board_ip + kMask, 0);
+    SendToShell(port, "ifconfig eth0 " + g_sys_inf.board_ip + " " + kMask, 0);
     eth_is_ready = true;
   }
   SendCmd(port, "tftp -l " + path + " -g -r " + request + " " + tftpd.ip + ":" + tftpd.port);
@@ -1141,7 +1141,7 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
   tftp_port << (unsigned)TFtp::Server::kPort;
   
   set.use_tftp.ip   = kTFtpArg.substr(0, kDelimOff);
-  set.use_tftp.mask = kTFtpArg.substr(kDelimOff);
+  set.use_tftp.mask = kTFtpArg.substr(kDelimOff + 1);
   set.use_tftp.port = tftp_port.str();
 	return true;
 }
