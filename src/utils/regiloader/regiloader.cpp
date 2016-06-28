@@ -547,8 +547,9 @@ static bool ParseUntil(SerialPort        &port,
   std::string str;
   uint8_t resp[1] = {0};
   std::cout << "\033[1A";
+  std::size_t total_read = 0;
   while (not Parse(str, wait_for + "(.*)", 0, 0)) {
-    boost::asio::read(port, boost::asio::buffer(resp, 1));
+    total_read += boost::asio::read(port, boost::asio::buffer(resp, 1));
     if (resp[0] == 0x0A) {
       if (g_sys_state.verbose) {
         std::cout << str << std::endl;
@@ -558,8 +559,9 @@ static bool ParseUntil(SerialPort        &port,
       if (out != 0) {
         FillInSysInfo(str, *out);
       }
-      str = "";
-    } else if (resp[0] != 0x0D) {
+      str        = "";
+      total_read = 0;
+    } else if (resp[0] != 0x0D && total_read < 256) {
       str += (char)resp[0];
     }
   }
