@@ -10,7 +10,7 @@ REGIGRAF_VER=$(echo $REGIGRAF_PKG | grep -Eo '([0-9\.\-]{5,})')
 REGIGRAF_INITD=$(ls -l /etc/init.d/S39gui 2> /dev/null)
 REGIGRAF_BIN=$(ipkg-cl files regigraf | grep -Eo '^(.+)/main$')
 REGIGRAF_NAME=$(cat ${REGIGRAF_BIN/main}/device.xml | grep -Eo 'name="([^"]+)"' | sed -r 's/(.+)"(.+)"/\2/')
-KERNEL_HR_TIMER=$(zcat /proc/config.gz | grep -E '(CONFIG_HIGH_RES_TIMERS=y|CONFIG_THUMB2_KERNEL=y|CONFIG_DEBUG_FS=y|CONFIG_NLS_CODEPAGE_866=y|CONFIG_NLS_CODEPAGE_1251=y|CONFIG_DYNAMIC_DEBUG=y|CONFIG_LOG_BUF_SHIFT=)'
+KERNEL_HR_TIMER=$(zcat /proc/config.gz | grep -E '(CONFIG_HIGH_RES_TIMERS=y|CONFIG_THUMB2_KERNEL=y|CONFIG_DEBUG_FS=y|CONFIG_NLS_CODEPAGE_866=y|CONFIG_NLS_CODEPAGE_1251=y|CONFIG_DYNAMIC_DEBUG=y|CONFIG_LOG_BUF_SHIFT=)')
 
 BOARD_ID=${BOARD_ID:='unknown'}
 
