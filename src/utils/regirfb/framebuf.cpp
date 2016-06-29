@@ -220,7 +220,7 @@ void Screen::SendUData(int socket) {
       }
       continue;
     }
-    std::cout << "Result: " << (long long)kResult << std::endl;
+    //std::cout << "Result: " << (long long)kResult << std::endl;
     sended += kResult;
   }
 }
@@ -338,8 +338,8 @@ bool Screen::SendFrameAsBmp(int socket) {
 	if (not FrameTimeout()) {
     const long long kSendBeg = GetMSec();
 	 	SendUData(socket);
-		std::cout << "UData cache: " << (GetMSec() - kSendBeg) << " msec;"
-		          << std::endl;
+		//std::cout << "UData cache: " << (GetMSec() - kSendBeg) << " msec;"
+		//          << std::endl;
 		return true;
   }
   const long long kGrabBeg = GetMSec();
@@ -406,12 +406,12 @@ bool Screen::SendFrameAsBmp(int socket) {
     dst_row += 8;
   }*/
 	_png_udata.offs += kBodySize;
-	std::cout << "Grab: " << (GetMSec() - kGrabBeg) << " msec;"
-	          << std::endl;
+	//std::cout << "Grab: " << (GetMSec() - kGrabBeg) << " msec;"
+	//          << std::endl;
   const long long kSendBeg = GetMSec();
  	SendUData(socket);
-	std::cout << "UData: " << (GetMSec() - kSendBeg) << " msec;"
-	          << std::endl;
+	//std::cout << "UData: " << (GetMSec() - kSendBeg) << " msec;"
+	//          << std::endl;
 	return true;
 }
 

@@ -10,9 +10,14 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <cstdlib>
+#include <stdlib.h>
 
 #include <sys/ipc.h>
 #include <sys/msg.h>
+
+#include <boost/asio.hpp>
+
+using boost::asio::ip::tcp;
 
 typedef struct message {
   long mtype;
@@ -49,6 +54,7 @@ static bool SendNewCoords(int x, int y, int what) {
 	return true;
 }
 
+/*
 static int CreateServerSocket() {
 	int serverSock = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -67,6 +73,7 @@ static int CreateServerSocket() {
 	listen(serverSock, 4);
 	return serverSock;
 }
+*/
 
 static std::string GetDateTime() {
   time_t     rawtime;
@@ -146,18 +153,33 @@ static bool SendDeviceState(int socket) {
   }
 }
 
-static void WaitForRequest(int socket, fb::Screen &screen) {
+static void WaitForRequest(boost::asio::io_service &io_service, tcp::acceptor &acceptor, fb::Screen &screen) {
     static const std::string kGetCoords("GET /?x");
     static const std::string kGetState("GET /state.json");
+    static const std::string kGetFirmware("GET /?firmware=");
 
-		char request[1024];
-		sockaddr_in clientAddr;
-		socklen_t   sin_size = sizeof(struct sockaddr_in);
-		int clientSock = accept(socket, (struct sockaddr*)&clientAddr, &sin_size);
+    tcp::socket socket(io_service);
+
+    try {
+      acceptor.accept(socket);
+    } catch(...) {
+      return;
+    }
+
+		char request[1024] = { 0 };
     const long long kRcvBeg = GetMSec();
-		recv(clientSock, request, 512, 0);
-		std::cout << "RECV: " << (GetMSec() - kRcvBeg) << " msec;"
-		          << std::endl;
+
+    boost::system::error_code error;
+    size_t len;
+    try {
+      len = socket.read_some(boost::asio::buffer(request, 1024), error);
+    } catch(...) {
+      return;
+    }
+
+		//std::cout << "RECV: " << (GetMSec() - kRcvBeg) << " msec;"
+		//          << std::endl;
+
 		if (std::string(request, kGetCoords.size()) == kGetCoords && GetNumber(request) >= 0) {
       int x = GetNumber(0);
       int y = GetNumber(0);
@@ -165,23 +187,36 @@ static void WaitForRequest(int socket, fb::Screen &screen) {
  		  if (s == 1) {
 	      SendNewCoords(x, y, s);
 	    }
-    }
-    if (std::string(request, kGetState.size()) == kGetState) {
+    } else if (std::string(request, kGetState.size()) == kGetState) {
       std::cout << "получен запрос состояния регистратора!" << std::endl;
-      SendDeviceState(clientSock);
-  		close(clientSock);
+      SendDeviceState(socket.native_handle());
   		return;
+    } else if (std::string(request, kGetFirmware.size()) == kGetFirmware &&
+               strlen(request) > kGetFirmware.size() + 5) { // url прошивки уж точно не может быть меньше 5 байт
+      // обрежем "мусор" что подставляет браузер за именем файла прошивки (там он другие параметры еще
+      //     передает, нам неинтересные)
+      const char *sub_str = strtok(request + kGetFirmware.size(), " ");
+      if (sub_str) {
+        std::stringstream str;
+        str << "/etc/init.d/S39gui update '" << std::string(request + kGetFirmware.size()) << "'";
+        std::cout << "regirfb: получен запрос прошивки. подготовилась команда на вызов: '"
+            << str.str() << "'" << std::endl;
+        int nRes = system(str.str().c_str());
+        if (nRes == -1)
+          std::cout << "regirfb: Error! Did not manage to execute S39gui update!" << std::endl;
+      }
+      return;
     }
     const long long kBmpBeg = GetMSec();
-    screen.SendFrameAsBmp(clientSock);
-		std::cout << "BMP: " << (GetMSec() - kBmpBeg) << " msec;"
-		          << std::endl;
-		close(clientSock);
+    screen.SendFrameAsBmp(socket.native_handle());
+		//std::cout << "BMP: " << (GetMSec() - kBmpBeg) << " msec;"
+		//          << std::endl;
 }
 
 static fb::Screen *fb_screen = 0;
 static bool        stop_sig  = false;
 
+/*
 void SignalCatcher(int sig_num) {
 	if (fb_screen == 0)
 		return;
@@ -199,11 +234,37 @@ void SignalCatcher(int sig_num) {
 		  break;
 	}
 }
+*/
+
+void signal_handler(const boost::system::error_code & err, int signal)
+{
+ 	stop_sig = true;
+}
+
+static void NetWork(fb::Screen &screen) {
+  boost::asio::io_service io_service;
+
+  boost::asio::signal_set sig(io_service, SIGINT, SIGTERM);
+  sig.async_wait(signal_handler);
+
+  tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), 8080));
+
+  boost::asio::socket_base::reuse_address option(true);
+  acceptor.set_option(option);
+
+  while(not stop_sig) {
+    WaitForRequest(io_service, acceptor, screen);
+  }
+}
 
 int main(int argc, char *argv[]) {
+
+  std::cout << "regirfb (new version)" << std::endl;
+
 	InitIPC();
 	fb::Screen screen;
 	screen.BindToFbDev("/dev/fb0");
+  /*
 	const int kSocket = CreateServerSocket();
 	if (kSocket < 0)
 	  return 1;
@@ -213,8 +274,11 @@ int main(int argc, char *argv[]) {
 	while (not stop_sig) {
 		WaitForRequest(kSocket, screen);
   }
-	TerminateIPC();
 	close(kSocket);
+  */
+  NetWork(screen);
+	TerminateIPC();
 	std::cout << "Работа завершена!" << std::endl;
 	return 0;
 }
+

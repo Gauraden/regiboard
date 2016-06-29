@@ -75,8 +75,16 @@
 		  ShowMessage('Нет связи с устройством');
 		}
 
+    var update_url=false;
+
     function GetReqParams() {
-      var req = '';//'?stamp=' + (new Date().getUTCSeconds()) + '&';
+      if (update_url == true) {
+        update_url = '?firmware=ftp://jenny/firmwares/F1772/cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf';
+      } else {
+        update_url = '';
+      }
+      var req = update_url;//'?stamp=' + (new Date().getUTCSeconds()) + '&';
+      update_url = false;
 			if (mouse.send != true)
 			  return req;
       mouse.send = false;
@@ -164,11 +172,24 @@
 		  
       UpdatePollTimeout();
 		}
+
+    function OnButtonUpdate() {
+      var ans = confirm("Будет установлена самая последняя прошивка на прибор!");
+
+      if (ans == true) {
+        update_url = true;
+      }
+    }
+
 		</script>
 	</head>
 	<body onload="OnLoad()" style="padding: 0px; margin: 0px">
 		<canvas id="screen" width="1024" height="768" style="border: 1px solid #000000;">
 		</canvas>
+    <br>
+      <input type="button" value="Обновить прошивку" onclick="OnButtonUpdate()">
+      </input>
+    </br>
 		<!--<div id="debug" style="overflow:scroll"></div>-->
 	</body>
 </html>

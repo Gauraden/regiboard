@@ -14,4 +14,9 @@ target_link_libraries(regirfb
     png
     z
     rt
+
+    boost_system
+    boost_thread
+    pthread
 )
+
