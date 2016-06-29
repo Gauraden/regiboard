@@ -29,7 +29,6 @@ static const std::string kRegigrafIpk("regigraf.ipk");
 static const std::string kRegigrafLicense("license.xml");
 static const std::string kRbfName("cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf");
 
-static const std::string kHwAddr("00:60:2F:10:20:30");
 static const std::string kRootFsTar("/tmp/rootfs.tar.gz");
 
 static const std::string kUBootPswdPrompt("Enter password:");
@@ -307,6 +306,16 @@ struct Settings {
   Network     use_tftp;
 };
 
+static std::string GetHwAddr() {
+  std::stringstream mac_str;
+  mac_str.fill('0');
+  mac_str << std::hex << std::uppercase
+          << "00:60:2F:" << std::setw(2) << (unsigned)g_sys_state.stand << ":"
+                         << std::setw(2) << (unsigned)g_sys_state.batch << ":"
+                         << std::setw(2) << (unsigned)g_sys_state.device << std::dec;
+  return mac_str.str();
+}
+
 template <typename ListType>
 static void PrintList(const std::string         &pref, 
                       const std::list<ListType> &list) {
@@ -558,7 +567,7 @@ static bool ParseUntil(SerialPort        &port,
                        SysInfo           *out) {
   std::string str;
   uint8_t resp[1] = {0};
-  std::cout << "\033[1A";
+//  std::cout << "\033[1A";
   std::size_t total_read = 0;
   while (not Parse(str, wait_for + "(.*)", 0, 0)) {
     total_read += boost::asio::read(port, boost::asio::buffer(resp, 1));
@@ -769,6 +778,7 @@ static bool DownloadFromTFtp(const Settings::Network &tftpd,
   }
   static bool eth_is_ready = false;
   if (not eth_is_ready && g_shell_prompt != kRegigrafPrompt) {
+    const std::string kHwAddr = GetHwAddr();
     std::cout << "Инициализация сетевого интерфейса..." << std::endl;
     SendToShell(port, std::string("ifconfig eth0 up hw ether ") + kHwAddr, 0);
     SendToShell(port, "udhcpc", &g_sys_inf);
@@ -840,15 +850,10 @@ static bool UnpackRootFs(SerialPort &port) {
   SendToShell(port, "gunzip " + kRootFsTar, 0);
   const std::string kPathTar(kRootFsTar.substr(0, kRootFsTar.find_last_of(".")));
   SendToShell(port, "cd /mnt && tar xvf " + kPathTar, 0);
-  std::stringstream mac_str;
-  mac_str.fill('0');
-  mac_str << std::hex << std::uppercase
-          << "00:60:2F:" << std::setw(2) << (unsigned)g_sys_state.stand << ":"
-                         << std::setw(2) << (unsigned)g_sys_state.batch << ":"
-                         << std::setw(2) << (unsigned)g_sys_state.device;
-  std::cout << "Установка MAC-адреса: " << mac_str.str() << std::endl;
-  g_sys_inf.board_hw_addr = mac_str.str();
-  SendToShell(port, "echo " + mac_str.str() + " > /mnt/etc/hwaddr", 0);
+  const std::string kHwAddr = GetHwAddr();
+  std::cout << "Установка MAC-адреса: " << kHwAddr << std::endl;
+  g_sys_inf.board_hw_addr = kHwAddr;
+  SendToShell(port, "echo " + kHwAddr + " > /mnt/etc/hwaddr", 0);
   SendToShell(port, "sync", 0);
   return true;
 }
