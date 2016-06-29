@@ -260,7 +260,6 @@ public:
               << "\t - Плата  : " << (unsigned)device << "\n"
               << "\t - Дисплей: " << lcd_model << "\n"
               << "\t - Сенсор : " << ts_model << "\n"
-              << "\t - Идентификатор: " << GetDeviceId() << "\n"
               << std::endl;
   }
   
@@ -1047,6 +1046,11 @@ static bool RegisterBoard(SerialPort &port, const std::string &pswd) {
   SendToShell(port, pswd, 0);
   std::cout << "Регистрация платы" << std::endl;  
   SaveSysInfoToJson("./tmp/", g_sys_state, g_sys_inf);
+  std::cout << "Идентификатор платы: "
+            << UseColor(kBlue)
+            << g_sys_state.GetDeviceId()
+            << UseColor(kReset)
+            << std::endl;
   g_sys_state.device++;
   g_sys_state.CheckBatchCapacity();
   g_sys_state.Save();
@@ -1472,9 +1476,9 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   }
   // вывод общей информации
   if (not recipe_fail) {
-    PrintSysInfo(g_sys_inf);
-    std::cout << "Для контроля работоспособности ПО Regigraf, воспользуйтесь ссылкой: "
-              << "http://" << g_sys_inf.board_ip
+//    PrintSysInfo(g_sys_inf);
+    std::cout << "Для контроля работоспособности ПО Regigraf, воспользуйтесь ссылкой:\n"
+              << "\t http://" << g_sys_inf.board_ip
               << std::endl;
   }
   std::cout << UseColor(kGreen)
