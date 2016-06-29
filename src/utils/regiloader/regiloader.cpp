@@ -1004,11 +1004,9 @@ static bool UploadAndInstallFirmware(const Settings::Network &tftpd,
   return true;
 }
 
-static bool SetupBooting(SerialPort &port, const std::string &pswd) {
+static bool SetupBooting(SerialPort &port) {
   std::cout << "Прошивка FUSE памяти" << std::endl;
   SendToShell(port, "rb_fuses_imx53v2_spi_flash.sh", 0);
-  std::cout << "Установка пароля" << std::endl;
-  SendToShell(port, "passwd root -d " + pswd, 0);
   std::cout << "Проверка загрузки платы. Перезагрузка..." << std::endl;
   SendCmd(port, "reboot");
   ParseUntil(port, kRegigrafLogin, 0);
@@ -1016,7 +1014,7 @@ static bool SetupBooting(SerialPort &port, const std::string &pswd) {
   return true;
 }
 
-static bool RegisterBoard(SerialPort &port) {
+static bool RegisterBoard(SerialPort &port, const std::string &pswd) {
   LoginToRegiboard(port);
   std::cout << "Запись идентификатора платы..." << std::endl;
   std::stringstream cmd;
@@ -1024,12 +1022,17 @@ static bool RegisterBoard(SerialPort &port) {
       << "--board=" << g_sys_state.GetDeviceId();
   SendToShell(port, cmd.str(), 0);
   SendToShell(port, "uboot_conf --of=/dev/mtd1 --if=/tmp/uboot.conf --do=w", 0);
+  std::cout << "Установка пароля" << std::endl;
+  SendCmd(port, "passwd root");
+  ParseUntil(port, "New password:", 0);
+  SendCmd(port, pswd);
+  ParseUntil(port, "Retype password:", 0);
+  SendToShell(port, pswd, 0);
   std::cout << "Регистрация платы" << std::endl;  
   SaveSysInfoToJson("./tmp/", g_sys_state, g_sys_inf);
   g_sys_state.device++;
   g_sys_state.CheckBatchCapacity();
   g_sys_state.Save();
-  
   return true;
 }
 
@@ -1373,9 +1376,9 @@ static bool DoAction(const Settings           &set,
       }
       break;
     case RecipeAct::kSetupBooting:
-      return SetupBooting(*port, set.uboot_pswd);
+      return SetupBooting(*port);
     case RecipeAct::kRegisterBoard:
-      return RegisterBoard(*port);
+      return RegisterBoard(*port, set.uboot_pswd);
     case RecipeAct::kValidateHW:
       return ValidateHardware(*port);
     case RecipeAct::kTestHW:
@@ -1428,8 +1431,10 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   }
   PrintDelimiter("\n", "Для выполнения рецепта", 80);
   std::cout << UseColor(kGreen)
-            << "\t 1. Подайте напряжение на плату\n"
-            << "\t 2. Нажмите [Enter] для начала загрузки..." 
+            << "\t 1. Установите перемычку (джампер) \"on/off\"\n"
+            << "\t 2. Подключите провод к разъёму \"debug_uart\""
+            << "\t 3. Подайте напряжение на плату\n"
+            << "\t 4. Нажмите [Enter] для начала загрузки..." 
             << UseColor(kReset)
             << std::endl;
   std::cin.get();
@@ -1530,8 +1535,6 @@ int main(int argc, char **argv) {
     std::cout << UseColor(kGreen)
               << "\t 1. Отключите питание\n"
               << "\t 2. Замените процессорную плату\n"
-              << "\t 3. Установите перемычку (джампер) \"on/off\"\n"
-              << "\t 4. Подключите провод к разъёму \"debug_uart\""
               << UseColor(kReset)
               << std::endl;
     port.close();
