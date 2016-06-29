@@ -79,7 +79,8 @@
 
     function GetReqParams() {
       if (update_url == true) {
-        update_url = '?firmware=ftp://jenny/firmwares/F1772/cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf';
+        var host = document.getElementById('firmware_download_host');
+        update_url = '?firmware=ftp://' + host.value + '/firmwares/F1772/cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf';
       } else {
         update_url = '';
       }
@@ -144,8 +145,8 @@
 	        var w = canvas_node.width;
 	        canvas_node.width  = canvas_node.height;
 	        canvas_node.height = w;
-//	      	canvas_ctx.translate(0, w);
-//	      	canvas_ctx.rotate(-90 * Math.PI / 180);
+	      	canvas_ctx.translate(0, w);
+	      	canvas_ctx.rotate(-90 * Math.PI / 180);
  		    }
  		  });
       
@@ -187,6 +188,8 @@
 		<canvas id="screen" width="1024" height="768" style="border: 1px solid #000000;">
 		</canvas>
     <br>
+      <lable for="firmware_download_host">Адрес хоста, для загрузки: </lable>
+      <input type="text" value="jenny" id="firmware_download_host"/>
       <input type="button" value="Обновить прошивку" onclick="OnButtonUpdate()">
       </input>
     </br>
