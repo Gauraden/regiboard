@@ -562,7 +562,7 @@ static bool ParseUntil(SerialPort        &port,
   std::size_t total_read = 0;
   while (not Parse(str, wait_for + "(.*)", 0, 0)) {
     total_read += boost::asio::read(port, boost::asio::buffer(resp, 1));
-    if (resp[0] == 0x0A) {
+    if (resp[0] == 0x0A || total_read > 256) {
       if (g_sys_state.verbose) {
         std::cout << str << std::endl;
       } else {
@@ -573,7 +573,7 @@ static bool ParseUntil(SerialPort        &port,
       }
       str        = "";
       total_read = 0;
-    } else if (resp[0] != 0x0D && total_read < 256) {
+    } else if (resp[0] != 0x0D) {
       str += (char)resp[0];
     }
   }
@@ -1444,7 +1444,7 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   PrintDelimiter("\n", "Для выполнения рецепта", 80);
   std::cout << UseColor(kGreen)
             << "\t 1. Установите перемычку (джампер) \"on/off\"\n"
-            << "\t 2. Подключите провод к разъёму \"debug_uart\""
+            << "\t 2. Подключите провод к разъёму \"debug_uart\"\n"
             << "\t 3. Подайте напряжение на плату\n"
             << "\t 4. Нажмите [Enter] для начала загрузки..." 
             << UseColor(kReset)
@@ -1546,7 +1546,7 @@ int main(int argc, char **argv) {
     PrintDelimiter("\n", "Подготовка к работе со следующей платой", 80);
     std::cout << UseColor(kGreen)
               << "\t 1. Отключите питание\n"
-              << "\t 2. Замените процессорную плату\n"
+              << "\t 2. Замените процессорную плату"
               << UseColor(kReset)
               << std::endl;
     port.close();
