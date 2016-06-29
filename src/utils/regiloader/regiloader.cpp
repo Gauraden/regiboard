@@ -3,6 +3,7 @@
 #include "ymodem.hpp"
 #include "tftp.hpp"
 #include "debug_backtrace.hpp"
+#include <unistd.h>
 #include <iostream>
 #include <sstream>
 #include <list>
@@ -183,6 +184,19 @@ static std::string UseColor(int8_t id) {
   return esc.str();
 }
 
+static std::string GetTime() {
+  namespace pt = boost::posix_time;
+  struct tm ltm = to_tm(pt::second_clock::local_time());
+  return static_cast<std::stringstream&>(std::stringstream() 
+    << (ltm.tm_year + 1900) << "-"
+    << (ltm.tm_mon + 1)     << "-"
+    << ltm.tm_mday          << " "
+    << ltm.tm_hour          << ":"
+    << ltm.tm_min           << ":"
+    << ltm.tm_sec
+  ).str();
+}
+
 class SysState {
 public:
   SysState()
@@ -207,11 +221,11 @@ public:
     }
     using boost::property_tree::ptree;
     ptree pt;
-    pt.put("stand_id",  (unsigned)stand);
-    pt.put("batch_id",  (unsigned)batch);
-    pt.put("device_id", (unsigned)device);
-    pt.put("lcd_model", lcd_model);
-    pt.put("ts_model",  ts_model);
+    pt.put("stand_id",     (unsigned)stand);
+    pt.put("batch_id",     (unsigned)batch);
+    pt.put("device_id",    (unsigned)device);
+    pt.put("lcd_model",    lcd_model);
+    pt.put("ts_model",     ts_model);
     write_json(_file_path, pt);
   }
   
@@ -251,6 +265,16 @@ public:
               << std::endl;
   }
   
+  void WasManufacturedBy(boost::property_tree::ptree &ptree,
+                         const std::string           &node) const {
+    const size_t kCharArrSize = 255;
+    char char_arr[kCharArrSize];
+    if (gethostname(char_arr, kCharArrSize) == 0) {
+      ptree.put(node + ".host", std::string(char_arr));
+    }
+    ptree.put(node + ".time", GetTime());
+  }
+  
   uint32_t    stand;
   uint32_t    batch;
   uint32_t    device;
@@ -282,19 +306,6 @@ struct Settings {
   std::string uboot_pswd;
   Network     use_tftp;
 };
-
-static std::string GetTime() {
-  namespace pt = boost::posix_time;
-  struct tm ltm = to_tm(pt::second_clock::local_time());
-  return static_cast<std::stringstream&>(std::stringstream() 
-    << (ltm.tm_year + 1900) << "-"
-    << (ltm.tm_mon + 1)     << "-"
-    << ltm.tm_mday          << " "
-    << ltm.tm_hour          << ":"
-    << ltm.tm_min           << ":"
-    << ltm.tm_sec
-  ).str();
-}
 
 template <typename ListType>
 static void PrintList(const std::string         &pref, 
@@ -381,6 +392,7 @@ static void SaveSysInfoToJson(const std::string &path,
   ).str());
   using boost::property_tree::ptree;
   ptree pt;
+  g_sys_state.WasManufacturedBy(pt, "manufacture");
   pt.put("board",      inf.board);
   pt.put("cpu",        inf.cpu);
   pt.put("uboot",      inf.u_boot_build);
