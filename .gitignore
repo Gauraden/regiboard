@@ -19,3 +19,4 @@ bin/regiloader
 bin/regipswd
 bin/regiprotector
 bin/ubiformat
+bin/regigraf-gdb
