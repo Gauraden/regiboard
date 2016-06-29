@@ -359,6 +359,7 @@ bool TFtp::Session::Open(asio::ip::udp::endpoint *srv_endpt) {
 
 void TFtp::Session::Close() {
   _socket.close();
+  _task.file->close();
 }
 
 bool TFtp::Session::PushPacket(Packet::Ptr pkt) {
