@@ -64,6 +64,10 @@ function RecipeBootAndWriteRootFS() { # загрузка ядра Linux и пр�
 function RecipeBootAndInstallRegigraf() { # загрузка ядра Linux и установка ПО Regigraf
   ${RUN} --acts "uboot->kernel_eth->install_regigraf"
 }
+# --- Основные рецепты ---------------------------------------------------------
+function RecipeUpdateRootFS() { # обновление rootfs и переустановка всех программ
+  ${RUN} --acts "uboot->kernel_eth->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->register"
+}
 
 function RecipeSetupBoardForRegigraf() { # загрузка, прошивка и установка всего необходимого ПО для Regigraf
   ${RUN} --acts "uboot->setup_nor->kernel_eth->validate_hw->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->install_uboot->install_kernel->setup_booting->register"

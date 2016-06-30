@@ -701,6 +701,8 @@ static bool UploadKernelEnd(SerialPort &port, SysInfo *inf) {
   }
   ParseUntil(port, "\\[([^\\]]+)\\] usb 2-1.3: FTDI USB Serial Device converter now attached to ttyUSB11", inf);
   inf->kernel.usb_uart.push_back("ttyUSB11");
+  g_eth_is_ready     = false;
+  g_already_has_been = false;
   return true;
 }
 
@@ -1489,8 +1491,6 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   if (answer != 10 && answer != 'y' && answer != 'Y') {
     return false; 
   }
-  g_eth_is_ready     = false;
-  g_already_has_been = false;
   return true;
 }
 
