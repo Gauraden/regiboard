@@ -37,6 +37,10 @@ static const std::string kRamFsPrompt("(.*)regiboard \\(initramfs\\)");
 static const std::string kRegigrafLogin("regigraf login:");
 static const std::string kRegigrafPrompt("(.*)\\@regigraf");
 
+static bool        g_eth_is_ready     = false;
+static bool        g_already_has_been = false;
+static std::string g_shell_prompt     = kRamFsPrompt;
+
 static bool UploadDCD(boost::asio::serial_port &port, ImxFirmware &firm) {
   const ImxFirmware::DCDCmd::List &cmds = firm.GetDCDCommands();
   ImxFirmware::DCDCmd::List::const_iterator cmd_it = cmds.begin();
@@ -594,8 +598,6 @@ static void SendToUBoot(SerialPort &port, const std::string &cmd, SysInfo *out) 
   ParseUntil(port, kUBootPrompt, out);
 }
 
-static std::string g_shell_prompt = kRamFsPrompt;
-
 static void SwitchShell(const std::string &prompt) {
   g_shell_prompt = prompt;
 }
@@ -632,19 +634,17 @@ static bool UploadUBoot(SerialPort &port, const std::string &file) {
   return PktComplete().Send(port, kMaxTries, "Запуск программы");
 }
 
-static bool already_has_been = false;
-
 static bool WaitForWelcomeFromUBoot(SerialPort        &port,
                                     SysInfo           *inf,
                                     const std::string &pswd) {
-  if (already_has_been && not inf->wait_for_reboot) {
+  if (g_already_has_been && not inf->wait_for_reboot) {
     return true;
   }
   const bool kHasGot = ParseUntil(port, "Hit any key to stop autoboot", inf);
   if (not kHasGot) {
     return false;
   }
-  already_has_been = true;
+  g_already_has_been = true;
   if (pswd.size() > 0) {
     SendCmd(port, "");
     ParseUntil(port, kUBootPswdPrompt, 0);
@@ -684,7 +684,6 @@ static bool UploadKernelBegin(SerialPort       &port,
   if (inf == 0 || not WaitForWelcomeFromUBoot(port, inf, pswd)) {
     return false;
   }
-  already_has_been = false;
   if (not inf->boot_from_nand) {
     // Убираем имя монтируемого устройства, для предотвращения загрузки с nand.
     // Таким образом загрузка всегда будет останавливаться на initramfs
@@ -775,8 +774,7 @@ static bool DownloadFromTFtp(const Settings::Network &tftpd,
       path.size() == 0) {
     return false;
   }
-  static bool eth_is_ready = false;
-  if (not eth_is_ready && g_shell_prompt != kRegigrafPrompt) {
+  if (not g_eth_is_ready && g_shell_prompt != kRegigrafPrompt) {
     const std::string kHwAddr = GetHwAddr();
     std::cout << "Инициализация сетевого интерфейса..." << std::endl;
     SendToShell(port, std::string("ifconfig eth0 up hw ether ") + kHwAddr, 0);
@@ -785,7 +783,7 @@ static bool DownloadFromTFtp(const Settings::Network &tftpd,
               << "\t IP: " << g_sys_inf.board_ip << std::endl;
     const std::string kMask(tftpd.mask.size() > 0 ? "netmask " + tftpd.mask : "");
     SendToShell(port, "ifconfig eth0 " + g_sys_inf.board_ip + " " + kMask, 0);
-    eth_is_ready = true;
+    g_eth_is_ready = true;
   }
   SendCmd(port, "tftp -l " + path + " -g -r " + request + " " + tftpd.ip + ":" + tftpd.port);
   const bool kRunRes = srv->Run();
@@ -1491,6 +1489,8 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   if (answer != 10 && answer != 'y' && answer != 'Y') {
     return false; 
   }
+  g_eth_is_ready     = false;
+  g_already_has_been = false;
   return true;
 }
 
