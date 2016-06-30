@@ -277,8 +277,8 @@ bool PktComplete::Write() {
 SdpPacket::Transfer PktComplete::Read() {
   static FieldU32 resp;
   GetVal(0, resp);
-  std::cout << "PktComplete: 0x" << std::hex << (unsigned)resp.value
-                                 << std::dec << std::endl;
+//  std::cout << "PktComplete: 0x" << std::hex << (unsigned)resp.value
+//                                 << std::dec << std::endl;
   return (resp.value == 0x88888888 ? kStop : kError);
 }
 // class PktWriteMem
