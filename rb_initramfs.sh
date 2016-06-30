@@ -68,6 +68,8 @@ BuildBusyBox() {
   MkAlias 'ubidetach'
   MkAlias 'ubimkvol'
   MkAlias 'udhcpc'
+  MkAlias 'rmmod'
+  MkAlias 'modprobe'
 }
 
 PrepareInitRAMFS() {
