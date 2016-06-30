@@ -703,6 +703,7 @@ static bool UploadKernelEnd(SerialPort &port, SysInfo *inf) {
   inf->kernel.usb_uart.push_back("ttyUSB11");
   g_eth_is_ready     = false;
   g_already_has_been = false;
+  g_shell_prompt     = kRamFsPrompt;
   return true;
 }
 
