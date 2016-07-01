@@ -131,6 +131,9 @@ PacketBuild() {
 	PacketInstall() {
 		PrintWarn "Skipping installation to: $1"
 	}
+	PacketEditConfigLine() {
+	  echo "$1"
+	}
 	local packet=$1
 	. "${CONF_PAK_DIR}/$packet"
   RB_INSTALL_LOG="${LOG_DIR}/${PACKET_NAME}.install.log"
@@ -193,7 +196,14 @@ PacketBuild() {
     fi
 		# Copy registered configuration
 		IsDefined $PACKET_CONFIG_FILE && \
-		  cp ${CONF_DIR}/${PACKET_NAME}/${PACKET_CONFIG_FILE} ${build_dir}/.config
+		  cp ${CONF_DIR}/${PACKET_NAME}/${PACKET_CONFIG_FILE} ${build_dir}/.config_orig
+    # редактирование конфигурации
+    rm -f ${build_dir}/.config
+    while read config_line
+    do           
+      echo $(PacketEditConfigLine "$config_line") >> ${build_dir}/.config
+    done < ${build_dir}/.config_orig
+    rm -f ${build_dir}/.config_orig
 		# Building
     PacketMake $build_dir
 	fi

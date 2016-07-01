@@ -29,6 +29,12 @@ ConfigurateKernel() {
 	  	ApplyAllPatchesFor "${KERNEL_DIR}" "${KERNEL_BUILD_DIR}"
 	  fi
 	fi
+	# получение версии ядра
+	pushd ${KERNEL_BUILD_DIR}
+	local kernel_ver=$(echo $BOARD_KERNEL_VER | grep -Po '\w+.\w+.\w+.\w+')
+	local kernel_commit=$(git rev-parse --verify HEAD | grep -Po '(.{7,7})' | head -n 1)
+	KERNEL_VERSION="${kernel_ver}-g${kernel_commit}-dirty"
+	popd
 }
 
 SwapKernelConfig() {

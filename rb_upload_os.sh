@@ -7,6 +7,7 @@ TTY_USB=${2:-/dev/ttyUSB0}
 REGILOADER="bin/regiloader"
 IMG_UBOOT="output/uboot/u-boot.regigraf.imx53"
 IMG_KERNEL="output/kernel/uImage.regigraf.imx53.bin"
+IMG_KERNEL_MODS="tmp/linux-kernel-modules.ipk/data.tar.gz"
 IMG_ROOTFS="output/rootfs/rootfs.regigraf.cortex_a8.tar.gz"
 IMG_MTD_UTILS="tmp/mtd-utils.ipk/data.tar.gz"
 IMG_RBF="cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf"
@@ -18,6 +19,7 @@ HOST_MASK=$(echo $HOST_IP | grep -oE "(netmask |Mask:)([0-9\.]+)" | grep -oE "([
 HOST_IP=$(echo $HOST_IP | grep -oE "(inet |inet addr:)([0-9\.]+)" | grep -oE "([0-9\.]+)")
 
 RUN="$REGILOADER --tty ${TTY_USB} --img ${IMG_UBOOT} --kernel ${IMG_KERNEL}
+--kernel_mods ${IMG_KERNEL_MODS}
 --tftp ${HOST_IP}/${HOST_MASK} --rootfs ${IMG_ROOTFS} --utils ${IMG_MTD_UTILS} --conf ./tmp
 --rbf ${IMG_RBF_PATH}${IMG_RBF} --uboot_pswd ${UBOOT_PSWD} ${RBUP_EXT_OPTS}"
 

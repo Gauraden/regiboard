@@ -22,6 +22,7 @@ static const std::string kConfName("regiloader.json");
 static const std::string kTtyDev("ttyUSB0");
 static const std::string kUBootImg("u-boot");
 static const std::string kKernelImg("uImage");
+static const std::string kKernelMods("linux-kernel-modules.tar.gz");
 static const std::string kRootFsImg("rootfs.tar.gz");
 static const std::string kMtdUtils("mtd-utils.tar.gz");
 static const std::string kIpkPath("output/packets");
@@ -299,6 +300,7 @@ struct Settings {
   std::string tty_dev;
   std::string imx_img;
   std::string kernel_img;
+  std::string kernel_mods;
   std::string rootfs_img;
   std::string mtd_utils;
   std::string acts;
@@ -609,6 +611,9 @@ static void SendToShell(SerialPort &port, const std::string &cmd, SysInfo *out) 
 
 static void UpdateListOfPartitions(SerialPort &port) {
   static bool parts_are_ready = false;
+  g_sys_inf.packets.clear();
+  g_sys_inf.kernel.partitions.clear();
+  g_sys_inf.kernel.usb_uart.clear();
   if (not parts_are_ready) {
     SendToShell(port, "cat /proc/mtd", &g_sys_inf);
     parts_are_ready = true;
@@ -746,16 +751,6 @@ static bool UploadKernelOverEth(SerialPort        &port,
   } while (g_sys_inf.upload_fail);
   g_sys_inf.upload_fail = false;
   return UploadKernelEnd(port, &g_sys_inf);
-}
-
-static bool UploadKernelAndDebug(SerialPort        &port,
-                                 TFtp::Server      *srv,
-                                 const std::string &pswd) {
-  if (not WaitForWelcomeFromUBoot(port, &g_sys_inf, pswd)) {
-    return false;
-  }
-  SendToUBoot(port, "setenv dyndbg 'file i2c-imx.c +p'", 0);
-  return UploadKernelOverEth(port, srv, pswd);
 }
 
 static bool UploadKernelWithOldSys(SerialPort        &port,
@@ -1099,7 +1094,29 @@ static bool ValidateHardware(SerialPort &port) {
   }
   return check_res;
 }
- 
+
+static bool UploadKernelAndDebug(const Settings &set,
+                                 SerialPort     &port,
+                                 TFtp::Server   *srv) {
+  if (not WaitForWelcomeFromUBoot(port, &g_sys_inf, set.uboot_pswd)) {
+    return false;
+  }
+  SendToUBoot(port, "setenv dyndbg 'file i2c-imx.c +p'", 0);
+  if (not UploadKernelOverEth(port, srv, set.uboot_pswd)) {
+    return false;
+  }
+  static const std::string kPathGz("/tmp/" + kKernelMods);
+  std::cout << "Загрузка модулей ядра..." << std::endl;
+  if (not DownloadFromTFtp(set.use_tftp, kKernelMods, kPathGz, port, srv)) {
+    return false;
+  }
+  std::cout << "Распаковка модулей ядра..." << std::endl;
+  SendToShell(port, "gunzip " + kPathGz, 0);
+  const std::string kPathTar(kPathGz.substr(0, kPathGz.find_last_of(".")));
+  SendToShell(port, "tar xvf " + kPathTar + " -C /", 0);
+  return true;
+}
+
 static bool TestHardware(SerialPort &port) {
   std::cout << "Тестирование работоспособности периферийных устройств..." << std::endl;
   // TODO
@@ -1121,6 +1138,9 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
              "2 файла: *.bin, *.imx")
 		("kernel", po::value<std::string>()->default_value(kKernelImg),
              "путь к образу ядра Linux. Ядро не будет загружено если не указать файл.")
+		("kernel_mods", po::value<std::string>()->default_value(kKernelMods),
+             "путь к архиву, с модулями ядра. Необязательный параметр, работает "
+             "только соместно с флагом: --tftp.")
 		("rootfs", po::value<std::string>()->default_value(kRootFsImg),
              "путь к образу файловой системы. Необязательный параметр, работает "
              "только совместно с флагом: --tftp.")
@@ -1151,16 +1171,17 @@ static bool ParseArgs(int argc, char **argv, Settings &set) {
 	  return false;
 	}
   g_sys_state.verbose = vm["verbose"].as<bool>();
-	set.tty_dev    = vm["tty"].as<std::string>();
-	set.imx_img    = vm["img"].as<std::string>();
-  set.kernel_img = vm["kernel"].as<std::string>();
-  set.rootfs_img = vm["rootfs"].as<std::string>();
-  set.mtd_utils  = vm["utils"].as<std::string>();
-  set.acts       = vm["acts"].as<std::string>();
-  set.packets    = vm["packets"].as<std::string>();
-  set.config     = vm["conf"].as<std::string>();
-  set.rbf        = vm["rbf"].as<std::string>();
-  set.uboot_pswd = vm["uboot_pswd"].as<std::string>();
+	set.tty_dev     = vm["tty"].as<std::string>();
+	set.imx_img     = vm["img"].as<std::string>();
+  set.kernel_img  = vm["kernel"].as<std::string>();
+  set.kernel_mods = vm["kernel_mods"].as<std::string>();
+  set.rootfs_img  = vm["rootfs"].as<std::string>();
+  set.mtd_utils   = vm["utils"].as<std::string>();
+  set.acts        = vm["acts"].as<std::string>();
+  set.packets     = vm["packets"].as<std::string>();
+  set.config      = vm["conf"].as<std::string>();
+  set.rbf         = vm["rbf"].as<std::string>();
+  set.uboot_pswd  = vm["uboot_pswd"].as<std::string>();
   
   const std::string kTFtpArg  = vm["tftp"].as<std::string>();
   const size_t      kDelimOff = kTFtpArg.find_first_of("/");
@@ -1364,7 +1385,10 @@ static bool DoAction(const Settings           &set,
       }
       break;
     case RecipeAct::kKernelDebug:
-      return UploadKernelAndDebug(*port, srv, set.uboot_pswd);
+      if (set.use_tftp.ip.size() > 0) {
+        return UploadKernelAndDebug(set, *port, srv);
+      }
+      break;
     case RecipeAct::kKernelOldSys:
       return UploadKernelWithOldSys(*port, srv, set.uboot_pswd);
     case RecipeAct::kRootFs:
@@ -1541,10 +1565,11 @@ int main(int argc, char **argv) {
   // инициализация сервера TFTP
   TFtp::Server srv(set.use_tftp.ip);
   srv.PublishFile(kUBootImg + ".bin", set.imx_img + ".bin");
-  srv.PublishFile(kKernelImg, set.kernel_img);
-  srv.PublishFile(kRootFsImg, set.rootfs_img);
-  srv.PublishFile(kMtdUtils,  set.mtd_utils);
-  srv.PublishFile(kRbfName,   set.rbf);
+  srv.PublishFile(kKernelImg,  set.kernel_img);
+  srv.PublishFile(kKernelMods, set.kernel_mods);
+  srv.PublishFile(kRootFsImg,  set.rootfs_img);
+  srv.PublishFile(kMtdUtils,   set.mtd_utils);
+  srv.PublishFile(kRbfName,    set.rbf);
   PublishDir(set.packets, &srv);
   PublishRegigrafLicense(license, &srv);
   // инициализация COM порта
