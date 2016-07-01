@@ -41,6 +41,7 @@ static const std::string kRegigrafPrompt("(.*)\\@regigraf");
 static bool        g_eth_is_ready     = false;
 static bool        g_already_has_been = false;
 static std::string g_shell_prompt     = kRamFsPrompt;
+static bool        g_parts_are_ready  = false;
 
 static bool UploadDCD(boost::asio::serial_port &port, ImxFirmware &firm) {
   const ImxFirmware::DCDCmd::List &cmds = firm.GetDCDCommands();
@@ -162,6 +163,7 @@ struct SysInfo {
   bool            wait_for_reboot;
   bool            upload_fail;
   bool            boot_from_nand;
+  bool            mk_part_fail;
 };
 
 static SysInfo g_sys_inf;
@@ -554,6 +556,11 @@ static bool FillInSysInfo(const std::string &str, SysInfo &inf) {
     inf.packets.push_back(Packet(t_list[1], t_list[2]));
     return true;
   }
+  // ERROR: UBI error: ubi_create_volume
+  if (Parse(str, "(.*)UBI error: ubi_create_volume(.*)", 2, &t_str)) {
+    inf.mk_part_fail = true;
+    return true;
+  }
   return true;
 }
 
@@ -610,11 +617,9 @@ static void SendToShell(SerialPort &port, const std::string &cmd, SysInfo *out) 
 }
 
 static void UpdateListOfPartitions(SerialPort &port) {
-  static bool parts_are_ready = false;
-  g_sys_inf.kernel.partitions.clear();
-  if (not parts_are_ready) {
+  if (not g_parts_are_ready) {
     SendToShell(port, "cat /proc/mtd", &g_sys_inf);
-    parts_are_ready = true;
+    g_parts_are_ready = true;
   }
 }
 
@@ -687,8 +692,8 @@ static bool UploadKernelBegin(SerialPort       &port,
   if (inf == 0 || not WaitForWelcomeFromUBoot(port, inf, pswd)) {
     return false;
   }
+  g_sys_inf.kernel.partitions.clear();
   g_sys_inf.kernel.usb_uart.clear();
-  g_sys_inf.packets.clear();
   if (not inf->boot_from_nand) {
     // Убираем имя монтируемого устройства, для предотвращения загрузки с nand.
     // Таким образом загрузка всегда будет останавливаться на initramfs
@@ -708,6 +713,7 @@ static bool UploadKernelEnd(SerialPort &port, SysInfo *inf) {
   inf->kernel.usb_uart.push_back("ttyUSB11");
   g_eth_is_ready     = false;
   g_already_has_been = false;
+  g_parts_are_ready  = false;
   g_shell_prompt     = kRamFsPrompt;
   return true;
 }
@@ -818,16 +824,28 @@ static bool MkUbiFsPartition(SerialPort        &port,
   // подключение устройства ubi
   cmd << "ubiattach /dev/ubi_ctrl -m " << (unsigned)part->mtd_id;
   SendToShell(port, cmd.str(), 0);
-  cmd.str(std::string());
   // создание раздела ubi
-  const uint64_t kMaxVolSize = part->area.Length();
-  const uint64_t kVolSize    = kMaxVolSize - (kMaxVolSize * 0.04);
-  cmd << "ubimkvol /dev/ubi" << (unsigned)ubi_id
-                             << " -N " << vol_name
-                             << " -s " << (unsigned long long)kVolSize;
-  std::cout << "\t создание раздела: " << vol_name << " "
-                                       << (unsigned)kVolSize << " bytes" << std::endl;
-  SendToShell(port, cmd.str(), 0);
+  float vol_reserve = 0.02;
+  do {
+    const uint64_t kMaxVolSize = part->area.Length();
+    const uint64_t kVolSize    = kMaxVolSize - (kMaxVolSize * vol_reserve);
+    cmd.str(std::string());
+    cmd << "ubimkvol /dev/ubi" << (unsigned)ubi_id
+                               << " -N " << vol_name
+                               << " -s " << (unsigned long long)kVolSize;
+    g_sys_inf.mk_part_fail = false;
+    SendToShell(port, cmd.str(), &g_sys_inf);
+    if (g_sys_inf.mk_part_fail) {
+      std::cout << "\t ошибка при создании раздела: " << vol_name << " "
+                                                      << (unsigned)kVolSize << " bytes;\n"
+                << "\t новая попытка, с меньшим размером..."
+                << std::endl;
+    } else {
+      std::cout << "\t создан раздел: " << vol_name << " "
+                                        << (unsigned)kVolSize << " bytes" << std::endl;
+    }
+    vol_reserve += 0.005;
+  } while (g_sys_inf.mk_part_fail);
   return true;
 }
 
