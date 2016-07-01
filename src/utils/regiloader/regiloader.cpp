@@ -611,9 +611,7 @@ static void SendToShell(SerialPort &port, const std::string &cmd, SysInfo *out) 
 
 static void UpdateListOfPartitions(SerialPort &port) {
   static bool parts_are_ready = false;
-  g_sys_inf.packets.clear();
   g_sys_inf.kernel.partitions.clear();
-  g_sys_inf.kernel.usb_uart.clear();
   if (not parts_are_ready) {
     SendToShell(port, "cat /proc/mtd", &g_sys_inf);
     parts_are_ready = true;
@@ -689,6 +687,8 @@ static bool UploadKernelBegin(SerialPort       &port,
   if (inf == 0 || not WaitForWelcomeFromUBoot(port, inf, pswd)) {
     return false;
   }
+  g_sys_inf.kernel.usb_uart.clear();
+  g_sys_inf.packets.clear();
   if (not inf->boot_from_nand) {
     // Убираем имя монтируемого устройства, для предотвращения загрузки с nand.
     // Таким образом загрузка всегда будет останавливаться на initramfs
