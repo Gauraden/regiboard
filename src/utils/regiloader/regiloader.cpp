@@ -590,7 +590,7 @@ static bool ParseUntil(SerialPort        &port,
   size_t total_read = 0;
   bool   stop       = false;
   // 10 попыток, по 2 сек
-  AsioIface asio_if(&port, 3, 10);
+  AsioIface asio_if(&port, 2, 10);
   while (not stop) {
     const size_t kWasRead = asio_if.Read(resp, kMaxRespSize, ParseTimeoutHandler);
     if (asio_if.ReadingWasFailed()) {

@@ -170,6 +170,7 @@ class TFtp {
         Session(asio::io_service &io);
         ~Session();
         bool IsAlive() const;
+        bool IsTimeout() const;
         bool Open(asio::ip::udp::endpoint *srv_endpt);
         void Close();
         void Process(const VirDir &dir);
@@ -180,6 +181,8 @@ class TFtp {
         bool Send(const Byte *data, size_t size);
         bool Receive(Byte *data, size_t size);
       private:
+        typedef boost::asio::deadline_timer Timer;
+        
         struct Task {
           typedef boost::scoped_ptr<std::fstream> FilePtr;
           
@@ -205,7 +208,8 @@ class TFtp {
         };
         
         static const size_t kBuffMaxSize = Packet::kMaxSize / 2;
-        
+        void SetupTimer();
+        void HandlerTimer(const sys::error_code &err);
         void HandlerWrite(const sys::error_code &e,
                           size_t                 bytes);
         void HandlerRead(const sys::error_code &e,
@@ -219,6 +223,8 @@ class TFtp {
         EndPoint    _endpt;
         uint16_t    _buff[kBuffMaxSize];
         Task        _task;
+        Timer       _timer;
+        bool        _timeout;
     };
     
     class Server {
