@@ -510,7 +510,7 @@ UnpackArchive() {
 	PrintNotice "Extracting \"$1\" to: ${dst_dir}"
 	if [ -d $1 ]; then
 	  PrintWarn "Directory is detected, it will be copied..."
-	  ${_USE_SUDO} rsync -ura --exclude='.git' --exclude='.gitignore' $1 $dst_dir
+	  ${_USE_SUDO} rsync -ra --exclude='.git' --exclude='.gitignore' $1 $dst_dir
 	else
 		${_USE_SUDO} tar -C "${dst_dir}" -xaf "$1"
 	fi

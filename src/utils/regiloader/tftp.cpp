@@ -394,7 +394,7 @@ void TFtp::Session::AsyncAccept() {
 
 void TFtp::Session::SetupTimer() {
   _timeout = false;
-  _timer.expires_from_now(boost::posix_time::seconds(3));
+  _timer.expires_from_now(boost::posix_time::seconds(5));
   _timer.async_wait(boost::bind(&TFtp::Session::HandlerTimer,
         this,
         boost::asio::placeholders::error));
