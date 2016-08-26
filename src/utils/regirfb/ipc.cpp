@@ -18,10 +18,10 @@ key_t   msgkey;
 Message sent,
         received;
 
-void InitIPC() {
+bool InitIPC() {
 	msgkey = ftok("/home/regigraf",'a');
 	qid = msgget(msgkey, IPC_CREAT | 0660);
-//	std::cout << "InitIPC: QID = " << qid << " mtype version" << std::endl;
+  return (qid != -1);
 }
 
 void TerminateIPC() {
@@ -35,7 +35,6 @@ bool SendNewCoords(int x, int y, int what) {
 	snprintf(sent.result, 5, "%s", "OK");
 	nres = msgsnd(qid, &sent, Message::GetSize(), 0);
 	if (nres == -1) {
-    //ERROR("Couldn't msgsng!");
 	  return false;
 	}
 	return true;

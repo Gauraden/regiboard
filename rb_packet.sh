@@ -116,6 +116,13 @@ MakeIpkg() {
 	mkdir $ipk_dir 2> ${_DEV_NULL}
 	mkdir $ctl_dir 2> ${_DEV_NULL}
 	SetPacketControl "$ctl_dir"
+	# подготовка скриптов-обработчиков событий начала и завершения установки пакета
+  local pre_install=$ipk_dir/preinst
+  local post_install=$ipk_dir/postinst
+  rm ${pre_install} ${post_install} 2> /dev/null
+  PacketPreInstallHandler ${post_install} && chmod o+x ${post_install}
+  PacketPostInstallHandler ${pre_install} && chmod o+x ${pre_install}
+	# подготовка программных файлов
 	PacketInstall $ipk_dir 2> $RB_INSTALL_LOG
 	# creating ipkg
 	# archive is indeed a Debian[esque] package
@@ -143,6 +150,12 @@ PacketBuild() {
 	}
 	PacketEditConfigLine() {
 	  echo "$1"
+	}
+	PacketPreInstallHandler() {
+	  return 1
+	}
+	PacketPostInstallHandler() {
+	  return 1
 	}
 	local packet=$1
 	. "${CONF_PAK_DIR}/$packet"

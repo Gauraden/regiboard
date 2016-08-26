@@ -79,8 +79,10 @@ bool Update(const webapp::ProtocolHTTP::Uri::Path &path,
     int x     = request.Get("x", (int)0);
     int y     = request.Get("y", (int)0);
     int state = request.Get("s", (int)0);
-	  if (state == 1) {
-      SendNewCoords(x, y, state);
+	  if (state == 1 && not SendNewCoords(x, y, state)) {
+	    std::cout << "DEBUG: ошибка при отправке координат: "
+	              << x << "x" << y
+	              << std::endl;      
     }
   }
   if (path.at(0) == "firmware") {
@@ -136,11 +138,11 @@ class Inspector : public webapp::Inspector {
     virtual ~Inspector() {}
 
     virtual void RegisterError(const std::string &msg, const Error &error) {
-    
+      // do nothing
     }
     
     virtual void RegisterMessage(const std::string &msg) {
-    
+      // do nothing
     }
 };
 
@@ -149,10 +151,15 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 	if (not screen.BindToFbDev("/dev/fb0")) {
+	  std::cout << "Ошибка: не удалось открыть устройство fb0"
+	            << std::endl;
 	  return 1;
 	}
-	InitIPC();
-	
+	if (not InitIPC()) {
+	  std::cout << "Ошибка: не удалось обнаружить очередь сообщений"
+	            << std::endl;
+	  return 1;
+	}
   webapp::ProtocolHTTP::Router::Ptr router = webapp::ProtocolHTTP::Router::Create();
   webapp::ServerHttp srv(router);
   router->AddDirectoryFor("/static", static_dir);
@@ -164,7 +171,6 @@ int main(int argc, char *argv[]) {
   do {
     srv.Run();
   } while (1);
-  
 	TerminateIPC();
 	return 0;
 }
