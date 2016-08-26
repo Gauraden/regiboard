@@ -26,7 +26,7 @@ PacketConfigure() {
 	  IsPacketForHost && ./configure ${PACKET_CONFIGURE} && return
     # target
 	  local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
-	  local 
+#	  local 
 	  local conf_flags="--host=${TC_PREFIX} --prefix=${staging_dir}/usr --exec-prefix=${staging_dir}/usr"
 	  if [ "${PACKET_ENV_VARS}" != '' ]; then
 		  export ${PACKET_ENV_VARS}
@@ -162,7 +162,17 @@ PacketBuild() {
 	if [ "${SUBPROG_ARG1}" = 'clean' ]; then
 		rebuild=true
 	fi
-	if ! IsFileExists "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"; then
+	GetDirectoryForBuild() {
+		if ! IsPacketForHost; then
+		  echo "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
+		else
+		  echo "${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
+		fi	
+	}
+	if [ -d "${SRC_UTILS_DIR}/${PACKET_NAME}/.git" ]; then
+	  cd ${SRC_UTILS_DIR}/${PACKET_NAME} && git pull origin master
+	fi
+	if ! IsFileExists $(GetDirectoryForBuild); then
 		if ! IsFileExists "$tarball"; then
 			# Trying to find sources at src/utils/
 			if [ ! -d "${SRC_UTILS_DIR}/${PACKET_NAME}" ]; then
@@ -179,22 +189,11 @@ PacketBuild() {
 		fi
 		UnpackArchive "${tarball}" "${BUILD_DIR}"
 		ApplyAllPatchesFor "${build_dir}" "${BUILD_DIR}/${build_dir}"
-		if ! IsPacketForHost; then
-		  MoveDir "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
-		else
-		  MoveDir "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
-		fi
+    MoveDir "${BUILD_DIR}/${build_dir}" $(GetDirectoryForBuild)
 		rebuild=true
 		unpacked=true
 	fi
-	if [ -d "${SRC_UTILS_DIR}/${PACKET_NAME}/.git" ]; then
-	  cd ${SRC_UTILS_DIR}/${PACKET_NAME} && git pull origin master
-	fi
-	if ! IsPacketForHost; then
-  	build_dir="${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
-  else
-    build_dir="${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
-	fi
+	build_dir=$(GetDirectoryForBuild)
 	if [ "${SUBPROG_ARG1}" = 'mkpatch' ]; then
 		CreatePatch "${build_dir}"
 		return 0
