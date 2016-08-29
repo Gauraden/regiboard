@@ -41,7 +41,7 @@ if [ "${_EXPORT_ONLY_FUNCS}" = '' ]; then
 	GCC_VER=$(echo ${_PROC_VERSION} | awk -F '(' '{print $3}' | grep -P -o '([0-9\.]+)')
 	LINUX_DIST=$(echo ${_PROC_VERSION} | awk -F '(' '{print $4}' | grep -P -o '^([a-zA-Z]+)')
 	RB_BUILD_ID=$(git tag -l 'v*' | sort -V | tail -n 1 | sed -r 's/(.+)([\.\-]+)([0-9]+)/\3/')
-	BUILD_ID=${BUILD_ID:-0}
+	RB_BUILD_ID=${RB_BUILD_ID:-0}
 	# Список утилит
 	UTIL_CRC=${BIN_DIR}/regicrc
 	UTIL_PROTECTOR=${BIN_DIR}/regiprotector
