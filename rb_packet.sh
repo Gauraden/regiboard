@@ -117,8 +117,8 @@ MakeIpkg() {
 	mkdir $ctl_dir 2> ${_DEV_NULL}
 	SetPacketControl "$ctl_dir"
 	# подготовка скриптов-обработчиков событий начала и завершения установки пакета
-  local pre_install=$ipk_dir/preinst
-  local post_install=$ipk_dir/postinst
+  local pre_install=$ctl_dir/preinst
+  local post_install=$ctl_dir/postinst
   rm ${pre_install} ${post_install} 2> /dev/null
   PacketPreInstallHandler ${post_install} && chmod o+x ${post_install}
   PacketPostInstallHandler ${pre_install} && chmod o+x ${pre_install}
