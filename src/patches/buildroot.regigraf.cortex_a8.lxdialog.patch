@@ -1,0 +1,31 @@
+--- ./build/buildroot.regigraf.cortex_a8/support/kconfig/lxdialog/check-lxdialog.sh.orig	2012-05-31 01:23:07.000000000 +0400
++++ ./build/buildroot.regigraf.cortex_a8/support/kconfig/lxdialog/check-lxdialog.sh	2016-09-13 13:38:49.195326124 +0300
+@@ -4,15 +4,20 @@
+ # What library to link
+ ldflags()
+ {
+-	for ext in so a dylib ; do
+-		for lib in ncursesw ncurses curses ; do
+-			$cc -print-file-name=lib${lib}.${ext} | grep -q /
+-			if [ $? -eq 0 ]; then
+-				echo "-l${lib}"
+-				exit
+-			fi
++	if type -p ncurses5-config &> /dev/null ; then
++		ncurses5-config --libs
++		exit 0
++	else
++		for ext in so a dylib ; do
++			for lib in ncursesw ncurses curses ; do
++				$cc -print-file-name=lib${lib}.${ext} | grep -q /
++				if [ $? -eq 0 ]; then
++					echo "-l${lib}"
++					exit
++				fi
++			done
+ 		done
+-	done
++	fi
+ 	exit 1
+ }
+ 
