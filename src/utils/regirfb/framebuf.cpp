@@ -41,7 +41,8 @@ Screen::Screen()
 	  _depth(0),
 	  _fbmmap(0),
 	  _size(0),
-	  _last_up(0) {
+	  _last_up(0),
+	  _cur_frame(0) {
   GeneratePalette();
 }
 
@@ -52,7 +53,8 @@ Screen::Screen(uint32_t w, uint32_t h, uint8_t d)
 		_depth(d),
 		_fbmmap(0),
 		_size(0),
-	  _last_up(0) {
+	  _last_up(0),
+	  _cur_frame(0) {
 }
 	  
 Screen::~Screen() {
@@ -90,7 +92,10 @@ bool Screen::BindToFbDev(const char *fname) {
 
 	_size   = _width * _height * _depth;
 	_fbmmap = (Byte*)mmap(0, _size, PROT_READ, MAP_SHARED, _fbdev, 0);
-  _frame_buf.reset(new Byte[_size + 1024]);
+  _frame_buf_0.reset(new Byte[_size + 1024]);
+  _frame_buf_1.reset(new Byte[_size + 1024]);
+  _frames[0].data = _frame_buf_0.get();
+  _frames[1].data = _frame_buf_1.get();
   return true;
 }
 
@@ -281,10 +286,26 @@ bool Screen::Convert32ToPalette(uint8_t *dst, uint8_t *src, uint32_t body_sz) {
   return true;
 }
 
+uint8_t Screen::GetNextFrameId() const {
+	if (_cur_frame == 0) {
+	  return 1;
+	}
+	return 0;
+}
+
+void Screen::SwitchToNextFrame() {
+  _cur_frame++;
+  if (_cur_frame > 1) {
+    _cur_frame = 0;
+  }
+}
+
 bool Screen::PrepareBMPFrame(const uint8_t kBmpDepth) {
+/*
 	if (not FrameTimeout()) {
 		return true;
   }
+  */
   const long long kGrabBeg = GetMSec();
 	Header header;
 	Info   info;
@@ -311,7 +332,7 @@ bool Screen::PrepareBMPFrame(const uint8_t kBmpDepth) {
 	info.biYPelsPerMeter = 0;
 	info.biClrUsed       = kPaletteSize;
 	info.biClrImportant  = 0;
- 	Byte *dst_row = _frame_buf.get();
+ 	Byte *dst_row = _frames[GetNextFrameId()].data;
  	Byte *src_row = _fbmmap;
 	// инициализация заголовка BMP
  	memcpy(dst_row, (void*)&header, Header::Size());
@@ -332,16 +353,22 @@ bool Screen::PrepareBMPFrame(const uint8_t kBmpDepth) {
     default:
       return false;
   };
-  _frame_off = (uint32_t)(dst_row - _frame_buf.get()) + kBodySize;  
+  _frame_off = (uint32_t)(dst_row - _frames[GetNextFrameId()].data) + kBodySize;
+  _frames[GetNextFrameId()].size = _frame_off;
+  SwitchToNextFrame();
 	return true;
 }
 
 const Byte* Screen::GetFrameData() const {
-  return _frame_buf.get();
+  return _frames[_cur_frame].data;
 }
 
 const uint32_t Screen::GetFrameSize() const {
-  return _frame_off;
+  return _frames[_cur_frame].size;
+}
+
+Screen::Frame Screen::GetFrame() const {
+  return _frames[_cur_frame];
 }
 
 } // namespace fb

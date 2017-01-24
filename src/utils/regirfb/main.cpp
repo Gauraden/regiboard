@@ -2,15 +2,29 @@
 #include <sstream>
 #include <fstream>
 #include <boost/program_options.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <webapp/webapp_lib.hpp>
 #include "ipc.hpp"
 #include "framebuf.hpp"
 
-static std::string JsonPair(const std::string &name, const std::string val) {
+struct Global {
+  typedef webapp::Task<bool>        ReqTask;
+  typedef boost::scoped_ptr<Global> Ptr;
+
+  fb::Screen      screen;
+  std::string     static_dir;
+  ReqTask::Future scr_future;
+}; // struct Global
+
+Global::Ptr global;
+
+static
+std::string JsonPair(const std::string &name, const std::string val) {
   return "\"" + name + "\": \"" + val + "\"";
 }
 
-static std::string GetDeviceInfo() {
+static
+std::string GetDeviceInfo() {
   std::fstream proc("/proc/cmdline");
   std::string  cmdline_arg;
   std::string  display_orientation("horizontal");
@@ -41,7 +55,8 @@ static std::string GetDeviceInfo() {
   return json.str();
 }
 
-static bool UpdateFirm(const std::string &url) {
+static
+bool UpdateFirm(const std::string &url) {
   if (url.size() == 0) {
     return false;
   }
@@ -58,17 +73,7 @@ static bool UpdateFirm(const std::string &url) {
   return true;
 }
 
-fb::Screen  screen;
-std::string static_dir;
-
-bool InitUI(const webapp::ProtocolHTTP::Uri::Path &path,
-            const webapp::ProtocolHTTP::Request   &request,
-                  webapp::ProtocolHTTP::Response  *response) {
-  typedef webapp::ProtocolHTTP::Content::Type CType;
-  response->UseFile(CType(CType::kText, "html"), static_dir + "/index.html");
-  return true;
-}
-
+static
 bool Update(const webapp::ProtocolHTTP::Uri::Path &path,
             const webapp::ProtocolHTTP::Request   &request,
                   webapp::ProtocolHTTP::Response  *response) {
@@ -92,6 +97,7 @@ bool Update(const webapp::ProtocolHTTP::Uri::Path &path,
   return true;
 }
 
+static
 bool SendState(const webapp::ProtocolHTTP::Uri::Path &path,
                const webapp::ProtocolHTTP::Request   &request,
                      webapp::ProtocolHTTP::Response  *response) {
@@ -99,19 +105,45 @@ bool SendState(const webapp::ProtocolHTTP::Uri::Path &path,
   return true;
 }
 
+static
+bool PrepareFrame() {
+  static const uint64_t kPeriod = 250000000;
+	timespec from_tm;
+	timespec to_tm;
+	clock_gettime(CLOCK_MONOTONIC, &from_tm);
+	const uint64_t kFromTime = (from_tm.tv_sec * 1000000000) + from_tm.tv_nsec;
+	
+	const bool kRes = global->screen.PrepareBMPFrame();
+
+	clock_gettime(CLOCK_MONOTONIC, &to_tm);
+	const uint64_t kToTime = (to_tm.tv_sec * 1000000000) + to_tm.tv_nsec;	
+	
+	const uint64_t kDiff = kToTime - kFromTime;
+	if (kDiff < kPeriod) {
+    usleep((kPeriod - kDiff) / 1000);
+  }
+  return kRes;
+}
+
+static
 bool SendFrame(const webapp::ProtocolHTTP::Uri::Path &path,
                const webapp::ProtocolHTTP::Request   &request,
                      webapp::ProtocolHTTP::Response  *response) {
-  if (screen.PrepareBMPFrame()) {
-    response->SetHeader("bmp");
-    response->UseCacheControl().NoStore();
-    response->SetBody(screen.GetFrameData(), screen.GetFrameSize());
-    return true;
+  using namespace boost;
+  if (global->scr_future.get_state() == future_state::uninitialized ||
+      global->scr_future.get_state() == future_state::ready) {
+    global->scr_future = Global::ReqTask::Async(PrepareFrame);
   }
-  return false;
+  response->SetHeader("bmp");
+  response->UseCacheControl().NoStore();
+  response->UseETag().Random();
+  fb::Screen::Frame frame = global->screen.GetFrame();
+  response->SetBody(frame.data, frame.size);
+  return true;
 }
 
-static bool ParseArguments(int ac, char **av) {
+static
+bool ParseArguments(int ac, char **av) {
   namespace po = boost::program_options;
   po::options_description desc("Программа для удалённого управления устройством"
                                ", по протоколу HTTP");
@@ -126,9 +158,7 @@ static bool ParseArguments(int ac, char **av) {
     std::cout << desc << std::endl;
     return false;
   }
-  if (vm.count("static")) {
-    static_dir = vm["static"].as<std::string>();
-  }
+  global->static_dir = vm["static"].as<std::string>();
   return true;
 }
 
@@ -147,10 +177,11 @@ class Inspector : public webapp::Inspector {
 };
 
 int main(int argc, char *argv[]) {
+  global.reset(new Global());
   if (not ParseArguments(argc, argv)) {
     return 0;
   }
-	if (not screen.BindToFbDev("/dev/fb0")) {
+	if (not global->screen.BindToFbDev("/dev/fb0")) {
 	  std::cout << "Ошибка: не удалось открыть устройство fb0"
 	            << std::endl;
 	  return 1;
@@ -160,14 +191,16 @@ int main(int argc, char *argv[]) {
 	            << std::endl;
 	  return 1;
 	}
-  webapp::ProtocolHTTP::Router::Ptr router = webapp::ProtocolHTTP::Router::Create();
-  webapp::ServerHttp srv(router);
-  router->AddDirectoryFor("/static", static_dir);
-  router->AddHandlerFor("/",                   InitUI);
+	using namespace webapp;
+  ProtocolHTTP::Router::Ptr router(new ProtocolHTTP::Router(
+    "/static/index.html"
+  ));
+  ServerHttp srv(router);
+  router->AddDirectoryFor("/static", global->static_dir);
   router->AddHandlerFor("/action/update",      Update);
   router->AddHandlerFor("/request/state.json", SendState);
   router->AddHandlerFor("/request/frame.bmp",  SendFrame);
-  srv.BindTo(0x00000000, 80, webapp::Inspector::Ptr(new Inspector()));
+  srv.BindTo(ServerHttp::kAllIPv4Addresses, 80, webapp::Inspector::Ptr(new ::Inspector()));
   do {
     srv.Run();
   } while (1);
