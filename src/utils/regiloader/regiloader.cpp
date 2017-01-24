@@ -3,6 +3,7 @@
 #include "ymodem.hpp"
 #include "tftp.hpp"
 #include "debug_backtrace.hpp"
+#include "asio_helper.hpp"
 #include <unistd.h>
 #include <iostream>
 #include <sstream>
@@ -38,10 +39,11 @@ static const std::string kRamFsPrompt("(.*)regiboard \\(initramfs\\)");
 static const std::string kRegigrafLogin("regigraf login:");
 static const std::string kRegigrafPrompt("(.*)\\@regigraf");
 
-static bool        g_eth_is_ready     = false;
-static bool        g_already_has_been = false;
-static std::string g_shell_prompt     = kRamFsPrompt;
-static bool        g_parts_are_ready  = false;
+static bool        g_eth_is_ready       = false;
+static bool        g_already_has_been   = false;
+static std::string g_shell_prompt       = kRamFsPrompt;
+static bool        g_parts_are_ready    = false;
+static bool        g_parse_timeout_fail = false;
 
 static bool UploadDCD(boost::asio::serial_port &port, ImxFirmware &firm) {
   const ImxFirmware::DCDCmd::List &cmds = firm.GetDCDCommands();
@@ -477,6 +479,12 @@ static bool Parse(const std::string &str,
 }
 
 static void SendCmd(SerialPort &port, const std::string &cmd) {
+  if (g_sys_state.verbose) {
+    std::cout << "<: " << UseColor(kMagenta)
+                       << cmd
+                       << UseColor(kReset)
+                       << std::endl;
+  }
   boost::asio::write(port, boost::asio::buffer(cmd + "\r"));
 }
 
@@ -564,28 +572,45 @@ static bool FillInSysInfo(const std::string &str, SysInfo &inf) {
   return true;
 }
 
+static void ParseTimeoutHandler(unsigned try_num) {
+  ShowProcess("\t * Ожидание исполнения команды");
+}
+
 static void SkipLines(SerialPort &port, const size_t limit) {
   uint8_t resp[1] = {0};
-  size_t lines = 0;
+  size_t  lines   = 0;
+  AsioIface asio_if(&port, 1, 1);
   do {
-    boost::asio::read(port, boost::asio::buffer(resp, 1));
-    if (resp[0] == 0x0D)
+    //boost::asio::read(port, boost::asio::buffer(resp, 1));
+    asio_if.Read(resp, 1, ParseTimeoutHandler);
+    if (resp[0] == 0x0D) {
       lines++;
+    }
   } while (lines < limit);
 }
 
 static bool ParseUntil(SerialPort        &port,
                        const std::string &wait_for,
                        SysInfo           *out) {
+  const size_t kMaxRespSize = 1;
   std::string str;
-  uint8_t resp[1] = {0};
-//  std::cout << "\033[1A";
-  std::size_t total_read = 0;
-  while (not Parse(str, wait_for + "(.*)", 0, 0)) {
-    total_read += boost::asio::read(port, boost::asio::buffer(resp, 1));
+  uint8_t resp[kMaxRespSize];
+  size_t total_read = 0;
+  bool   stop       = false;
+  // 10 попыток, по 2 сек
+  AsioIface asio_if(&port, 2, 10);
+  while (not stop) {
+    const size_t kWasRead = asio_if.Read(resp, kMaxRespSize, ParseTimeoutHandler);
+    if (asio_if.ReadingWasFailed()) {
+      g_parse_timeout_fail = true;
+      return false;
+    }
     if (resp[0] == 0x0A || total_read > 256) {
       if (g_sys_state.verbose) {
-        std::cout << str << std::endl;
+        std::cout << ">: " << UseColor(kBlack)
+                           << str
+                           << UseColor(kReset)
+                           << std::endl;
       } else {
         ShowProcess("\t * Ожидание исполнения команды");
       }
@@ -596,24 +621,41 @@ static bool ParseUntil(SerialPort        &port,
       total_read = 0;
     } else if (resp[0] != 0x0D) {
       str += (char)resp[0];
+      if (Parse(str, wait_for + "(.*)", 0, 0)) {
+        if (g_sys_state.verbose) {
+          std::cout << ">: " << UseColor(kBlack)
+                             << str
+                             << UseColor(kReset)
+                             << std::endl;
+        }
+        stop = true;
+        break;
+      }
+      total_read++;
     }
   }
   std::cout << std::endl;
   return true;
 }
 
-static void SendToUBoot(SerialPort &port, const std::string &cmd, SysInfo *out) {
+static bool SendToUBoot(SerialPort &port, const std::string &cmd, SysInfo *out) {
+  if (g_parse_timeout_fail) {
+    return false;
+  }
   SendCmd(port, cmd);
-  ParseUntil(port, kUBootPrompt, out);
+  return ParseUntil(port, kUBootPrompt, out);
 }
 
 static void SwitchShell(const std::string &prompt) {
   g_shell_prompt = prompt;
 }
 
-static void SendToShell(SerialPort &port, const std::string &cmd, SysInfo *out) {
+static bool SendToShell(SerialPort &port, const std::string &cmd, SysInfo *out) {
+  if (g_parse_timeout_fail) {
+    return false;
+  }
   SendCmd(port, cmd);
-  ParseUntil(port, g_shell_prompt, out);
+  return ParseUntil(port, g_shell_prompt, out);
 }
 
 static void UpdateListOfPartitions(SerialPort &port) {
@@ -655,7 +697,9 @@ static bool WaitForWelcomeFromUBoot(SerialPort        &port,
   g_already_has_been = true;
   if (pswd.size() > 0) {
     SendCmd(port, "");
-    ParseUntil(port, kUBootPswdPrompt, 0);
+    if (not ParseUntil(port, kUBootPswdPrompt, 0)) {
+      return false;
+    }
     SendToUBoot(port, pswd, 0);
   } else {
     SendToUBoot(port, "", 0);
@@ -709,12 +753,17 @@ static bool UploadKernelEnd(SerialPort &port, SysInfo *inf) {
   if (inf == 0) {
     return false;
   }
-  ParseUntil(port, "\\[([^\\]]+)\\] usb 2-1.3: FTDI USB Serial Device converter now attached to ttyUSB11", inf);
-  inf->kernel.usb_uart.push_back("ttyUSB11");
   g_eth_is_ready     = false;
   g_already_has_been = false;
   g_parts_are_ready  = false;
   g_shell_prompt     = kRamFsPrompt;
+  if (not ParseUntil(port, "\\[([^\\]]+)\\] usb 2-1.3: FTDI USB Serial Device converter now attached to ttyUSB11", inf)) {
+    return false; 
+  }
+  inf->kernel.usb_uart.push_back("ttyUSB11");
+  std::cout << "Ожидание приглашения для ввода команд..." << std::endl;
+  SkipLines(port, 10);
+  SendToShell(port, "", 0);
   return true;
 }
 
@@ -745,17 +794,19 @@ static bool UploadKernelOverEth(SerialPort        &port,
     if (not UploadKernelBegin(port, &g_sys_inf, pswd)) {
       return false;
     }
+    g_sys_inf.upload_fail = false;
     std::stringstream args;
     args << (unsigned)TFtp::Server::kPort;
-    SendCmd(port, "setenv tftpdstp " + args.str());
+    SendToUBoot(port, "setenv tftpdstp " + args.str(), 0);
     SendCmd(port, "dhcp ${loadaddr} " + srv->get_ip() + ":" + kKernelImg + 
             BootM(g_sys_inf));
-    srv->Run();
+    if (not srv->Run()) {
+      g_sys_inf.upload_fail = true;
+    }
     if (g_sys_inf.upload_fail) {
       std::cout << "Не удалось загрузить ядро, пробуем ещё раз" << std::endl;
     }
   } while (g_sys_inf.upload_fail);
-  g_sys_inf.upload_fail = false;
   return UploadKernelEnd(port, &g_sys_inf);
 }
 
@@ -790,8 +841,7 @@ static bool DownloadFromTFtp(const Settings::Network &tftpd,
     g_eth_is_ready = true;
   }
   SendCmd(port, "tftp -l " + path + " -g -r " + request + " " + tftpd.ip + ":" + tftpd.port);
-  const bool kRunRes = srv->Run();
-  ParseUntil(port, g_shell_prompt, 0);
+  const bool kRunRes = srv->Run() && ParseUntil(port, g_shell_prompt, 0);
   return kRunRes;
 }
 
@@ -1004,7 +1054,9 @@ static bool UploadAndInstallRegigraf(const Settings::Network &tftpd,
   SendToShell(port, "mount --move /tmp  /mnt/tmp",  0);
   // авторизация
   SendCmd(port, "exec switch_root /mnt /sbin/init");
-  ParseUntil(port, kRegigrafLogin, 0);
+  if (not ParseUntil(port, kRegigrafLogin, 0)) {
+    return false;
+  }
   LoginToRegiboard(port);
   std::cout << "Установка пакетов" << std::endl;
   SendToShell(port, "mount -t ubifs ubi1:storage /home", 0);
@@ -1039,7 +1091,9 @@ static bool SetupBooting(SerialPort &port) {
   SendToShell(port, "rb_fuses_imx53v2_spi_flash.sh", 0);
   std::cout << "Проверка загрузки платы. Перезагрузка..." << std::endl;
   SendCmd(port, "reboot");
-  ParseUntil(port, kRegigrafLogin, 0);
+  if (not ParseUntil(port, kRegigrafLogin, 0)) {
+    return false;
+  }
   std::cout << "Плата готова к работе!" << std::endl;
   return true;
 }
@@ -1054,9 +1108,13 @@ static bool RegisterBoard(SerialPort &port, const std::string &pswd) {
   SendToShell(port, "uboot_conf --of=/dev/mtd1 --if=/tmp/uboot.conf --do=w", 0);
   std::cout << "Установка пароля" << std::endl;
   SendCmd(port, "passwd root");
-  ParseUntil(port, "New password:", 0);
+  if (not ParseUntil(port, "New password:", 0)) {
+    return false;
+  }
   SendCmd(port, pswd);
-  ParseUntil(port, "Retype password:", 0);
+  if (not ParseUntil(port, "Retype password:", 0)) {
+    return false;
+  }
   SendToShell(port, pswd, 0);
   std::cout << "Регистрация платы" << std::endl;  
   SaveSysInfoToJson("./tmp/", g_sys_state, g_sys_inf);
@@ -1507,9 +1565,11 @@ static bool ExecuteRecipe(const Recipe             &recipe,
   // приготовление рецепта
   Recipe::const_iterator act_it = recipe.begin();
   bool recipe_fail = false;
+  g_parse_timeout_fail = false;
   for (; act_it != recipe.end(); act_it++) {
-    if (not DoAction(set, *act_it, srv, port)) {
-      std::cout << UseColor(kRed)
+    if (not DoAction(set, *act_it, srv, port) || g_parse_timeout_fail) {
+      std::cout << std::endl
+                << UseColor(kRed)
                 << "Невозможно продолжить исполнение рецепта!"
                 << UseColor(kReset)
                 << std::endl;

@@ -327,7 +327,9 @@ void TFtp::Session::Task::PrintState() const {
 // class Session
 TFtp::Session::Session(asio::io_service &io)
     : _socket(io),
-      _task(Task::kIdling, PacketRRQ::kUnknown, "") {
+      _task(Task::kIdling, PacketRRQ::kUnknown, ""),
+      _timer(io),
+      _timeout(false) {
 }
 
 TFtp::Session::~Session() {
@@ -338,6 +340,10 @@ TFtp::Session::~Session() {
 
 bool TFtp::Session::IsAlive() const {
   return _socket.is_open();
+}
+
+bool TFtp::Session::IsTimeout() const {
+  return _timeout;
 }
 
 bool TFtp::Session::Open(asio::ip::udp::endpoint *srv_endpt) {
@@ -386,6 +392,14 @@ void TFtp::Session::AsyncAccept() {
   Receive((Byte*)_buff, kBuffMaxSize);
 }
 
+void TFtp::Session::SetupTimer() {
+  _timeout = false;
+  _timer.expires_from_now(boost::posix_time::seconds(5));
+  _timer.async_wait(boost::bind(&TFtp::Session::HandlerTimer,
+        this,
+        boost::asio::placeholders::error));
+}
+
 bool TFtp::Session::Send(const Byte *data, size_t size) {
   _input.reset();
 //  std::cout << " - отправка данных: " << (unsigned)size << "; "
@@ -404,12 +418,22 @@ bool TFtp::Session::Receive(Byte *data, size_t size) {
     boost::bind(&TFtp::Session::HandlerRead, this, 
                 asio::placeholders::error,
                 asio::placeholders::bytes_transferred));
+  SetupTimer();
+}
+
+void TFtp::Session::HandlerTimer(const sys::error_code &err) {
+  const bool exp = _timer.expires_at() <= boost::asio::deadline_timer::traits_type::now();
+  if (not err && exp) {
+    _socket.cancel();
+    _timeout = true;
+  }
 }
 
 void TFtp::Session::HandlerWrite(const sys::error_code &e,
                                  size_t                 bytes) {
   if (e) {
-    std::cerr << e.message() << std::endl;
+    //std::cerr << e.message() << std::endl;
+    return;
   }
 //  std::cout << " ! отправлены данные: " << (unsigned)bytes << "; "
 //            << std::endl;
@@ -419,9 +443,10 @@ void TFtp::Session::HandlerWrite(const sys::error_code &e,
 void TFtp::Session::HandlerRead(const sys::error_code &e,
                                 size_t                 bytes) {
   if (e) {
-    std::cerr << e.message() << std::endl;
+    //std::cerr << e.message() << std::endl;
     return;
   }
+  _timer.cancel();
 //  std::cout << " ! получены данные: " << (unsigned)bytes << "; "
 //            << std::endl;
   DetectInputPkt();
@@ -555,11 +580,11 @@ bool TFtp::Server::Run() {
         continue;
       }
       sess_ptr->Process(_pub_files);
-      if (not sess_ptr->IsAlive()) {
+      if (not sess_ptr->IsAlive() || sess_ptr->IsTimeout()) {
         sess_it = _sessions.erase(sess_it);
         _new_sess.reset();
         _io.stop();
-        return true;
+        return not sess_ptr->IsTimeout();
       }
     }
     _io.run(err);

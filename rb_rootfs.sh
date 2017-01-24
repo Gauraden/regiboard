@@ -92,7 +92,8 @@ BuildRootFS() {
 	fi
 	if [ "${SUBPROG_ARG}" = 'clean' ]; then
 		PrintNotice "Clearing BuildRoot sources..."
-		TcTargetCleanSources "${RFS_BUILD_DIR}"
+		#TcTargetCleanSources "${RFS_BUILD_DIR}"
+		rm -rf ${RFS_BUILD_DIR}/output/*
 	fi
 	# setup directory for downloads
 	BindDirIfRequired "${DOWNLOAD_DIR}" "${RFS_BUILD_DIR}/dl"

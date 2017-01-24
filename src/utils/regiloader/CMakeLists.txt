@@ -13,6 +13,7 @@ add_executable(regiloader
 	ymodem.cpp
 	tftp.cpp
 	debug_backtrace.cpp
+	asio_helper.cpp
 )
 
 target_link_libraries(regiloader

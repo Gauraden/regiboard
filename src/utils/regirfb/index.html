@@ -5,16 +5,15 @@
   <title>F1772 Online</title>
   <meta http-equiv="content-type" content="text/html;charset=utf-8" />
 	<script type="text/javascript">
-	  var kPollPeriod  = 250; // msec
+	  var kPollPeriod  = 333; // msec
 		var debug_node   = 0;
 		var canvas_node  = 0;
 		var canvas_ctx   = 0;
 		var ready        = true;
 		var frame        = new Image();
-		var video_scheme = new Image();
 		var timeout      = 0;
 		var disconnected = true;
-		var mouse        = {'x': 0, 'y': 0, 'state': 0, 'send': false};
+		var mouse        = {'x': 0, 'y': 0, 'state': 0};
 		var poll_tm_out  = 0;
 
 		function Debug(msg) {
@@ -32,10 +31,6 @@
         color = '#000000';
       canvas_ctx.fillStyle = color;
       canvas_ctx.fillRect(x, y, w, h);
-//      canvas_ctx.beginPath();
-//      canvas_ctx.rect(x, y, x + w, y + h);
-//      canvas_ctx.closePath();
-//      canvas_ctx.clip();
     }
 
     function PrintText(msg, x, y, color) {
@@ -66,81 +61,70 @@
         return;
 			if (!disconnected)
 			  return
-			/*
-			canvas_ctx.save();
-		  canvas_ctx.drawImage(video_scheme, 0, 0, canvas_node.width,
-		                                           canvas_node.height);
-		  canvas_ctx.restore();
-		  */
 		  ShowMessage('Нет связи с устройством');
 		}
 
-    var update_url=false;
-
-    function GetReqParams() {
-      if (update_url == true) {
-        var host = document.getElementById('firmware_download_host');
-        update_url = '?firmware=ftp://' + host.value + '/firmwares/F1772/cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf';
-      } else {
-        update_url = '';
-      }
-      var req = update_url;//'?stamp=' + (new Date().getUTCSeconds()) + '&';
-      update_url = false;
-			if (mouse.send != true)
-			  return req;
-      mouse.send = false;
-  		return ('?' + req + 'x=' + mouse.x + '&y=' + mouse.y + '&s=' + mouse.state);
-    }
-
-    function GetDeviceState(handler) {
+    function SendAsyncRequest(relative_url, handler) {
       var xhr = new XMLHttpRequest();
-      xhr.open('GET', "http://" + document.domain + ":8080/state.json", true);
+      xhr.open('GET', "http://" + document.domain + relative_url, true);
       xhr.onreadystatechange = function() {
         if (xhr.readyState == 4) {
-           if(xhr.status == 200 && handler !== undefined) {
+           if (xhr.status == 200 && handler !== undefined) {
              var resp_json = undefined;
              eval("resp_json = " + xhr.responseText);
              handler(resp_json);
            }
         }
       };
-      xhr.send(null);
+      xhr.send(null);    
+    }
+
+	  function UpdatePollTimeout() {
+	    if (poll_tm_out != undefined && poll_tm_out != 0)
+			  clearTimeout(poll_tm_out);
+      poll_tm_out = setTimeout(PollFrame, kPollPeriod);
+	  }
+	  
+		function PollFrame() {
+			if (ready == false) {
+				timeout++;
+				if (timeout < 10) {
+					return UpdatePollTimeout();
+			  }
+				timeout = 0;
+				disconnected = true;
+			}
+      ShowState();
+			ready = false;
+			frame.src = 'http://' + document.domain + '/request/frame.bmp';
+		}
+
+    function OnButtonUpdate() {
+      var ans = confirm("Будет установлена самая последняя прошивка на прибор!");
+      if (ans == false) {
+        return;
+      }
+      var host    = document.getElementById('firmware_download_host');
+      var req_url = '/action/update/firmware?from=ftp://' + host.value + 
+        '/firmwares/F1772/cortex_a8.regigraf.1772.53.UNIVERSAL-last.rbf';
+      SendAsyncRequest(req_url);
     }
 
 		function OnLoad() {
-			debug_node   = document.getElementById("debug");
-			canvas_node  = document.getElementById("screen");
-			canvas_ctx   = canvas_node.getContext('2d');
-		  
-		  video_scheme.src = 'http://' + document.domain + '/video_calib_scheme.svg'
+			debug_node  = document.getElementById("debug");
+			canvas_node = document.getElementById("screen");
+			canvas_ctx  = canvas_node.getContext('2d');
 		  
 			canvas_node.onmousedown = function(event) {
 		    mouse.x     = event.clientX;
  		    mouse.y     = event.clientY;
  		    mouse.state = 1;
- 		    mouse.send  = true;
+    		SendAsyncRequest('/action/update/mouse/?x=' + mouse.x + 
+    		                                      '&y=' + mouse.y + 
+    		                                      '&s=' + mouse.state);
 		  };
-		  
-		  function UpdatePollTimeout() {
-		    if (poll_tm_out != undefined && poll_tm_out != 0)
-  			  clearTimeout(poll_tm_out);
-        poll_tm_out = setTimeout(PollFrame, kPollPeriod);
-		  }
-		  
-			function PollFrame() {
-				if (ready == false) {
-					timeout++;
-					if (timeout < 10) 
-						return UpdatePollTimeout();
-					timeout = 0;
-					disconnected = true;
-				}
-        ShowState();
-				ready = false;
-				frame.src = 'http://' + document.domain + ':8080' + GetReqParams();
-			}
       
- 		  GetDeviceState(function (dev_state) {
+ 		  SendAsyncRequest("/request/state.json", function (dev_state) {
  		    if (dev_state.display.orientation == "vertical") {
 	        var w = canvas_node.width;
 	        canvas_node.width  = canvas_node.height;
@@ -173,15 +157,6 @@
 		  
       UpdatePollTimeout();
 		}
-
-    function OnButtonUpdate() {
-      var ans = confirm("Будет установлена самая последняя прошивка на прибор!");
-
-      if (ans == true) {
-        update_url = true;
-      }
-    }
-
 		</script>
 	</head>
 	<body onload="OnLoad()" style="padding: 0px; margin: 0px">

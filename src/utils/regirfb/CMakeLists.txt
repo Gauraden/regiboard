@@ -7,16 +7,19 @@ project("regirfb")
 add_executable(regirfb
     main.cpp
     framebuf.cpp
+    ipc.cpp
 )
 
 ## libraries
 target_link_libraries(regirfb
-    png
     z
     rt
-
-    boost_system
-    boost_thread
     pthread
+    boost_system
+    boost_filesystem
+    boost_date_time
+    boost_program_options
+#    boost_thread
+    webapp_lib
 )
 

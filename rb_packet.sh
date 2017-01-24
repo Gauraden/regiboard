@@ -26,7 +26,7 @@ PacketConfigure() {
 	  IsPacketForHost && ./configure ${PACKET_CONFIGURE} && return
     # target
 	  local pkg_config="PKG_CONFIG=${RFS_ROOT_DIR}/host/usr/bin/pkg-config"
-	  local 
+#	  local 
 	  local conf_flags="--host=${TC_PREFIX} --prefix=${staging_dir}/usr --exec-prefix=${staging_dir}/usr"
 	  if [ "${PACKET_ENV_VARS}" != '' ]; then
 		  export ${PACKET_ENV_VARS}
@@ -35,8 +35,20 @@ PacketConfigure() {
     PACKET_CONFIGURE=''
 		return
 	fi
+	local cmake_cxx_compiler="${TC_CXX}"
+	local cmake_c_compiler="${TC_C}"
+	local cmake_find_root_path="${RFS_HOST_DIR}"
+	local rb_cross_conf="${SRC_UTILS_DIR}/CMakeList.base.txt"
+	local rb_include_dir="${INCLUDE_DIR};${rfs_include};${PACKET_INCLUDE}"
+	local rb_link_dir="${rfs_lib};${staging_dir}/lib"
 	# Running: make
 	if IsFileExists "$build_dir/Makefile"; then
+    export CMAKE_CXX_COMPILER=${cmake_cxx_compiler}
+    export CMAKE_C_COMPILER=${cmake_c_compiler}
+    export CMAKE_FIND_ROOT_PATH=${cmake_find_root_path}
+    export RB_CROSS_CONF=${rb_cross_conf}
+    export RB_INCLUDE_DIR=${rb_include_dir}
+    export RB_LINK_DIR=${rb_link_dir}
 	  return
 	fi
 	# Running: cmake
@@ -48,12 +60,12 @@ PacketConfigure() {
 	  return
 	fi
   # target
-  cmake -DCMAKE_CXX_COMPILER="${TC_CXX}" \
-        -DCMAKE_C_COMPILER="${TC_C}" \
-        -DCMAKE_FIND_ROOT_PATH="${RFS_HOST_DIR}" \
-        -DRB_CROSS_CONF="${SRC_UTILS_DIR}/CMakeList.base.txt" \
-        -DRB_INCLUDE_DIR="${INCLUDE_DIR};${rfs_include};${PACKET_INCLUDE}" \
-        -DRB_LINK_DIR="${rfs_lib};${staging_dir}/lib"
+  cmake -DCMAKE_CXX_COMPILER=${cmake_cxx_compiler} \
+        -DCMAKE_C_COMPILER=${cmake_c_compiler} \
+        -DCMAKE_FIND_ROOT_PATH=${cmake_find_root_path} \
+        -DRB_CROSS_CONF=${rb_cross_conf} \
+        -DRB_INCLUDE_DIR=${rb_include_dir} \
+        -DRB_LINK_DIR=${rb_link_dir}
 }
 
 PacketClean() {
@@ -103,9 +115,14 @@ MakeIpkg() {
 	PrintNotice 'Creating package...'
 	mkdir $ipk_dir 2> ${_DEV_NULL}
 	mkdir $ctl_dir 2> ${_DEV_NULL}
-	# control file
 	SetPacketControl "$ctl_dir"
-	# install binary files
+	# подготовка скриптов-обработчиков событий начала и завершения установки пакета
+  local pre_install=$ctl_dir/preinst
+  local post_install=$ctl_dir/postinst
+  rm ${pre_install} ${post_install} 2> /dev/null
+  PacketPreInstallHandler ${post_install} && chmod o+x ${post_install}
+  PacketPostInstallHandler ${pre_install} && chmod o+x ${pre_install}
+	# подготовка программных файлов
 	PacketInstall $ipk_dir 2> $RB_INSTALL_LOG
 	# creating ipkg
 	# archive is indeed a Debian[esque] package
@@ -134,6 +151,12 @@ PacketBuild() {
 	PacketEditConfigLine() {
 	  echo "$1"
 	}
+	PacketPreInstallHandler() {
+	  return 1
+	}
+	PacketPostInstallHandler() {
+	  return 1
+	}
 	local packet=$1
 	. "${CONF_PAK_DIR}/$packet"
   RB_INSTALL_LOG="${LOG_DIR}/${PACKET_NAME}.install.log"
@@ -144,7 +167,6 @@ PacketBuild() {
     PacketInstall 2> $RB_INSTALL_LOG
 	  return
 	fi
-	# Trying to build the packet...
 	DieIfNotDefined "${PACKET_TARBALL}" 'Name of tarball'
 	local build_dir=$(GetPacketBuildDir $PACKET_TARBALL)
 	local tarball="${DOWNLOAD_DIR}/${PACKET_TARBALL}"
@@ -153,34 +175,38 @@ PacketBuild() {
 	if [ "${SUBPROG_ARG1}" = 'clean' ]; then
 		rebuild=true
 	fi
-	if ! IsFileExists "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"; then
+	GetDirectoryForBuild() {
+		if ! IsPacketForHost; then
+		  echo "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
+		else
+		  echo "${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
+		fi	
+	}
+	if [ -d "${SRC_UTILS_DIR}/${PACKET_NAME}/.git" ]; then
+	  cd ${SRC_UTILS_DIR}/${PACKET_NAME} && git pull origin master
+	fi
+	if ! IsFileExists $(GetDirectoryForBuild); then
 		if ! IsFileExists "$tarball"; then
 			# Trying to find sources at src/utils/
 			if [ ! -d "${SRC_UTILS_DIR}/${PACKET_NAME}" ]; then
-				DieIfNotDefined "${PACKET_URL}" 'URL for downloading tarball of packet'
-				# TODO: downloading from PACKET_URL
-				PrintAndDie "Tarball was not found: ${PACKET_TARBALL}"
-			else
-				tarball="${SRC_UTILS_DIR}/${PACKET_NAME}"
-				build_dir=${PACKET_NAME}
-			fi
+			  if [ "${PACKET_REPOSITORY}" != "" ]; then
+			    cd ${SRC_UTILS_DIR} && git clone ${PACKET_REPOSITORY} ${PACKET_NAME}
+			  else
+  				DieIfNotDefined "${PACKET_URL}" 'URL for downloading tarball of packet'
+	  			# TODO: downloading from PACKET_URL
+	  			PrintAndDie "Tarball was not found: ${PACKET_TARBALL}"
+	  	  fi
+      fi
+			tarball="${SRC_UTILS_DIR}/${PACKET_NAME}"
+  		build_dir=${PACKET_NAME}
 		fi
-		# Unpacking and patching
 		UnpackArchive "${tarball}" "${BUILD_DIR}"
 		ApplyAllPatchesFor "${build_dir}" "${BUILD_DIR}/${build_dir}"
-		if ! IsPacketForHost; then
-		  MoveDir "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
-		else
-		  MoveDir "${BUILD_DIR}/${build_dir}" "${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
-		fi
+    MoveDir "${BUILD_DIR}/${build_dir}" $(GetDirectoryForBuild)
 		rebuild=true
 		unpacked=true
 	fi
-	if ! IsPacketForHost; then
-  	build_dir="${BUILD_DIR}/${build_dir}.${BOARD_PREFIX}"
-  else
-    build_dir="${BUILD_DIR}/${build_dir}.${_HOST_ARCH}"
-	fi
+	build_dir=$(GetDirectoryForBuild)
 	if [ "${SUBPROG_ARG1}" = 'mkpatch' ]; then
 		CreatePatch "${build_dir}"
 		return 0
@@ -195,15 +221,16 @@ PacketBuild() {
       PacketClean $build_dir
     fi
 		# Copy registered configuration
-		IsDefined $PACKET_CONFIG_FILE && \
+		if IsDefined $PACKET_CONFIG_FILE; then
 		  cp ${CONF_DIR}/${PACKET_NAME}/${PACKET_CONFIG_FILE} ${build_dir}/.config_orig
-    # редактирование конфигурации
-    rm -f ${build_dir}/.config
-    while read config_line
-    do           
-      echo $(PacketEditConfigLine "$config_line") >> ${build_dir}/.config
-    done < ${build_dir}/.config_orig
-    rm -f ${build_dir}/.config_orig
+      # редактирование конфигурации
+      rm -f ${build_dir}/.config
+      while read config_line
+      do           
+        echo $(PacketEditConfigLine "$config_line") >> ${build_dir}/.config
+      done < ${build_dir}/.config_orig
+      rm -f ${build_dir}/.config_orig
+    fi
 		# Building
     PacketMake $build_dir
 	fi
@@ -212,7 +239,6 @@ PacketBuild() {
   	PacketInstall $BIN_DIR
 	  return
 	fi
-	# Making ipkg packet
 	MakeIpkg
 }
 
