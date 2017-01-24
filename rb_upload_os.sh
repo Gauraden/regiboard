@@ -76,6 +76,11 @@ function RecipeSetupBoardForRegigraf() { # загрузка, прошивка и
   ${RUN} --acts "uboot->setup_nor->kernel_eth->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->install_uboot->install_kernel->setup_booting->register"
 }
 
+function RecipeSetupBoardForRegigrafWithHWtest() { # загрузка, прошивка и установка всего необходимого ПО для Regigraf, без проверки конфигурации периферии
+# validate_hw
+  ${RUN} --acts "uboot->setup_nor->kernel_eth->validate_hw->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->install_uboot->install_kernel->setup_booting->register"
+}
+
 function RecipeTestRegiboard() { # проверка конфигурации периферии и её тестирование
 #  ${RUN} --acts "uboot->kernel_eth->validate_hw->test_hw"
   ${RUN} --acts "uboot->kernel_eth->validate_hw"

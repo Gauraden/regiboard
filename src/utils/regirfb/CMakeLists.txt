@@ -2,6 +2,10 @@
 cmake_minimum_required(VERSION 2.6)
 project("regirfb")
 
+add_definitions(
+  --std=gnu++0x
+)
+
 #### compilation
 ## executable
 add_executable(regirfb
@@ -12,14 +16,15 @@ add_executable(regirfb
 
 ## libraries
 target_link_libraries(regirfb
+    pthread
     z
     rt
-    pthread
+    boost_thread
     boost_system
     boost_filesystem
     boost_date_time
+    boost_regex
     boost_program_options
-#    boost_thread
     webapp_lib
 )
 
