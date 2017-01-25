@@ -84,6 +84,10 @@ function RecipeTestRegiboard() { # проверка конфигурации п�
   ${RUN} --acts "uboot->kernel_eth->validate_hw"
 }
 
+function RecipeTestTFTP() { # проверка загрузки файлов по протоколу TFTP
+  ${RUN} --acts "mtd_utils->rootfs"
+}
+
 function RecipeDefault() { # действие по умолчанию, загрузка ядра Linux
   RecipeBootOverEth
 }

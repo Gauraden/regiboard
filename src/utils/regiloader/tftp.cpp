@@ -329,7 +329,9 @@ TFtp::Session::Session(asio::io_service &io)
     : _socket(io),
       _task(Task::kIdling, PacketRRQ::kUnknown, ""),
       _timer(io),
-      _timeout(false) {
+      _timeout(false),
+      _timeout_tries(0),
+      _timeout_ms(kRequestTimeoutMs) {
 }
 
 TFtp::Session::~Session() {
@@ -394,7 +396,7 @@ void TFtp::Session::AsyncAccept() {
 
 void TFtp::Session::SetupTimer() {
   _timeout = false;
-  _timer.expires_from_now(boost::posix_time::seconds(5));
+  _timer.expires_from_now(boost::posix_time::milliseconds(_timeout_ms));
   _timer.async_wait(boost::bind(&TFtp::Session::HandlerTimer,
         this,
         boost::asio::placeholders::error));
@@ -402,8 +404,6 @@ void TFtp::Session::SetupTimer() {
 
 bool TFtp::Session::Send(const Byte *data, size_t size) {
   _input.reset();
-//  std::cout << " - отправка данных: " << (unsigned)size << "; "
-//            << std::endl;
   _socket.async_send_to(asio::buffer((const char*)data, size), _endpt,
     boost::bind(&TFtp::Session::HandlerWrite, this, 
                 asio::placeholders::error,
@@ -412,8 +412,6 @@ bool TFtp::Session::Send(const Byte *data, size_t size) {
 
 bool TFtp::Session::Receive(Byte *data, size_t size) {
   _input.reset();
-//  std::cout << " - ожидание данных: " << (unsigned)size << "; "
-//            << std::endl;
   _socket.async_receive_from(asio::buffer((char*)data, size), _endpt,
     boost::bind(&TFtp::Session::HandlerRead, this, 
                 asio::placeholders::error,
@@ -422,10 +420,21 @@ bool TFtp::Session::Receive(Byte *data, size_t size) {
 }
 
 void TFtp::Session::HandlerTimer(const sys::error_code &err) {
+  static const uint8_t kTriesLimit = 12;
   const bool exp = _timer.expires_at() <= boost::asio::deadline_timer::traits_type::now();
   if (not err && exp) {
     _socket.cancel();
-    _timeout = true;
+    _timeout_tries++;
+    if (_output) {
+      _output->Write();
+      _output->StartTransaction(this);
+    } else {
+      _timeout_tries = kTriesLimit;
+    }
+    if (_timeout_tries >= kTriesLimit) {
+      _timeout       = true;
+      _timeout_tries = 0;
+    }
   }
 }
 
@@ -435,8 +444,7 @@ void TFtp::Session::HandlerWrite(const sys::error_code &e,
     //std::cerr << e.message() << std::endl;
     return;
   }
-//  std::cout << " ! отправлены данные: " << (unsigned)bytes << "; "
-//            << std::endl;
+  _timeout_ms = kResponseTimeoutMs;
   AsyncAccept();
 }
 
@@ -447,8 +455,6 @@ void TFtp::Session::HandlerRead(const sys::error_code &e,
     return;
   }
   _timer.cancel();
-//  std::cout << " ! получены данные: " << (unsigned)bytes << "; "
-//            << std::endl;
   DetectInputPkt();
 }
 
@@ -485,8 +491,12 @@ bool TFtp::Session::ProcessTask(const Packet::BlockId block_id) {
     return false;
   }
   static const size_t kSize = Packet::kMaxSize - 4;
+  const size_t kTail = _task.file_sz - _task.file->tellg();
+  if (kTail == 0) {
+    return false;
+  }
   Byte data[kSize];
-  _task.file->read((char*)&data, kSize);
+  _task.file->read((char*)&data, kTail > kSize ? kSize : kTail);
   const size_t kBlockSz = _task.file->gcount();
   _task.PrintState();
   PushPacket(Packet::Ptr(new PacketData(block_id, data, kBlockSz)));
@@ -553,7 +563,6 @@ bool TFtp::Server::PublishFile(const std::string &name,
   if (path.size() == 0) {
     return false;
   }
-//  std::string name(path, path.find_last_of('/') + 1, std::string::npos);
   if (name.size() == 0) {
     return false;
   }

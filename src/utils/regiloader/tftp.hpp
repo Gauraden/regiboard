@@ -207,7 +207,10 @@ class TFtp {
           size_t          file_sz;
         };
         
-        static const size_t kBuffMaxSize = Packet::kMaxSize / 2;
+        static const size_t   kBuffMaxSize       = Packet::kMaxSize / 2;
+        static const uint32_t kRequestTimeoutMs  = 10000;
+        static const uint32_t kResponseTimeoutMs = 2000;
+
         void SetupTimer();
         void HandlerTimer(const sys::error_code &err);
         void HandlerWrite(const sys::error_code &e,
@@ -225,6 +228,8 @@ class TFtp {
         Task        _task;
         Timer       _timer;
         bool        _timeout;
+        uint8_t     _timeout_tries;
+        uint32_t    _timeout_ms;
     };
     
     class Server {
