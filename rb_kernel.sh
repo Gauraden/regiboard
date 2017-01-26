@@ -32,7 +32,7 @@ ConfigurateKernel() {
 	# получение версии ядра
 	pushd ${KERNEL_BUILD_DIR}
 	local kernel_ver=$(echo $BOARD_KERNEL_VER | grep -Po '\w+.\w+.\w+.\w+')
-	local kernel_commit=$(git rev-parse --verify HEAD | grep -Po '(.{7,7})' | head -n 1)
+	local kernel_commit=$(git rev-parse --short HEAD)
 	KERNEL_VERSION="${kernel_ver}-g${kernel_commit}-dirty"
 	popd
 }
@@ -70,6 +70,7 @@ BuildKernel() {
 	PrintNotice "Building modules..."
 	TcTargetMakeSources "${KERNEL_BUILD_DIR}" modules 'CROSS_COMPILE'
 	PrintNotice "Installing modules: $KERNEL_MODULES_DIR"
+	rm -r ${KERNEL_MODULES_DIR}/*
 	TcTargetMakeSources "${KERNEL_BUILD_DIR}" "INSTALL_MOD_PATH=\"${KERNEL_MODULES_DIR}\" modules_install"
 	PrintNotice "Copying image to output directory..."
 	mv "${KERNEL_BUILD_DIR}/arch/${BOARD_ARCH}/boot/uImage" "${KERNEL_IMG_DIR}/${KERNEL_IMG}"

@@ -939,6 +939,21 @@ static bool UploadAndInstallTools(const Settings::Network &tftpd,
   return true;
 }
 
+static bool UploadKernelModulesAndInstall(const Settings::Network &tftpd,
+                                          SerialPort              &port,
+                                          TFtp::Server            *srv) {
+  static const std::string kPathGz("/tmp/" + kKernelMods);
+  std::cout << "Загрузка модулей ядра..." << std::endl;
+  if (not DownloadFromTFtp(tftpd, kKernelMods, kPathGz, port, srv)) {
+    return false;
+  }
+  std::cout << "Распаковка модулей ядра..." << std::endl;
+  SendToShell(port, "gunzip " + kPathGz, 0);
+  const std::string kPathTar(kPathGz.substr(0, kPathGz.find_last_of(".")));
+  SendToShell(port, "tar xvf " + kPathTar + " -C /", 0);
+  return true;
+}
+
 static bool UploadAndInstallKernel(const Settings::Network &tftpd,
                                    SerialPort              &port,
                                    TFtp::Server            *srv) {
@@ -966,7 +981,7 @@ static bool UploadAndInstallKernel(const Settings::Network &tftpd,
   cmd << "nandwrite -p /dev/mtd" << (unsigned)part->mtd_id
       << " " << kPath;
   SendToShell(port, cmd.str(), 0);
-  return true;
+  return UploadKernelModulesAndInstall(tftpd, port, srv);
 }
 
 static bool UploadAndInstallUBoot(const Settings::Network &tftpd,
@@ -1181,16 +1196,7 @@ static bool UploadKernelAndDebug(const Settings &set,
   if (not UploadKernelOverEth(port, srv, set.uboot_pswd)) {
     return false;
   }
-  static const std::string kPathGz("/tmp/" + kKernelMods);
-  std::cout << "Загрузка модулей ядра..." << std::endl;
-  if (not DownloadFromTFtp(set.use_tftp, kKernelMods, kPathGz, port, srv)) {
-    return false;
-  }
-  std::cout << "Распаковка модулей ядра..." << std::endl;
-  SendToShell(port, "gunzip " + kPathGz, 0);
-  const std::string kPathTar(kPathGz.substr(0, kPathGz.find_last_of(".")));
-  SendToShell(port, "tar xvf " + kPathTar + " -C /", 0);
-  return true;
+  return UploadKernelModulesAndInstall(set.use_tftp, port, srv);
 }
 
 static bool TestHardware(SerialPort &port) {

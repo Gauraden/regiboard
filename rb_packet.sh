@@ -113,6 +113,7 @@ MakeIpkg() {
 	local ipk_dir="${TMP_DIR}/${PACKET_NAME}.ipk"
 	local ctl_dir="$ipk_dir/CONTROL"
 	PrintNotice 'Creating package...'
+	rm -r $ipk_dir 2> ${_DEV_NULL}
 	mkdir $ipk_dir 2> ${_DEV_NULL}
 	mkdir $ctl_dir 2> ${_DEV_NULL}
 	SetPacketControl "$ctl_dir"
