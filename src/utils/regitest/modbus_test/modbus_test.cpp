@@ -15,7 +15,7 @@
 #include "mbcomm_rot.h"
 #include "../regitest_time.hpp"
 
-//#define MODBUS_TCP
+#define MODBUS_TCP
 //#define POLL_COLD_JUNCTION
 
 typedef std::numeric_limits<float> FloatLimit;
@@ -299,11 +299,13 @@ int main(int argc, char *argv[]) {
   if (argc > 2) {
     slave_id = atoi(argv[2]);
   }
-  buf << "/dev/ttyUSB" << tty_dev_id;
 #ifndef MODBUS_TCP
+  buf << "/dev/ttyUSB" << tty_dev_id;
   ctx = modbus_new_rtu(buf.str().c_str(), 115200, 'N', 8, 1);
 #else
-  ctx = modbus_new_tcp("192.168.6.2", 502);
+  const std::string kIpAddr("192.168.6.65");
+  buf << "host: " << kIpAddr;
+  ctx = modbus_new_tcp(kIpAddr.c_str(), 502);
 #endif
   if (ctx == NULL) {
     fprintf(stderr, "Unable to create the libmodbus context\n");

@@ -29,5 +29,9 @@ GPIOexport $VD1_2 out 0 0
 GPIOexport $VD3_4 out 0 1
 GPIOexport $SPEAKER out 0 1 
 
-GPIOintExport $PSU_SAVE
-GPIOintExport $PSU_RESET
+# Denis: Такой подход не работает, возникли проблемы на испытаниях.
+#GPIOintExport $PSU_SAVE
+#GPIOintExport $PSU_RESET
+# Блокируем эти ножки.
+GPIOexport $PSU_SAVE out 0 1
+GPIOexport $PSU_RESET out 0 1

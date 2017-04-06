@@ -71,11 +71,11 @@ function RecipeUpdateRootFS() { # обновление rootfs и переуст�
   ${RUN} --acts "uboot->kernel_eth->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->register"
 }
 
-function RecipeSetupBoardForRegigraf() { # загрузка, прошивка и установка всего необходимого ПО для Regigraf
+function RecipeSetupBoardForRegigraf() { # загрузка, прошивка и установка всего необходимого ПО для Regigraf, без проверки конфигурации периферии
   ${RUN} --acts "uboot->setup_nor->kernel_eth->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->install_uboot->install_kernel->setup_booting->register"
 }
 
-function RecipeSetupBoardForRegigrafWithHWtest() { # загрузка, прошивка и установка всего необходимого ПО для Regigraf, без проверки конфигурации периферии
+function RecipeSetupBoardForRegigrafWithHWtest() { # загрузка, прошивка и установка всего необходимого ПО для Regigraf, с проверкой конфигурации периферии
   ${RUN} --acts "uboot->setup_nor->kernel_eth->validate_hw->mtd_utils->rootfs->unpack_rootfs->install_regigraf->install_firmware->install_uboot->install_kernel->setup_booting->register"
 }
 
@@ -107,6 +107,7 @@ function RecipeHelp() { # вывод помощи
   echo "Список функций:"
   local funcs_list=$(grep "^function" $0 | sed -r "s/function Recipe(.+)\(\)(.+)\{ \# (.+)/\t * \\$BLUE\1\\$RESET: \n\t   \3/")
   echo -e "$funcs_list"
+  echo -e "Отладочный режим: RBUP_EXT_OPTS=--verbose rb_upload_os.sh <название рецепта> <путь к tty устройству (необязательно, по умолчанию ttyUSB0)>"
 }
 
 UpdateFirmwareImage() {
