@@ -166,8 +166,13 @@ BuildToolchain() {
 		GetFileByUrl "http://crosstool-ng.org/download/crosstool-ng/${crosstool_tar}" "${DOWNLOAD_DIR}"
 		UnpackArchive "${DOWNLOAD_DIR}/${crosstool_tar}" "${BUILD_DIR}"
 	fi
+	if [ "${SUBPROG_ARG}" = 'mkpatch' ]; then
+		CreatePatch "${crosstool_build_dir}"
+		return 0
+	fi
 	# reinstalling crosstool-ng
 	rm -r -f "${TC_CROSSTOOL_DIR}"
+	ApplyAllPatchesFor "crosstool-ng" "${crosstool_build_dir}"
 	PrintNotice "Preparing crosstool-ng..."
 	cd "${crosstool_build_dir}"
 	./configure --prefix="${TC_CROSSTOOL_DIR}"

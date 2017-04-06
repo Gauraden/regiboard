@@ -1,0 +1,14 @@
+--- ./build/crosstool-ng-1.16.0/Makefile.in.orig	2012-08-05 01:41:28.000000000 +0400
++++ ./build/crosstool-ng-1.16.0/Makefile.in	2017-04-06 12:16:02.400237194 +0300
+@@ -26,7 +26,11 @@
+ # '-Rr' to MAKEFLAGS adds it literaly ( and does not add 'Rr' )
+ ifeq ($(filter Rr,$(MAKEFLAGS)),)
+ ifeq ($(filter -Rr,$(MAKEFLAGS)),)
++ifeq ($(filter rR,$(MAKEFLAGS)),)
++ifeq ($(filter -rR,$(MAKEFLAGS)),)
+ CT_MAKEFLAGS += -Rr
++endif # No -rR
++endif # No rR
+ endif # No -Rr
+ endif # No Rr
+ 
