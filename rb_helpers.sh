@@ -540,7 +540,7 @@ GetFtpDir() {
   local ftp_url="ftp://${REPO_URL_FTP}/${1}"
   PrintNotice "Downloading files from: $ftp_url -> $2"
   cd $2
-  wget -r -nH --cut-dirs=1 ${ftp_url}/*
+  wget -r -nH --cut-dirs=1 --password=${REPO_PSW_FTP} ${ftp_url}/*
 }
 
 GetFtpDirList() {
